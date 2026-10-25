@@ -1577,7 +1577,7 @@ const PRINT_LABELS: Record<PrintLabelLanguage, PrintLabelTable> = {
     'receipt.reprint': "إعادة طبع",
     'receipt.onlineOrder': "الطلب عبر الإنترنت",
     'pos.orderNumber': "الطلب رقم #{number}",
-    'pos.orderTypeDineIn': "تناول الطعام في المطعم",
+    'pos.orderTypeDineIn': "في المطعم",
     'pos.orderTypeDelivery': "توصيل",
     'pos.orderTypeOnline': "عبر الإنترنت",
     'pos.orderTypeTakeaway': "سفري",
