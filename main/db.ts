@@ -8496,14 +8496,14 @@ function seedWhatsAppDefaults(): void {
   insertSettingIfMissing('whatsapp_filter_groups', 'true');
   insertSettingIfMissing('receipt_logo', '');
   insertSettingIfMissing('receipt_logo_raster', '');
-  insertSettingIfMissing('bill_show_logo', 'false');
+  insertSettingIfMissing('bill_show_logo', 'true');
 }
 
 function seedInstallDefaults(): void {
   const insert = (key: string, value: string) =>
     db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, value);
 
-  insert('business_name', '');
+  insert('business_name', 'Al Malaki Pizza & Café');
   insert('business_type', 'restaurant');
   // country/currency/currency_symbol/timezone are deliberately not seeded here:
   // they come only from the signup wizard (docs/reference/product-invariants.md,
@@ -8557,7 +8557,7 @@ function seedInstallDefaults(): void {
   insert('printer_trim_decimals', 'false');
   insert('bill_template', 'classic');
   insert('bill_footer_message', '');
-  insert('bill_show_logo', 'false');
+  insert('bill_show_logo', 'true');
   insert('bill_show_name', 'true');
   insert('bill_show_address', 'true');
   insert('bill_show_phone', 'true');

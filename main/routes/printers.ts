@@ -8,6 +8,7 @@ import {
   parseItemJson,
 } from '../db';
 import { getOrderWithItems } from './bills';
+import { resolveBrandLogo } from '../branding';
 import { loadProductRelationsBatch } from './products';
 import { randomUUID } from 'node:crypto';
 import {
@@ -1085,7 +1086,7 @@ router.post(
         show_customer_name: settings.bill_show_customer_name !== 'false',
         show_table_number: settings.bill_show_table_number !== 'false',
         show_logo: settings.bill_show_logo === 'true',
-        receipt_logo: settings.receipt_logo || '',
+        receipt_logo: resolveBrandLogo(settings.receipt_logo),
         receipt_logo_raster: settings.receipt_logo_raster || '',
         footer_note: settings.bill_footer_message || '',
       };

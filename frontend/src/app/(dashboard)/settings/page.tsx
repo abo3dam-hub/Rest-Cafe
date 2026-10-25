@@ -3586,6 +3586,8 @@ export default function SettingsPage() {
         receipt_logo_raster: form.receiptLogoRaster || '',
       });
       updateCurrentTenant({
+        business_name: form.businessName,
+        brand_logo: form.receiptLogo || '',
         currency: form.currency,
         timezone: form.timezone,
         business_day_start_time: form.businessDayStartTime,

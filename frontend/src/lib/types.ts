@@ -14,6 +14,8 @@ export interface User {
 export interface Tenant {
   id: number;
   business_name: string;
+  /** Owner-uploaded store logo (data URL) from Settings; empty = bundled brand. */
+  brand_logo?: string;
   slug: string;
   database_name: string;
   business_type: 'restaurant';

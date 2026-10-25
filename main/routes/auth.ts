@@ -38,6 +38,7 @@ import { getHttpRequestSignal } from '../shutdown';
 import { PASSWORD_POLICY_MESSAGE } from '../../shared/password-policy';
 import { normalizeOptionalPhone } from '../lib/phone';
 import { isSupportedCurrencyCode } from '../../shared/currencies';
+import { resolveBrandLogo } from '../branding';
 import {
   effectivePermissionRevision,
   hasActiveAdministrator,
@@ -98,6 +99,7 @@ function buildLocalTenant(db: ReturnType<typeof getDatabase>, userId: string, us
   return {
     id: 1,
     business_name: s.business_name || 'Store',
+    brand_logo: s.receipt_logo || '',
     slug: 'local',
     database_name: 'local',
     business_type: s.business_type || 'restaurant',
@@ -835,6 +837,29 @@ router.get('/setup/status', (_req: Request, res: Response) => {
       masterPinAvailable: isMasterPinAvailable(),
       cloudRecoveryAvailable: cloudSync.isEmailRecoveryAvailable(),
       currencyReset,
+    });
+  } catch (error: any) {
+    console.error('[API] Internal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/auth/branding ────────────────────────────────────────────────────
+// Public store identity (name + logo) for pre-auth surfaces: login, setup,
+// and the customer ordering page. This is the same identity printed on
+// receipts; the logo is the owner's Settings upload, else the bundled brand.
+
+router.get('/branding', (_req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT key, value FROM settings').all() as {
+      key: string;
+      value: string;
+    }[];
+    const s: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    res.json({
+      business_name: s.business_name || '',
+      logo: resolveBrandLogo(s.receipt_logo),
     });
   } catch (error: any) {
     console.error('[API] Internal error:', error);

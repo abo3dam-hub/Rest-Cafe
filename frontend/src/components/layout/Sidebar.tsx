@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useTranslations, type AppConfig } from 'use-intl';
 import { useAuthStore } from '@/store/auth';
+import { BrandLogo } from '@/components/BrandLogo';
 import { usePosSettingsStore } from '@/store/pos-settings';
 import { getLandingPage } from '@/components/layout/AuthGuard';
 import api from '@/lib/api';
@@ -244,9 +245,10 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href={homeHref}>
-                <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground font-semibold">
-                  {(currentTenant?.business_name || tCommon('brandName')).charAt(0).toUpperCase()}
-                </div>
+                <BrandLogo
+                  size={32}
+                  className="aspect-square size-8 shrink-0 rounded-md object-cover"
+                />
                 <div className="flex flex-col gap-0.5 min-w-0 leading-none">
                   <span className="font-semibold truncate">
                     {currentTenant?.business_name || tCommon('brandName')}
