@@ -50,13 +50,7 @@ import { parseDbTimestamp } from '@/lib/utils';
 import { formatItemHeading } from '@/lib/printer/item-heading';
 import { isTerminalItemStatus } from '../../../../shared/order-item-status';
 import PendingOrderItemEdits from './PendingOrderItemEdits';
-import {
-  orderStatusBadge,
-  paymentStatusBadge,
-  itemStatusDot,
-  whatsappReceiptStatusBadge,
-  ORDER_TYPE_KEYS,
-} from './OrderCard';
+import { orderStatusBadge, paymentStatusBadge, itemStatusDot, ORDER_TYPE_KEYS } from './OrderCard';
 
 /** Callbacks the Orders page already owns; the panel composes them and never
  * reimplements billing, checkout, cancel or refund behaviour. */
@@ -72,7 +66,6 @@ export interface OrderDetailPanelProps {
   onOverridePrice?: (order: Order, item: OrderItem) => void;
   canRestoreItems: boolean;
   canRefund: boolean;
-  isWhatsAppReady: boolean;
   printHistory: Record<
     number,
     { id: number; print_type: string; user_name: string; printed_at: string }[]
@@ -80,7 +73,6 @@ export interface OrderDetailPanelProps {
   generatingBillId: number | null;
   printingBillId: number | null;
   printingSlipOrderId?: number | null;
-  sendingWaOrderId: number | null;
   cancellingOrderId: number | null;
   convertingOrderId: number | null;
   isLinkingCustomer?: boolean;
@@ -97,7 +89,6 @@ export interface OrderDetailPanelProps {
   onPrint: (billId: number) => void;
   onPrintOrder?: (order: Order) => void;
   onPrintDeliverySlip?: (order: Order) => void;
-  onSendWhatsApp: (order: Order) => void;
   onLinkCustomer: (orderId: number) => void;
   onCancelLinkCustomer?: () => void;
   onSearchCustomer?: (query: string) => void;
@@ -135,12 +126,10 @@ function OrderDetailContent({
   onOverridePrice,
   canRestoreItems,
   canRefund,
-  isWhatsAppReady,
   printHistory,
   generatingBillId,
   printingBillId,
   printingSlipOrderId,
-  sendingWaOrderId,
   cancellingOrderId,
   convertingOrderId,
   isLinkingCustomer,
@@ -156,7 +145,6 @@ function OrderDetailContent({
   onPrint,
   onPrintOrder,
   onPrintDeliverySlip,
-  onSendWhatsApp,
   onLinkCustomer,
   onCancelLinkCustomer,
   onSearchCustomer,
@@ -173,7 +161,6 @@ function OrderDetailContent({
   const tCommon = useTranslations('common');
   const tPos = useTranslations('pos');
   const tReceipt = useTranslations('receipt');
-  const tWhatsappStatus = useTranslations('whatsapp.status');
   const fmt = useFormatCurrency();
   const { formatTime, formatDateTime } = useFormatDate();
 
@@ -232,20 +219,6 @@ function OrderDetailContent({
       order.items?.some((i) => ['preparing', 'ready', 'served', 'completed'].includes(i.status)),
     ) ||
     hasCollectedFunds;
-
-  const hasPaidBill =
-    order.bills?.some((candidate) => candidate.payment_status === 'paid') ?? isPaid;
-  const receiptStatusBadge =
-    isWhatsAppReady && hasPaidBill && order.whatsapp_receipt_status
-      ? whatsappReceiptStatusBadge[order.whatsapp_receipt_status] || null
-      : null;
-  const receiptStatusLabel = receiptStatusBadge
-    ? receiptStatusBadge.labelKey === 'sent'
-      ? tOrders('receiptSent')
-      : receiptStatusBadge.labelKey === 'failed'
-        ? tOrders('sendFailed')
-        : tWhatsappStatus(receiptStatusBadge.labelKey)
-    : '';
 
   const subtotal = bill ? Number(bill.subtotal) : Number(order.subtotal);
   const discount = bill ? Number(bill.discount_amount) : Number(order.discount_amount);
@@ -409,15 +382,6 @@ function OrderDetailContent({
               {getTimeSince(order.created_at)}
             </span>
           </div>
-          {receiptStatusBadge && (
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${receiptStatusBadge.bg} ${receiptStatusBadge.text}`}
-            >
-              {receiptStatusBadge.labelKey === 'sent' && <Send size={11} />}
-              {receiptStatusBadge.labelKey === 'failed' && <AlertCircle size={11} />}
-              {receiptStatusLabel}
-            </span>
-          )}
         </div>
       </div>
 
@@ -914,21 +878,6 @@ function OrderDetailContent({
                   <Printer size={15} className="me-1.5 text-muted-foreground" />
                 )}
                 {printCount > 0 ? tCommon('reprint') : tCommon('print')}
-              </Button>
-            )}
-            {isWhatsAppReady && order.customer?.phone && (
-              <Button
-                variant="outline"
-                onClick={() => onSendWhatsApp(order)}
-                disabled={sendingWaOrderId === order.id}
-                className="flex-1 h-10 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40 font-semibold text-xs"
-              >
-                {sendingWaOrderId === order.id ? (
-                  <Loader2 size={15} className="animate-spin me-1.5" />
-                ) : (
-                  <Send size={15} className="me-1.5" />
-                )}
-                {tOrders('sendReceipt')}
               </Button>
             )}
             {canRefund && hasEligibleRefund && (

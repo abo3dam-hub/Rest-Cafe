@@ -32,6 +32,7 @@ async function main() {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
   `);
   set.run('telemetry_enabled', 'true', now());
+  set.run('offline_mode', 'false', now()); // Rest&Cafe seeds offline on; this suite exercises delivery while online.
   set.run('country', 'AR', now());
   set.run('currency', ' usd ', now());
   // settings.country is seeded to 'IN' at install, so telemetry only reports a

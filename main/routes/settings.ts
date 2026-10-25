@@ -39,7 +39,6 @@ import {
   isOfflineMode,
   notifyOfflineModeEnabled,
 } from '../services/offline-mode';
-import * as whatsapp from '../services/whatsapp';
 import {
   PRODUCT_ANALYTICS_LEVEL_SETTING,
   parseProductAnalyticsLevel,
@@ -1645,13 +1644,11 @@ router.put(
       syncPostHogIdentity();
       if (value) {
         cloudSync.suspendForOfflineMode();
-        whatsapp.suspendForOfflineMode();
         googleDrive.suspendForOfflineMode();
         notifyOfflineModeEnabled();
       } else {
         cloudSync.reload();
         cloudSync.refreshRegistrationProfile();
-        whatsapp.initFromDb();
         telemetry.resumeDailyChecks();
       }
       res.json({ offline_mode: isOfflineMode() });

@@ -148,8 +148,6 @@ export const PERMISSION_LABEL_KEYS = {
   'print-templates.view': 'printTemplatesView',
   'print-templates.manage': 'printTemplatesManage',
 
-  'whatsapp.use': 'whatsappUse',
-  'whatsapp.manage': 'whatsappManage',
   'cloud.manage': 'cloudDrive',
   'cloud.account.manage': 'cloudAccountData',
   'google-drive.manage': 'googleDrive',

@@ -25,12 +25,7 @@ function buildIdentity() {
   }
 }
 
-fs.copyFileSync(
-  path.join(__dirname, '../main/baileys-loader.cjs'),
-  // Compiled main output lives at dist/main/ (rootDir is the repo root since
-  // shared/print was added, #441); whatsapp.js requires this sibling file.
-  path.join(__dirname, '../dist/main/baileys-loader.cjs'),
-);
+// Rest&Cafe: the Baileys loader copy was removed with the WhatsApp feature.
 
 // Only the release workflows set FLO_OFFICIAL_RELEASE=1 and the PostHog project; product analytics
 // counts no other build.

@@ -69,7 +69,6 @@ import { OfflineModeCard } from '@/components/settings/OfflineModeCard';
 import { HealthCheckDialog } from '@/components/settings/HealthCheckDialog';
 import { InitializeDatabaseDialog } from '@/components/settings/InitializeDatabaseDialog';
 import { CurrencyResetDialog } from '@/components/settings/CurrencyResetDialog';
-import { WhatsAppEnableCard } from '@/components/settings/WhatsAppEnableCard';
 import { TaxConfigurationPanel } from '@/components/settings/TaxConfigurationPanel';
 import { PaymentMethodsSettings } from '@/components/settings/PaymentMethodsSettings';
 import { ChargesSettingsCard } from '@/components/settings/ChargesSettingsCard';
@@ -358,14 +357,12 @@ export default function SettingsPage() {
   const router = useRouter();
   const { currentTenant, user, updateCurrentTenant } = useAuthStore();
   const posSettings = usePosSettingsStore();
-  const whatsappEnabled = posSettings.whatsappEnabled;
   const { printMethod, setPrintMethod } = usePrinterStore();
   const t = useTranslations('settings');
   const tAnalytics = useTranslations('productAnalytics');
   const tCommon = useTranslations('common');
   const tRestore = useTranslations('restore');
   const tUpdate = useTranslations('update');
-  const tWhatsappSettings = useTranslations('whatsapp.settings');
   const { formatDate, formatTime, formatDateTime } = useFormatDate();
   const isAdmin = tenantCan(currentTenant, 'settings.manage');
   const isOwner = tenantCan(currentTenant, 'cloud.account.manage');
@@ -1393,7 +1390,6 @@ export default function SettingsPage() {
     printMethod: printMethod as 'escpos' | 'browser',
     autoPrintKot: posSettings.autoPrintKot,
     autoPrintBill: posSettings.autoPrintBill,
-    whatsappShareEnabled: posSettings.whatsappShareEnabled,
     printerUseUnicode: posSettings.printerUseUnicode,
     printerArabicShaping: posSettings.printerArabicShaping,
     printerTrimDecimals: posSettings.printerTrimDecimals,
@@ -1516,7 +1512,6 @@ export default function SettingsPage() {
       setPrintMethod(formSnapshot.printMethod);
       posSettings.setAutoPrintKot(formSnapshot.autoPrintKot);
       posSettings.setAutoPrintBill(formSnapshot.autoPrintBill);
-      posSettings.setWhatsappShareEnabled(formSnapshot.whatsappShareEnabled);
       posSettings.setPrinterUseUnicode(formSnapshot.printerUseUnicode);
       posSettings.setPrinterArabicShaping(formSnapshot.printerArabicShaping);
       posSettings.setPrinterTrimDecimals(formSnapshot.printerTrimDecimals);
@@ -3884,14 +3879,6 @@ export default function SettingsPage() {
               active={activeTab}
               onClick={handleSettingsTabChange}
             />
-            {/* WhatsApp opt-in lives under Operations because the receive-bill
-                workflow is what the cashier touches every time a customer pays. */}
-            <SettingsNavItem
-              label={t('tabWhatsapp')}
-              value="whatsapp"
-              active={activeTab}
-              onClick={handleSettingsTabChange}
-            />
 
             {/* Customers group */}
             <div className="hidden md:block px-3 pt-4 pb-2 mt-3 mb-1 border-b border-border">
@@ -5806,27 +5793,6 @@ export default function SettingsPage() {
               onRequestInitializeDb={() => setInitializeDbOpen(true)}
               confirm={confirm}
             />
-          </TabsContent>
-
-          {/* Integrations tab — cloud + OrderFlow + More Apps */}
-          <TabsContent value="whatsapp">
-            <SettingsTabShell>
-              {!whatsappEnabled ? (
-                <WhatsAppEnableCard />
-              ) : (
-                <div className="bg-card rounded-xl border border-border p-6 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-foreground">{tWhatsappSettings('enabled')}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {tWhatsappSettings('enabledHint')}
-                    </p>
-                  </div>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/whatsapp">{tWhatsappSettings('openConnection')}</Link>
-                  </Button>
-                </div>
-              )}
-            </SettingsTabShell>
           </TabsContent>
 
           <TabsContent value="mobile-access">

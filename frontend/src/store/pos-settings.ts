@@ -24,7 +24,6 @@ export interface PosSettingsState {
   printerPrintMode: PrinterPrintMode;
   autoPrintKot: boolean;
   autoPrintBill: boolean;
-  whatsappShareEnabled: boolean;
   // Web print settings
   defaultPrintMode: 'thermal' | 'web';
   // Bill template settings
@@ -55,8 +54,6 @@ export interface PosSettingsState {
   // Kitchen workflow toggles synced from backend settings.
   kdsEnabled: boolean;
   kotPrintingEnabled: boolean;
-  // Whether WhatsApp messaging is enabled for this tenant.
-  whatsappEnabled: boolean;
   // Print language policies synced from backend settings.
   billLanguagePolicy: ReceiptLanguagePolicy;
   kotLanguagePolicy: KotLanguagePolicy;
@@ -70,7 +67,6 @@ export interface PosSettingsState {
   setPrinterPrintMode: (mode: PrinterPrintMode) => void;
   setAutoPrintKot: (enabled: boolean) => void;
   setAutoPrintBill: (enabled: boolean) => void;
-  setWhatsappShareEnabled: (enabled: boolean) => void;
   setDefaultPrintMode: (mode: 'thermal' | 'web') => void;
   setBillTemplate: (t: BillTemplate) => void;
   setBillTemplateSource: (source: 'core' | 'pack' | 'merchant' | null) => void;
@@ -97,7 +93,6 @@ export interface PosSettingsState {
   setPrinterTrimDecimals: (v: boolean) => void;
   setKdsEnabled: (v: boolean) => void;
   setKotPrintingEnabled: (v: boolean) => void;
-  setWhatsappEnabled: (v: boolean) => void;
   setBillLanguagePolicy: (policy: ReceiptLanguagePolicy) => void;
   setKotLanguagePolicy: (policy: KotLanguagePolicy) => void;
   hydrateReceiptSettings: (data: ReceiptSettingsHydrationData) => void;
@@ -156,7 +151,6 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       printerPrintMode: 'escpos',
       autoPrintKot: false,
       autoPrintBill: false,
-      whatsappShareEnabled: true,
       // Web print defaults
       defaultPrintMode: 'thermal',
       // Bill template defaults
@@ -183,9 +177,6 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       printerTrimDecimals: false,
       kdsEnabled: true,
       kotPrintingEnabled: true,
-      // Default false so sidebar hides WhatsApp nav until tenant enables it.
-      // Synced from /api/whatsapp/status on auth load.
-      whatsappEnabled: false,
       // Print language policies default to inherit/none until synced from
       // the backend settings API (#441).
       billLanguagePolicy: defaultPrintLanguagePolicy(),
@@ -200,7 +191,6 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       setPrinterPrintMode: (mode) => set({ printerPrintMode: mode }),
       setAutoPrintKot: (enabled) => set({ autoPrintKot: enabled }),
       setAutoPrintBill: (enabled) => set({ autoPrintBill: enabled }),
-      setWhatsappShareEnabled: (enabled) => set({ whatsappShareEnabled: enabled }),
       setDefaultPrintMode: (mode) => set({ defaultPrintMode: mode }),
       setBillTemplate: (t) => set({ billTemplate: t }),
       setBillTemplateSource: (source) => set({ billTemplateSource: source }),
@@ -228,7 +218,6 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       setPrinterTrimDecimals: (v) => set({ printerTrimDecimals: v }),
       setKdsEnabled: (v) => set({ kdsEnabled: v }),
       setKotPrintingEnabled: (v) => set({ kotPrintingEnabled: v }),
-      setWhatsappEnabled: (v: boolean) => set({ whatsappEnabled: v }),
       setBillLanguagePolicy: (billLanguagePolicy) => set({ billLanguagePolicy }),
       setKotLanguagePolicy: (kotLanguagePolicy) => set({ kotLanguagePolicy }),
       hydrateReceiptSettings: (d) =>
@@ -335,12 +324,11 @@ export const usePosSettingsStore = create<PosSettingsState>()(
     }),
     {
       name: 'pos-settings',
-      // Exclude backend-synced fields (WhatsApp, print policies) from persistence.
+      // Exclude backend-synced fields (print policies) from persistence.
       partialize: (s) =>
         Object.fromEntries(
           Object.entries(s).filter(
-            ([k]) =>
-              k !== 'whatsappEnabled' && k !== 'billLanguagePolicy' && k !== 'kotLanguagePolicy',
+            ([k]) => k !== 'billLanguagePolicy' && k !== 'kotLanguagePolicy',
           ),
         ) as PosSettingsState,
       // Migrates legacy store keys (GSTIN rename, removed A4/A5 paper sizes).

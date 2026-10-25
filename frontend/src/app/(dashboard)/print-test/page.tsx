@@ -23,10 +23,9 @@ import {
   resolveBillPrintLanguages,
 } from '@/lib/printer/print-document';
 import { generateKotHtml } from '@/lib/printer/kot-web-print';
-import { shareBillViaWhatsApp, getWhatsAppMessage } from '@/lib/whatsapp-share';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'use-intl';
-type TestMode = 'receipt' | 'tax' | 'kot' | 'web-print' | 'whatsapp';
+type TestMode = 'receipt' | 'tax' | 'kot' | 'web-print';
 type PaperWidth = 58 | 80;
 
 export default function PrintTestPage() {
@@ -153,18 +152,6 @@ export default function PrintTestPage() {
           showPrintWarningsToast(printWarnings);
           break;
         }
-        case 'whatsapp':
-          if (
-            !(await shareBillViaWhatsApp(testBill, testCustomer, testTenant, {
-              pointsEarned: 50,
-              walletBalance: 200,
-            }))
-          ) {
-            toast.error(tCommon('somethingWrong'));
-          } else {
-            toast.success(t('whatsappOpened'));
-          }
-          break;
       }
     } catch (err) {
       if (isPrintCancelledOnTenantChangeError(err)) return;
@@ -200,15 +187,6 @@ export default function PrintTestPage() {
     toast.success(t('htmlDownloaded'));
   };
 
-  const handleCopyWhatsappText = async () => {
-    const message = getWhatsAppMessage(testBill, testTenant, {
-      pointsEarned: 50,
-      walletBalance: 200,
-    });
-    await navigator.clipboard.writeText(message);
-    toast.success(t('whatsappCopied'));
-  };
-
   const testOptions: { value: TestMode; label: string; icon: React.ElementType }[] = [
     { value: 'receipt', label: t('optionBasicReceipt'), icon: Printer },
     { value: 'tax', label: t('optionTaxBill'), icon: Printer },
@@ -218,7 +196,6 @@ export default function PrintTestPage() {
       ? [{ value: 'kot' as TestMode, label: t('optionKot'), icon: Printer }]
       : []),
     { value: 'web-print', label: t('optionWebPrint'), icon: FileText },
-    { value: 'whatsapp', label: t('optionWhatsapp'), icon: MessageCircle },
   ];
 
   return (
@@ -342,12 +319,6 @@ export default function PrintTestPage() {
             <Button onClick={handleDownloadHtml} variant="outline" size="lg">
               <Download size={18} className="me-2" />
               {t('downloadHtml')}
-            </Button>
-          )}
-
-          {effectiveTestMode === 'whatsapp' && (
-            <Button onClick={handleCopyWhatsappText} variant="outline" size="lg">
-              {t('copyText')}
             </Button>
           )}
         </div>

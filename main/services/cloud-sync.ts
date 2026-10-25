@@ -821,7 +821,11 @@ function isLocalDevUrl(url: URL): boolean {
 }
 
 export function normalizeCloudServerUrl(raw?: string | null): string {
-  const url = new URL(raw && raw.trim() ? raw.trim() : DEFAULT_CLOUD_SERVER_URL);
+  const candidate = raw && raw.trim() ? raw.trim() : DEFAULT_CLOUD_SERVER_URL;
+  // Rest&Cafe: an empty URL means "no cloud configured" in this build, not
+  // an error - local diagnostics and settings must keep working with it.
+  if (!candidate) return '';
+  const url = new URL(candidate);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalDevUrl(url))) {
     throw new Error('Cloud server URL must use HTTPS');
   }

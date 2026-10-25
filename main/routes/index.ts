@@ -36,7 +36,6 @@ import { menuCsvRoutes } from './menu-csv';
 import { taxPackRoutes } from './tax-packs';
 import { heldOrderRoutes } from './held-orders';
 import { printTemplateRoutes } from './print-templates';
-import { whatsappRoutes } from './whatsapp';
 import { supportTicketRoutes } from './support-ticket';
 import { diagnosticsRoutes } from './diagnostics';
 import { authorizationRoutes } from './authorization';
@@ -142,7 +141,6 @@ export function registerRoutes(app: Express): void {
   app.use('/api/tax-packs', taxPackRoutes);
   app.use('/api/held-orders', heldOrderRoutes);
   app.use('/api/print-templates', printTemplateRoutes);
-  app.use('/api/whatsapp', whatsappRoutes);
   app.use('/api/support-ticket', supportTicketRoutes);
   app.use('/api/diagnostics', diagnosticsRoutes);
   app.use('/api/authorization', authorizationRoutes);

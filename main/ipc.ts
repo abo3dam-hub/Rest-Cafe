@@ -24,7 +24,6 @@ import {
   rememberRestoreFileSelection,
 } from './services/restore-file-selection';
 import { runHealthCheck, applySafeFixes } from './services/schema-health';
-import { getStatus as getWhatsAppStatus, sanitizeLogText } from './services/whatsapp';
 import { createKdsWindow, applyWindowControlAction } from './window-options';
 import {
   isApplicationMenuSender,
@@ -41,7 +40,6 @@ import { isOrdersLayout } from './routes/settings';
 import { googleDrive } from './services/google-drive';
 import { rasterizeKotDocumentForWebUsb, rasterizePrintDocumentForWebUsb } from './printers/thermal';
 import { isKotDocument, isPrintDocument } from '../shared/print/document';
-import { isSafeWhatsAppShareUrl } from './security/url-allowlist';
 import log from 'electron-log/main';
 import { randomUUID } from 'crypto';
 import { cloudSync } from './services/cloud-sync';
@@ -597,30 +595,6 @@ export function registerIpcHandlers(
         return { success: false, error: getErrorMessage(error) };
       }
     });
-  });
-
-  // WhatsApp status snapshot for renderer polling on app focus
-  handle('whatsapp-get-status', async () =>
-    withDatabaseRequest(async () => {
-      try {
-        return getWhatsAppStatus();
-      } catch (err: unknown) {
-        return { error: getErrorMessage(err) };
-      }
-    }),
-  );
-
-  handle('whatsapp-open-share', async (_event, rawUrl: unknown) => {
-    if (typeof rawUrl !== 'string' || !isSafeWhatsAppShareUrl(rawUrl)) {
-      return { success: false, error: 'Invalid WhatsApp share URL' };
-    }
-    try {
-      await shell.openExternal(rawUrl);
-      return { success: true };
-    } catch (error: unknown) {
-      console.error('[IPC] WhatsApp share open failed:', sanitizeLogText(error));
-      return { success: false, error: 'Failed to open WhatsApp' };
-    }
   });
 
   // Module-level reference to ensure single instance

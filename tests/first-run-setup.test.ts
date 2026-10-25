@@ -112,8 +112,8 @@ async function main() {
   assert.equal(count('printers'), 0, 'fresh install starts with no default printer');
   assert.equal(
     setting('cloud_server_url'),
-    'https://blue.flopos.com/',
-    'cloud server URL is seeded',
+    '',
+    'cloud server URL is empty in the Rest&Cafe local-only build',
   );
   assert.match(
     setting('cloud_pos_hash') || '',
@@ -408,18 +408,22 @@ async function main() {
     assert.equal(setting('onboarding_completed'), 'true');
     assert.equal(
       setting('anonymous_data_consent'),
-      'true',
-      'setup ignores a client-supplied consent field',
+      'false',
+      'Rest&Cafe: consent stays off after setup; no data is collected in this build',
     );
-    assert.equal(setting('telemetry_enabled'), 'true', 'telemetry is on by default after setup');
+    assert.equal(
+      setting('telemetry_enabled'),
+      'false',
+      'Rest&Cafe: telemetry stays off after setup',
+    );
     assert.equal(
       setting('telemetry_scope'),
       'usage_stats,country,app_version,platform,session_duration,feature_usage,error_diagnostics',
     );
     assert.equal(
       setting('diagnostics_consent'),
-      'true',
-      'store diagnostics are on by default for a new install',
+      'false',
+      'Rest&Cafe: store diagnostics consent is off by default for a new install',
     );
     assert.equal(
       profileRefreshes,
@@ -474,30 +478,28 @@ async function main() {
     assert.equal(count('users'), 1, 'disabled setup still cannot create a third owner');
     console.log('   ✓ disabled setup returns 403 before timezone validation');
 
-    // Cloud v2 coordination is automatic for new installs.
-    // '1', not 'true' — cloud-sync.ts reads this key with a strict '1' check
-    // everywhere, matching FloAdmin's own `stores` table.
+    // Rest&Cafe: new installs are local-only. Cloud coordination stays off
+    // and no cloud server URL is seeded (the local build never phones home).
     assert.equal(
       setting('cloud_sync_enabled'),
-      '1',
-      'cloud coordination is enabled automatically on v2 setup',
+      '0',
+      'cloud coordination stays disabled on setup in the local-only build',
     );
     assert.equal(
       setting('cloud_server_url'),
-      'https://blue.flopos.com',
-      'cloud server URL keeps the default',
+      '',
+      'cloud server URL is empty in the local-only build',
     );
-    console.log('   ✓ setup endpoint enables cloud coordination automatically');
+    console.log('   ✓ setup endpoint keeps the install local-only');
   } finally {
     cloudSync.refreshRegistrationProfile = originalRefreshRegistrationProfile;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 
-  // ── Cloud services opt-in during first-run setup (#128) ──────────────────
-  // Exercises a second, independent fresh install so we can complete
-  // /setup/initialize with cloud_sync_enabled: true — the DB above already
-  // has its one allowed owner.
-  console.log('\n   Cloud services opt-in during setup');
+  // ── Cloud fields at first-run setup ─────────────────────────────────────
+  // Rest&Cafe is local-only: a second, independent fresh install proves the
+  // setup endpoint ignores cloud_sync_enabled / cloud_server_url entirely.
+  console.log('\n   Cloud fields ignored during setup');
   closeDatabase();
   fs.rmSync(testDir, { recursive: true, force: true });
   testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flo-first-run-cloud-'));
@@ -522,6 +524,9 @@ async function main() {
   const cloudBaseUrl = `http://127.0.0.1:${cloudAddress.port}/api/auth`;
 
   try {
+    // Rest&Cafe: first-run setup is local-only. Cloud fields in the payload
+    // are ignored entirely - setup succeeds, no cloud is enabled, and no
+    // cloud server URL is persisted.
     const badUrl = await request(cloudBaseUrl, '/setup/initialize', {
       method: 'POST',
       body: JSON.stringify({
@@ -541,45 +546,17 @@ async function main() {
     });
     assert.equal(
       badUrl.status,
-      400,
-      'an invalid cloud server URL is rejected when cloud sync is enabled',
-    );
-    assert.equal(count('users'), 0, 'no owner is created when the cloud server URL is invalid');
-    console.log('   ✓ setup rejects an invalid cloud server URL when cloud sync is enabled');
-
-    const enabled = await request(cloudBaseUrl, '/setup/initialize', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: 'Cloud Owner',
-        email: 'cloud-owner@example.com',
-        password: 'TestPass123',
-        business_type: 'restaurant',
-        setup_profile: 'empty',
-        service_model: 'qsr',
-        terms_accepted: true,
-        country: 'US',
-        owner_approval_pin: '5678',
-        owner_approval_pin_confirmation: '5678',
-        cloud_sync_enabled: true,
-        cloud_server_url: 'https://cloud.example.test/relay',
-      }),
-    });
-    assert.equal(
-      enabled.status,
       200,
-      `setup succeeds with a valid custom cloud server URL (got ${enabled.status}, ${JSON.stringify(enabled.data)})`,
+      'cloud fields are ignored at setup, even an invalid cloud server URL',
     );
+    assert.equal(count('users'), 1, 'the owner is created; cloud input does not block setup');
     assert.equal(
       setting('cloud_sync_enabled'),
-      '1',
-      'cloud sync is enabled when requested at setup',
+      '0',
+      'cloud sync stays disabled even when requested at setup',
     );
-    assert.equal(
-      setting('cloud_server_url'),
-      'https://cloud.example.test/relay',
-      'the custom cloud server URL is persisted, normalized',
-    );
-    console.log('   ✓ setup persists an explicit cloud_sync_enabled + custom cloud_server_url');
+    assert.equal(setting('cloud_server_url'), '', 'no cloud server URL is persisted at setup');
+    console.log('   ✓ setup ignores cloud opt-in fields and stays local-only');
   } finally {
     await new Promise<void>((resolve) => cloudServer.close(() => resolve()));
   }

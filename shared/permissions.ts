@@ -513,20 +513,6 @@ export const PERMISSION_DEFINITIONS = [
   },
 
   {
-    id: 'whatsapp.use',
-    area: 'integrations',
-    defaultRoles: OWNER_MANAGER_CASHIER,
-    configurable: true,
-    risk: 'sensitive',
-  },
-  {
-    id: 'whatsapp.manage',
-    area: 'integrations',
-    defaultRoles: OWNER_MANAGER,
-    configurable: true,
-    risk: 'sensitive',
-  },
-  {
     id: 'cloud.manage',
     area: 'integrations',
     defaultRoles: OWNER_MANAGER,

@@ -175,14 +175,6 @@ Module._load = function (request, parent, isMain) {
   if (request === './printers/thermal')
     return { initPrinter: async () => {}, printReceipt() {}, printKOT() {} };
   if (request === './ipc') return { registerIpcHandlers() {} };
-  if (request === './services/whatsapp')
-    return {
-      initFromDb() {},
-      requestShutdown() {},
-      shutdown: async () => {
-        events.push('whatsapp.stop');
-      },
-    };
   return originalLoad.apply(this, arguments);
 };
 
@@ -205,7 +197,6 @@ setTimeout(
             'cloud.shutdown',
             'telemetry.stop',
             'drive.stop',
-            'whatsapp.stop',
             'database.admission',
             'database.close',
           ]
@@ -219,7 +210,6 @@ setTimeout(
             'cloud.shutdown',
             'telemetry.stop',
             'drive.stop',
-            'whatsapp.stop',
             'database.admission',
             'database.close',
           ];

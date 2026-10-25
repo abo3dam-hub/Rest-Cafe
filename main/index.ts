@@ -43,10 +43,6 @@ import { initPrinter } from './printers/thermal';
 import { destroySharedRasterRenderer } from './printers/raster-renderer';
 import { registerIpcHandlers } from './ipc';
 import { authorizeMasterPin } from './services/master-pin';
-import {
-  requestShutdown as requestWhatsAppShutdown,
-  shutdown as shutdownWhatsApp,
-} from './services/whatsapp';
 import log from 'electron-log/main';
 import { autoUpdater } from 'electron-updater';
 import { CancellationToken } from 'builder-util-runtime';
@@ -242,10 +238,6 @@ function setUpdateStatus(next: StoredUpdateStatus): void {
 }
 
 function setupAutoUpdater(): void {
-  // Rest&Cafe: updates are fully manual in phase 1 - the updater is never
-  // configured, never checks, and never downloads. Releases ship from our
-  // own repo after testing and are installed by running the new installer.
-  return;
   autoUpdater.logger = log;
   configureAutoUpdaterChannel();
   // The user approves both the download and the restart-to-install.
@@ -1648,8 +1640,14 @@ async function initialize(): Promise<void> {
     createTray();
     createMenu();
     // Auto-updater configured on non-store platforms.
+    // Rest&Cafe: updates are fully manual in phase 1, so the updater stays
+    // off unless RESTCAFE_ENABLE_UPDATER=1 is set explicitly (future phase,
+    // pointed at our own repo). Manual installs only until then.
     if (!isStoreBuild) {
-      if (process.env.FLO_E2E_SKIP_OPTIONAL_NETWORK !== '1') {
+      if (
+        process.env.FLO_E2E_SKIP_OPTIONAL_NETWORK !== '1' &&
+        process.env.RESTCAFE_ENABLE_UPDATER === '1'
+      ) {
         setupAutoUpdater();
         if (readAutoUpdateCheckEnabled()) {
           setTimeout(() => checkForUpdates(), 5000);
@@ -1768,7 +1766,6 @@ const cleanupCoordinator = createShutdownCoordinator(
     { name: 'posthog', run: () => stopPostHog(), blocksDatabase: true },
     { name: 'Google Drive', run: () => googleDrive.stop(), blocksDatabase: true },
     { name: 'local backup', run: () => localBackup.stop(), blocksDatabase: true },
-    { name: 'WhatsApp', run: () => shutdownWhatsApp(), blocksDatabase: true },
     { name: 'Bonjour', run: () => stopMdns() },
     { name: 'HTTP handler cleanup', run: () => waitForHttpShutdownWork(), blocksDatabase: true },
     { name: 'database admission', run: () => beginDatabaseShutdown(), blocksDatabase: true },
@@ -1806,7 +1803,6 @@ const { runCleanup, isShutdownRequested, shutdownSignal } = createShutdownEntryp
     isQuitting = true;
     runtimeState = 'stopping';
   },
-  onShutdownRequested: requestWhatsAppShutdown,
   destroyWindow: () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
   },

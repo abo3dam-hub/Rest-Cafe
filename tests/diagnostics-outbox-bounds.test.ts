@@ -112,6 +112,12 @@ async function main() {
   console.log('='.repeat(56));
 
   let db = initTestDb();
+  // Rest&Cafe seeds no cloud server URL; this suite exercises the delivery
+  // machinery against the (stubbed) upstream endpoint. It also seeds
+  // offline_mode on; the suite drives offline phases via FLO_MATRIX_OFFLINE,
+  // so restore the upstream default here.
+  setSetting(db, 'cloud_server_url', 'https://blue.flopos.com/');
+  setSetting(db, 'offline_mode', 'false');
 
   console.log(
     '\n1. A fresh install is opted out by default, and an explicit local opt-out retains only local evidence',
@@ -711,6 +717,10 @@ async function main() {
   setSetting(db, 'cloud_server_url', 'https://example.invalid');
   setSetting(db, 'cloud_registration_status', 'registered');
   setSetting(db, 'cloud_services_disabled_by_user', 'false');
+  // Rest&Cafe seeds diagnostics_consent 'false', so migration v110 marks a
+  // consent sync as pending; upstream seeds 'true' and takes the GET path.
+  // Reset it so this section exercises the same reconcile path as upstream.
+  setSetting(db, 'diagnostics_consent_sync_pending', 'false');
   const priorSignedFetch = (cloudSync as any).signedFetch;
   const signedReportBodies: string[] = [];
   const signedStatuses = [429, 503];

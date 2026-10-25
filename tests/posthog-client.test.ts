@@ -704,6 +704,7 @@ async function main() {
   setSetting('posthog_install_seed', installSeed ?? '');
 
   setSetting('telemetry_enabled', 'true');
+  setSetting('offline_mode', 'false'); // Rest&Cafe seeds offline on; this suite exercises analytics while online.
   setSetting('product_analytics_level', 'full');
   setSetting('diagnostics_consent', 'true');
   setSetting('diagnostics_transmission_enabled', 'true');

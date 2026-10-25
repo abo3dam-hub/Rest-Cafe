@@ -249,7 +249,11 @@ export async function fetchRemoteTaxPackCatalog(
   fetchImpl: FetchLike = fetch,
   signal?: AbortSignal,
 ): Promise<RemoteTaxPackCatalog> {
+  signal?.throwIfAborted();
   assertOnlineAllowed('Tax pack catalog');
+  // Rest&Cafe: the remote catalog endpoint is removed in this build; only
+  // bundled tax packs are available. Fail closed without any network call.
+  if (!RELEASES_API_URL) throw new Error('Remote tax-pack catalog is disabled in this build');
   for (let page = 1; page <= MAX_RELEASE_PAGES; page += 1) {
     assertOnlineAllowed('Tax pack catalog');
     const releasesJson = await fetchText(

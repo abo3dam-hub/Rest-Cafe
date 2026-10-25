@@ -50,12 +50,6 @@ export type ElectronApiContractChecks = [
   >,
   Expect<Equal<ElectronAPI['getKdsInfo'], () => Promise<KdsInfo | ElectronIpcError>>>,
   Expect<Equal<ElectronAPI['openKdsWindow'], () => Promise<void | ElectronIpcError>>>,
-  Expect<
-    Equal<
-      ElectronAPI['openWhatsAppShare'],
-      (url: string) => Promise<ElectronActionResult | ElectronIpcError>
-    >
-  >,
   Expect<Equal<ElectronAPI['getAppInfo'], () => Promise<ElectronAppInfo | ElectronIpcError>>>,
   Expect<Equal<ElectronAPI['getPrinters'], () => Promise<ElectronPrinter[] | ElectronIpcError>>>,
   Expect<Equal<ElectronAPI['getStatus'], () => Promise<ElectronStatus>>>,
@@ -82,7 +76,6 @@ export type ElectronApiMethodPresence = Pick<
   | 'setThemeEffective'
   | 'getKdsInfo'
   | 'openKdsWindow'
-  | 'openWhatsAppShare'
   | 'getAppInfo'
   | 'getStatus'
   | 'getPrinters'

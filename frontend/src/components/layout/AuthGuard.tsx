@@ -16,7 +16,6 @@ export const LANDING_PAGE_CANDIDATES = [
   ['orders.read', '/orders'],
   ['kitchen.use', '/kds'],
   ['tables.view', '/tables'],
-  ['whatsapp.use', '/whatsapp'],
   ['catalog.manage', '/products'],
   ['inventory.view', '/inventory'],
   ['expenses.view', '/expenses'],
@@ -56,7 +55,6 @@ export const PAGE_PERMISSIONS = [
   ['/expenses', 'expenses.view'],
   ['/tables', 'tables.view'],
   ['/customers', 'customers.view'],
-  ['/whatsapp', 'whatsapp.use'],
   ['/support', 'support.use'],
   ['/print-test', 'printers.manage'],
 ] as const;
@@ -173,7 +171,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           'database.manage',
           'mobile-access.manage',
           'kitchen.stations.manage',
-          'whatsapp.manage',
         ].some((permission) =>
           tenantCan(currentTenant, permission as import('@shared/permissions').PermissionId),
         );

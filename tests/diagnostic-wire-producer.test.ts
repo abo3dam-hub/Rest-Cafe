@@ -56,6 +56,9 @@ async function main() {
       ['cloud_server_url', 'https://example.invalid'],
       ['cloud_registration_status', 'registered'],
       ['cloud_services_disabled_by_user', 'false'],
+      // Rest&Cafe seeds offline_mode on; this suite exercises the delivery
+      // machinery under online conditions (upstream's default).
+      ['offline_mode', 'false'],
     ])
       setSetting(db, key, value);
     db.prepare('DELETE FROM local_diagnostics').run();

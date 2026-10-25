@@ -28,7 +28,6 @@ import {
   isTokenRevoked,
   isTokenStale,
 } from './middleware/security';
-import { initFromDb as initWhatsAppFromDb } from './services/whatsapp';
 import { postHogApiFailureMiddleware } from './services/posthog';
 import { API_JSON_BODY_LIMIT } from './http-limits';
 import { buildCspHeader } from './csp';
@@ -396,13 +395,6 @@ export function startServer(): Promise<void> {
           });
 
           console.log(`[Server] KDS WebSocket running on ws://localhost:${boundPort}/kds`);
-        }
-
-        // This is the single startup owner for WhatsApp in every server mode.
-        try {
-          initWhatsAppFromDb();
-        } catch (error) {
-          console.error('[Server] WhatsApp startup initialization failed:', error);
         }
 
         resolve();

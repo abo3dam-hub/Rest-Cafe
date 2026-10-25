@@ -889,7 +889,9 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     } = req.body;
     // Without a choice the store shares anonymously and the owner is asked after setup.
     const analyticsLevel = parseProductAnalyticsLevel(product_analytics_level);
-    const telemetryChoice = analyticsLevel === 'off' ? 'false' : 'true';
+    // Rest&Cafe: telemetry is never enabled in this build, whatever the
+    // setup wizard's analytics choice says.
+    const telemetryChoice = 'false';
     const email = normalizeEmail(req.body.email);
     // Regional settings come from signup, never from a fallback — see
     // docs/reference/product-invariants.md. There is no default country.
@@ -980,8 +982,9 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid service model' });
     }
 
-    // New installs start with cloud coordination enabled.
-    const cloudSyncEnabled = true;
+    // Rest&Cafe: new installs start local-only; cloud coordination stays off
+    // and no cloud server URL is validated or seeded.
+    const cloudSyncEnabled = false;
     let normalizedCloudServerUrl: string | undefined;
     if (cloudSyncEnabled) {
       try {

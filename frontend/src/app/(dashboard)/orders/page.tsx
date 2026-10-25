@@ -14,7 +14,6 @@ import PaymentModal from '@/components/pos/PaymentModal';
 import CreateCustomerModal from '@/components/pos/CreateCustomerModal';
 import AddonModal from '@/components/pos/AddonModal';
 import RefundModal from '@/components/orders/RefundModal';
-import { sendBillViaFlo } from '@/lib/whatsapp-share';
 import { useConfirm } from '@/hooks/use-confirm';
 import type { Table, Product, ProductVariant, Customer, Addon } from '@/lib/types';
 import { cartItemToOrderItem } from '@/lib/cart-order-item';
@@ -33,7 +32,6 @@ import { usePosSettingsStore } from '@/store/pos-settings';
 import { useTranslations, useLocale, type AppConfig } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatDate } from '@/hooks/useFormatDate';
-import { useWhatsAppReady } from '@/hooks/useWhatsAppReady';
 import {
   defaultDiscountTypeForMode,
   isDiscountTypeAllowed,
@@ -164,20 +162,6 @@ export default function OrdersPage() {
   const tPos = useTranslations('pos');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
-  const tWhatsappSend = useTranslations('whatsapp.send');
-
-  // sendBillViaFlo (shared with PaymentModal) takes a translator callback;
-  // bridge the typed `whatsapp.send` namespace to that contract.
-  const whatsappSendT = (key: string): string =>
-    tWhatsappSend(
-      key.replace(/^whatsapp\.send\./, '') as
-        | 'success'
-        | 'failed'
-        | 'error.notConnected'
-        | 'error.notOnWhatsapp'
-        | 'error.blocked'
-        | 'error.rateLimited',
-    );
   const { formatTime } = useFormatDate();
   const locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -195,7 +179,6 @@ export default function OrdersPage() {
   // upgrade with 404.
   const [kdsEnabled, setKdsEnabled] = useState<boolean | null>(null);
   const { confirm, ConfirmDialog } = useConfirm();
-  const isWhatsAppReady = useWhatsAppReady();
 
   // Consolidated filter state
   const [filters, setFilters] = useState<Filters>({ search: '', table: '', type: '', status: '' });
@@ -254,7 +237,6 @@ export default function OrdersPage() {
   const [generatingBill, setGeneratingBill] = useState<number | null>(null);
   const [printingBillId, setPrintingBillId] = useState<number | null>(null);
   const [printingSlipOrderId, setPrintingSlipOrderId] = useState<number | null>(null);
-  const [sendingWaOrderId, setSendingWaOrderId] = useState<number | null>(null);
   const [confirmPrintBillId, setConfirmPrintBillId] = useState<number | null>(null);
 
   // Other states
@@ -1232,35 +1214,6 @@ export default function OrdersPage() {
     }
   };
 
-  const handleSendViaFlo = async (order: Order) => {
-    if (!order.bill) {
-      toast.error(tOrders('billNotFound'));
-      return;
-    }
-    if (!order.customer?.phone) {
-      toast.error(tWhatsappSend('customerPhoneRequired'));
-      return;
-    }
-    setSendingWaOrderId(order.id);
-    try {
-      await sendBillViaFlo(
-        { ...order.bill, order },
-        order.customer.phone,
-        {
-          business_name: currentTenant?.business_name || tCommon('businessNameFallback'),
-          currency: currentTenant?.currency || '',
-          country: currentTenant?.country || '',
-        },
-        whatsappSendT,
-        { pointsEarned: order.bill.points_earned ?? 0 },
-        locale,
-      );
-      await fetchOrders(undefined, { refreshLoadedPages: true });
-    } finally {
-      setSendingWaOrderId(null);
-    }
-  };
-
   const handleApplyDiscount = async () => {
     if (!discountModal) return;
 
@@ -1858,12 +1811,10 @@ export default function OrdersPage() {
               onOverridePrice={(order, item) => setPriceOverrideTarget({ order, item })}
               canRestoreItems={canRestoreItems}
               canRefund={canRefund}
-              isWhatsAppReady={isWhatsAppReady}
               printHistory={printHistory}
               generatingBillId={generatingBill}
               printingBillId={printingBillId}
               printingSlipOrderId={printingSlipOrderId}
-              sendingWaOrderId={sendingWaOrderId}
               cancellingOrderId={cancellingOrderId}
               convertingOrderId={convertingOrderId}
               isLinkingCustomer={
@@ -1891,7 +1842,6 @@ export default function OrdersPage() {
                 tenantCan(currentTenant, 'bills.generate') ? handlePrintOrder : undefined
               }
               onPrintDeliverySlip={handlePrintDeliverySlip}
-              onSendWhatsApp={handleSendViaFlo}
               onLinkCustomer={(orderId) => {
                 setLinkCustomerOrderId(orderId);
                 setLinkCustomerSearch('');
@@ -1942,13 +1892,11 @@ export default function OrdersPage() {
               onOverridePrice={(order, item) => setPriceOverrideTarget({ order, item })}
               canRestoreItems={canRestoreItems}
               canRefund={canRefund}
-              isWhatsAppReady={isWhatsAppReady}
               printHistory={printHistory}
               generatingBillId={generatingBill}
               printingBillId={printingBillId}
               onPrintDeliverySlip={handlePrintDeliverySlip}
               printingSlipOrderId={printingSlipOrderId}
-              sendingWaOrderId={sendingWaOrderId}
               cancellingOrderId={cancellingOrderId}
               convertingOrderId={convertingOrderId}
               isLinkingCustomer={linkCustomerOrderId === order.id}
@@ -1972,7 +1920,6 @@ export default function OrdersPage() {
               onPrintOrder={
                 tenantCan(currentTenant, 'bills.generate') ? handlePrintOrder : undefined
               }
-              onSendWhatsApp={handleSendViaFlo}
               onLinkCustomer={(orderId) => {
                 setLinkCustomerOrderId(orderId);
                 setLinkCustomerSearch('');

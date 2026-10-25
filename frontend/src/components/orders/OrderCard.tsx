@@ -50,7 +50,6 @@ import { isTerminalItemStatus } from '../../../../shared/order-item-status';
 import PendingOrderItemEdits from './PendingOrderItemEdits';
 
 type OrdersKey = keyof AppConfig['Messages']['orders'];
-type WhatsAppStatusKey = keyof AppConfig['Messages']['whatsapp']['status'];
 
 export const orderStatusBadge: Record<
   Order['status'],
@@ -105,33 +104,6 @@ export const paymentStatusBadge: Record<
   },
 };
 
-export const whatsappReceiptStatusBadge: Record<
-  'sent' | 'partial' | 'pending' | 'failed' | 'notSent',
-  { bg: string; text: string; labelKey: WhatsAppStatusKey }
-> = {
-  sent: {
-    bg: 'bg-green-100 dark:bg-green-950/40',
-    text: 'text-green-700 dark:text-green-300',
-    labelKey: 'sent',
-  },
-  partial: {
-    bg: 'bg-amber-100 dark:bg-amber-950/40',
-    text: 'text-amber-700 dark:text-amber-300',
-    labelKey: 'partial',
-  },
-  pending: {
-    bg: 'bg-amber-100 dark:bg-amber-950/40',
-    text: 'text-amber-700 dark:text-amber-300',
-    labelKey: 'pending',
-  },
-  failed: {
-    bg: 'bg-red-100 dark:bg-red-950/40',
-    text: 'text-red-700 dark:text-red-300',
-    labelKey: 'failed',
-  },
-  notSent: { bg: 'bg-muted', text: 'text-muted-foreground', labelKey: 'notSent' },
-};
-
 export const itemStatusDot: Record<OrderItem['status'], { dot: string; labelKey: OrdersKey }> = {
   pending: { dot: 'bg-yellow-400', labelKey: 'itemStatusWaiting' },
   preparing: { dot: 'bg-blue-500', labelKey: 'itemStatusPreparing' },
@@ -155,14 +127,12 @@ interface OrderCardProps {
   canCancelItems: boolean;
   canRestoreItems: boolean;
   canRefund: boolean;
-  isWhatsAppReady: boolean;
   printHistory: Record<
     number,
     { id: number; print_type: string; user_name: string; printed_at: string }[]
   >;
   generatingBillId: number | null;
   printingBillId: number | null;
-  sendingWaOrderId: number | null;
   cancellingOrderId: number | null;
   convertingOrderId: number | null;
   isLinkingCustomer?: boolean;
@@ -178,7 +148,6 @@ interface OrderCardProps {
   onPrintOrder?: (order: Order) => void;
   onPrintDeliverySlip?: (order: Order) => void;
   printingSlipOrderId?: number | null;
-  onSendWhatsApp: (order: Order) => void;
   onLinkCustomer: (orderId: number) => void;
   onCancelLinkCustomer?: () => void;
   onSearchCustomer?: (query: string) => void;
@@ -202,11 +171,9 @@ export function OrderCard({
   canCancelItems,
   canRestoreItems,
   canRefund,
-  isWhatsAppReady,
   printHistory,
   generatingBillId,
   printingBillId,
-  sendingWaOrderId,
   cancellingOrderId,
   convertingOrderId,
   isLinkingCustomer,
@@ -222,7 +189,6 @@ export function OrderCard({
   onPrintOrder,
   onPrintDeliverySlip,
   printingSlipOrderId,
-  onSendWhatsApp,
   onLinkCustomer,
   onCancelLinkCustomer,
   onSearchCustomer,
@@ -243,7 +209,6 @@ export function OrderCard({
   const tCommon = useTranslations('common');
   const tPos = useTranslations('pos');
   const tReceipt = useTranslations('receipt');
-  const tWhatsappStatus = useTranslations('whatsapp.status');
   const fmt = useFormatCurrency();
   const { formatTime, formatDateTime } = useFormatDate();
 
@@ -269,20 +234,6 @@ export function OrderCard({
   })();
 
   const payBadge = payStatus ? paymentStatusBadge[payStatus] : null;
-
-  const hasPaidBill =
-    order.bills?.some((candidate) => candidate.payment_status === 'paid') ?? isPaid;
-  const receiptStatusBadge =
-    isWhatsAppReady && hasPaidBill && order.whatsapp_receipt_status
-      ? whatsappReceiptStatusBadge[order.whatsapp_receipt_status] || null
-      : null;
-
-  const receiptStatusLabel = (() => {
-    if (!receiptStatusBadge) return '';
-    if (receiptStatusBadge.labelKey === 'sent') return tOrders('receiptSent');
-    if (receiptStatusBadge.labelKey === 'failed') return tOrders('sendFailed');
-    return tWhatsappStatus(receiptStatusBadge.labelKey);
-  })();
 
   const subtotal = bill ? Number(bill.subtotal) : Number(order.subtotal);
   const discount = bill ? Number(bill.discount_amount) : Number(order.discount_amount);
@@ -477,7 +428,7 @@ export function OrderCard({
           </div>
         </div>
 
-        {/* Header Row 2: Type, Table, Elapsed Time, WhatsApp Status */}
+        {/* Header Row 2: Type, Table, Elapsed Time */}
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1 font-medium capitalize text-foreground">
@@ -496,16 +447,6 @@ export function OrderCard({
               {getTimeSince(order.created_at)}
             </span>
           </div>
-
-          {receiptStatusBadge && (
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${receiptStatusBadge.bg} ${receiptStatusBadge.text}`}
-            >
-              {receiptStatusBadge.labelKey === 'sent' && <Send size={11} />}
-              {receiptStatusBadge.labelKey === 'failed' && <AlertCircle size={11} />}
-              {receiptStatusLabel}
-            </span>
-          )}
         </div>
       </div>
 
@@ -1002,23 +943,6 @@ export function OrderCard({
                   <Printer size={15} className="me-1.5 text-muted-foreground" />
                 )}
                 {printCount > 0 ? tCommon('reprint') : tCommon('print')}
-              </Button>
-            )}
-
-            {/* WhatsApp button: ONLY when WhatsApp IS ready/configured AND customer has a phone */}
-            {isWhatsAppReady && order.customer?.phone && (
-              <Button
-                variant="outline"
-                onClick={() => onSendWhatsApp(order)}
-                disabled={sendingWaOrderId === order.id}
-                className="flex-1 h-10 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40 active:scale-95 touch-manipulation font-semibold text-xs"
-              >
-                {sendingWaOrderId === order.id ? (
-                  <Loader2 size={15} className="animate-spin me-1.5" />
-                ) : (
-                  <Send size={15} className="me-1.5" />
-                )}
-                {tOrders('sendReceipt')}
               </Button>
             )}
 

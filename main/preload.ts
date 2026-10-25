@@ -39,7 +39,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPostHogBootstrap: () => ipcRenderer.invoke('get-posthog-bootstrap'),
 
   getStatus: () => ipcRenderer.invoke('get-status'),
-  openWhatsAppShare: (url: string) => ipcRenderer.invoke('whatsapp-open-share', url),
 
   windowReady: (payload: { epoch: number }) =>
     ipcRenderer.invoke('window-ready', { ...payload, documentNonce }),

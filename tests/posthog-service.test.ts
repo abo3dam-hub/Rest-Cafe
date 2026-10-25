@@ -122,6 +122,7 @@ async function main() {
     delete process.env.FLO_E2E_SKIP_OPTIONAL_NETWORK;
 
     setSetting('telemetry_enabled', 'true');
+    setSetting('offline_mode', 'false'); // Rest&Cafe seeds offline on; this suite exercises analytics while online.
     setSetting('product_analytics_level', 'anonymous');
 
     collectorRequests.length = 0;

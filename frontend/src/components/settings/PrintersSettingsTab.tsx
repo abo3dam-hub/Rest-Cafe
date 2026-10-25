@@ -79,7 +79,6 @@ export type PrintingForm = {
   printMethod: 'escpos' | 'browser';
   autoPrintKot: boolean;
   autoPrintBill: boolean;
-  whatsappShareEnabled: boolean;
   printerUseUnicode: boolean;
   printerArabicShaping: boolean;
   printerTrimDecimals: boolean;
@@ -1154,27 +1153,6 @@ export function PrintersSettingsTab({
                 <p className="text-xs text-muted-foreground mt-1">{t('footerMessageHint')}</p>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Share2 size={20} className="text-muted-foreground" />
-            <h2 className="font-semibold text-foreground">{t('whatsappSharing')}</h2>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-foreground">{t('enableWhatsappShare')}</p>
-              <p className="text-sm text-muted-foreground">{t('enableWhatsappShareHint')}</p>
-            </div>
-            <Toggle
-              value={printingForm.whatsappShareEnabled}
-              label={t('enableWhatsappShare')}
-              onChange={(v) => {
-                markHydrationTouched('whatsappShareEnabled');
-                setPrintingForm((p) => ({ ...p, whatsappShareEnabled: v }));
-              }}
-            />
           </div>
         </div>
       </div>

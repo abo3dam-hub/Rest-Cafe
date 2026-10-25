@@ -113,11 +113,11 @@ async function main() {
   const { baseUrl, server } = await startServer(app);
 
   try {
-    assertEqualOrThrow(isOfflineMode(), false, 'online by default');
+    assertEqualOrThrow(isOfflineMode(), true, 'offline by default in the Rest&Cafe build');
     assertEqualOrThrow(
       (await api(baseUrl, '/api/settings/offline-mode', { headers: managerAuth })).data
         .offline_mode,
-      false,
+      true,
       'the state is readable by settings viewers',
     );
 
@@ -127,7 +127,7 @@ async function main() {
       headers: managerAuth,
     });
     assertEqualOrThrow(refused.status, 403, 'a manager cannot switch Offline mode');
-    assertEqualOrThrow(isOfflineMode(), false, 'a refused change leaves the mode unchanged');
+    assertEqualOrThrow(isOfflineMode(), true, 'a refused change leaves the mode unchanged');
 
     const invalid = await api(baseUrl, '/api/settings/offline-mode', {
       method: 'PUT',
@@ -437,91 +437,42 @@ async function main() {
         });
       }
 
-      // 3b. Tax-pack catalog and download abort in-flight and before follow-up steps.
+      // 3b. Tax-pack catalog discovery is disabled in the Rest&Cafe build
+      // (bundled packs only): it fails closed without any network call, and
+      // Offline mode still gates it first. Pack downloads (used for
+      // bundled/imported packs) keep their offline-abort behavior below.
       let taxPackFetchCalls = 0;
-      let catalogSignalAborted = false;
-      const pendingCatalog = fetchRemoteTaxPackCatalog(async (_url: any, init?: RequestInit) => {
+      const countingFetch = async () => {
         taxPackFetchCalls += 1;
-        await new Promise<void>((_resolve, reject) => {
-          init?.signal?.addEventListener(
-            'abort',
-            () => {
-              catalogSignalAborted = true;
-              const err = new Error('Aborted');
-              err.name = 'AbortError';
-              reject(err);
-            },
-            { once: true },
-          );
-          notifyOfflineModeEnabled();
-        });
         return new Response('[]', { status: 200 });
-      });
-      let taxCatalogErrCode = '';
+      };
+      let disabledErrMessage = '';
       try {
-        await pendingCatalog;
+        await fetchRemoteTaxPackCatalog(countingFetch as any);
       } catch (err: any) {
-        taxCatalogErrCode = err?.code ?? '';
+        disabledErrMessage = err?.message ?? '';
       }
       assertEqualOrThrow(
-        catalogSignalAborted,
-        true,
-        'tax-pack catalog fetch signal aborted on Offline mode',
+        disabledErrMessage,
+        'Remote tax-pack catalog is disabled in this build',
+        'tax-pack catalog discovery is disabled in the Rest&Cafe build',
       );
-      assertEqualOrThrow(
-        taxCatalogErrCode,
-        'offline_mode',
-        'aborted tax-pack catalog throws OfflineModeError',
-      );
-      assertEqualOrThrow(
-        taxPackFetchCalls,
-        1,
-        'tax-pack catalog made no follow-up requests after abort',
-      );
-
-      let stepTwoCalled = false;
-      const multiStepCatalog = fetchRemoteTaxPackCatalog(async (url: any) => {
-        if (new URL(String(url)).pathname.endsWith('/releases')) {
-          upsertSettings({ offline_mode: 'true' });
-          return new Response(
-            JSON.stringify([
-              {
-                tag_name: 'tax-pack-official-india-v1.0.0',
-                html_url: 'https://github.com/FreeOpenSourcePOS/FloCafe-Plugins/releases/tag/v1',
-                draft: false,
-                assets: [
-                  {
-                    name: 'catalog.json',
-                    browser_download_url:
-                      'https://github.com/FreeOpenSourcePOS/FloCafe-Plugins/releases/download/tax-pack-official-india-v1.0.0/catalog.json',
-                  },
-                ],
-              },
-            ]),
-            { status: 200 },
-          );
-        }
-        stepTwoCalled = true;
-        return new Response('{}', { status: 200 });
-      });
-      let multiStepErrCode = '';
+      assertEqualOrThrow(taxPackFetchCalls, 0, 'disabled tax-pack catalog makes no network call');
+      upsertSettings({ offline_mode: 'true' });
+      let offlineCatalogErrCode = '';
       try {
-        await multiStepCatalog;
+        await fetchRemoteTaxPackCatalog(countingFetch as any);
       } catch (err: any) {
-        multiStepErrCode = err?.code ?? '';
+        offlineCatalogErrCode = err?.code ?? '';
       } finally {
         upsertSettings({ offline_mode: 'false' });
       }
       assertEqualOrThrow(
-        multiStepErrCode,
+        offlineCatalogErrCode,
         'offline_mode',
-        'tax-pack catalog re-checks Offline mode before downloading asset',
+        'tax-pack catalog is refused with OfflineModeError while Offline mode is on',
       );
-      assertEqualOrThrow(
-        stepTwoCalled,
-        false,
-        'tax-pack catalog skips second download step once Offline mode is on',
-      );
+      assertEqualOrThrow(taxPackFetchCalls, 0, 'offline tax-pack catalog makes no network call');
 
       let packDownloadAborted = false;
       const validEntry = {
