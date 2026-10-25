@@ -660,7 +660,7 @@ export default function SetupPage() {
                     <span>
                       {t('termsIntro')}{' '}
                       <a
-                        href="https://flopos.com/terms"
+                        href="https://ali-coding.pages.dev"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary underline"
@@ -669,7 +669,7 @@ export default function SetupPage() {
                       </a>
                       ,{' '}
                       <a
-                        href="https://flopos.com/privacy"
+                        href="https://ali-coding.pages.dev"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary underline"
@@ -678,7 +678,7 @@ export default function SetupPage() {
                       </a>
                       , {t('termsAnd')}{' '}
                       <a
-                        href="https://flopos.com/disclaimer"
+                        href="https://ali-coding.pages.dev"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary underline"
