@@ -44,7 +44,6 @@ const {
 } = require('./helpers/test-setup');
 
 const { settingsRoutes } = require('../main/routes/settings');
-const { cloudSync } = require('../main/services/cloud-sync');
 
 async function main() {
   console.log('Issue #389: tenant timezone override independent of country default');
@@ -52,8 +51,6 @@ async function main() {
 
   // refreshRegistrationProfile is best-effort FloAdmin telemetry; there is no
   // cloud account in this fixture, so pin it to a no-op for determinism.
-  const originalRefreshRegistrationProfile = cloudSync.refreshRegistrationProfile.bind(cloudSync);
-  cloudSync.refreshRegistrationProfile = () => {};
 
   const db = initTestDb();
   const app = createApp({ '/api/settings': settingsRoutes });
@@ -61,8 +58,12 @@ async function main() {
 
   try {
     const owner = seedOwnerUser(db);
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('country', 'CA', ?)").run(new Date().toISOString());
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('currency', 'CAD', ?)").run(new Date().toISOString());
+    db.prepare(
+      "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('country', 'CA', ?)",
+    ).run(new Date().toISOString());
+    db.prepare(
+      "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('currency', 'CAD', ?)",
+    ).run(new Date().toISOString());
 
     // ── Custom timezone for a multi-timezone country persists + round-trips ──
     const putRes = await api(baseUrl, '/api/settings/business', {
@@ -78,31 +79,59 @@ async function main() {
     assert.equal(putRes.status, 200, 'PUT /api/settings/business accepts a custom IANA timezone');
     assert.equal(putRes.data.country, 'CA', 'PUT preserves country = CA');
     assert.equal(putRes.data.currency, 'CAD', 'PUT keeps currency governed by the country profile');
-    assert.equal(putRes.data.timezone, 'America/Vancouver', 'PUT persists America/Vancouver instead of the America/Toronto default');
+    assert.equal(
+      putRes.data.timezone,
+      'America/Vancouver',
+      'PUT persists America/Vancouver instead of the America/Toronto default',
+    );
 
     const getRes = await api(baseUrl, '/api/settings/business', { headers: owner.authHeader });
     assert.equal(getRes.status, 200, 'GET /api/settings/business returns 200');
-    assert.equal(getRes.data.timezone, 'America/Vancouver', 'custom timezone survives a fresh read (page refresh / restart path)');
+    assert.equal(
+      getRes.data.timezone,
+      'America/Vancouver',
+      'custom timezone survives a fresh read (page refresh / restart path)',
+    );
 
-    const stored = db.prepare("SELECT value FROM settings WHERE key = 'timezone'").get() as { value: string };
-    assert.equal(stored.value, 'America/Vancouver', 'settings.timezone row persists the custom timezone');
+    const stored = db.prepare("SELECT value FROM settings WHERE key = 'timezone'").get() as {
+      value: string;
+    };
+    assert.equal(
+      stored.value,
+      'America/Vancouver',
+      'settings.timezone row persists the custom timezone',
+    );
 
     const lowercaseCurrencyRes = await api(baseUrl, '/api/settings/business', {
       method: 'PUT',
       body: { currency: 'xxx' },
       headers: owner.authHeader,
     });
-    assert.equal(lowercaseCurrencyRes.status, 409, 'PUT /api/settings/business cannot bypass the destructive currency-reset flow');
+    assert.equal(
+      lowercaseCurrencyRes.status,
+      409,
+      'PUT /api/settings/business cannot bypass the destructive currency-reset flow',
+    );
     assert.equal(lowercaseCurrencyRes.data.error, 'currency_change_requires_reset');
-    const storedCurrency = db.prepare("SELECT value FROM settings WHERE key = 'currency'").get() as { value: string };
-    assert.equal(storedCurrency.value, 'CAD', 'rejected direct change preserves the active currency');
+    const storedCurrency = db
+      .prepare("SELECT value FROM settings WHERE key = 'currency'")
+      .get() as { value: string };
+    assert.equal(
+      storedCurrency.value,
+      'CAD',
+      'rejected direct change preserves the active currency',
+    );
 
     const wildcardCurrencyRes = await api(baseUrl, '/api/settings/currency', {
       method: 'PUT',
       body: { value: 'jpy' },
       headers: owner.authHeader,
     });
-    assert.equal(wildcardCurrencyRes.status, 409, 'wildcard currency settings cannot bypass the destructive reset');
+    assert.equal(
+      wildcardCurrencyRes.status,
+      409,
+      'wildcard currency settings cannot bypass the destructive reset',
+    );
     assert.equal(wildcardCurrencyRes.data.error, 'currency_change_requires_reset');
 
     const invalidWildcardCurrencyRes = await api(baseUrl, '/api/settings/currency', {
@@ -110,7 +139,11 @@ async function main() {
       body: { value: 'US' },
       headers: owner.authHeader,
     });
-    assert.equal(invalidWildcardCurrencyRes.status, 400, 'wildcard currency settings reject invalid codes');
+    assert.equal(
+      invalidWildcardCurrencyRes.status,
+      400,
+      'wildcard currency settings reject invalid codes',
+    );
 
     // ── Invalid IANA timezone → documented 400 shape ──
     const badRes = await api(baseUrl, '/api/settings/business', {
@@ -124,14 +157,19 @@ async function main() {
       headers: owner.authHeader,
     });
     assert.equal(badRes.status, 400, 'PUT /api/settings/business rejects an invalid IANA timezone');
-    assert.equal(badRes.data.error, 'Invalid timezone, currency, or country', '400 error matches the documented message');
+    assert.equal(
+      badRes.data.error,
+      'Invalid timezone, currency, or country',
+      '400 error matches the documented message',
+    );
 
     console.log('  ✓ custom timezone persists and invalid timezones are rejected');
     console.log('\n✅ Issue #389 settings-route timezone checks passed');
   } finally {
-    cloudSync.refreshRegistrationProfile = originalRefreshRegistrationProfile;
     server.close();
-    try { closeDatabase(); } catch {}
+    try {
+      closeDatabase();
+    } catch {}
     Module._load = originalLoad;
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -139,7 +177,9 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  try { closeDatabase(); } catch {}
+  try {
+    closeDatabase();
+  } catch {}
   Module._load = originalLoad;
   fs.rmSync(tempDir, { recursive: true, force: true });
   process.exit(1);

@@ -139,14 +139,14 @@ Module._load = function (request, parent, isMain) {
       getServerAppPort: () => 0,
       isServerAppRunning: () => false,
     };
-  if (request === './services/cloud-sync')
+  if (request === './services/operation-diagnostics')
     return {
-      cloudSync: {
+      operationDiagnostics: {
         captureOperationFailure: () => {
           events.push('diagnostics.capture');
         },
         shutdown: async () => {
-          events.push('cloud.shutdown');
+          events.push('diagnostics.shutdown');
         },
       },
     };
@@ -172,7 +172,7 @@ setTimeout(
             'server-app.stop',
             'server.stop',
             'kds.stop',
-            'cloud.shutdown',
+            'diagnostics.shutdown',
             'database.admission',
             'database.close',
           ]
@@ -183,7 +183,7 @@ setTimeout(
             'server-app.stop',
             'server.stop',
             'kds.stop',
-            'cloud.shutdown',
+            'diagnostics.shutdown',
             'database.admission',
             'database.close',
           ];

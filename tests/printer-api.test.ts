@@ -34,7 +34,7 @@ const { initDatabase, getDatabase, closeDatabase, now } = require('../main/db');
 const { printerRoutes } = require('../main/routes/printers');
 const { kitchenStationRoutes } = require('../main/routes/kitchen-stations');
 const { printReceipt, printReceiptDetailed } = require('../main/printers/thermal');
-const { cloudSync } = require('../main/services/cloud-sync');
+const { operationDiagnostics } = require('../main/services/operation-diagnostics');
 const { printerService } = require('../frontend/src/lib/printer/PrinterService');
 
 let passed = 0;
@@ -619,13 +619,13 @@ async function runTests() {
       'unsupported financial refusal opens no transport or sends bytes',
     );
 
-    const originalCaptureOperationFailure = cloudSync.captureOperationFailure;
+    const originalCaptureOperationFailure = operationDiagnostics.captureOperationFailure;
     let diagnostic: any;
-    cloudSync.captureOperationFailure = (input: any) => {
+    operationDiagnostics.captureOperationFailure = (input: any) => {
       diagnostic = input;
     };
     const detailed = await printReceiptDetailed(...printArgs);
-    cloudSync.captureOperationFailure = originalCaptureOperationFailure;
+    operationDiagnostics.captureOperationFailure = originalCaptureOperationFailure;
     assert(
       detailed.stage === 'prepare',
       'unsupported financial refusal is reported at prepare stage',

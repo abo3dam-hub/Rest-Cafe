@@ -32,7 +32,7 @@ const {
   api,
   closeDatabase,
 } = require('./helpers/test-setup');
-const { cloudSync } = require('../main/services/cloud-sync');
+const { operationDiagnostics } = require('../main/services/operation-diagnostics');
 const { staffRoutes } = require('../main/routes/staff');
 const { customerRoutes } = require('../main/routes/customers');
 const { productRoutes } = require('../main/routes/products');
@@ -75,8 +75,8 @@ async function main() {
   });
   const { baseUrl, server } = await startServer(app);
   const captured: any[] = [];
-  const originalCapture = cloudSync.captureOperationFailure;
-  cloudSync.captureOperationFailure = (failure: any) => captured.push(failure);
+  const originalCapture = operationDiagnostics.captureOperationFailure;
+  operationDiagnostics.captureOperationFailure = (failure: any) => captured.push(failure);
 
   try {
     const unauthenticated = await api(baseUrl, '/api/staff');
@@ -162,8 +162,8 @@ async function main() {
       'the protected last-owner rejection branches emit their exact safe expected tuple',
     );
 
-    const captureBeforeFailureTest = cloudSync.captureOperationFailure;
-    cloudSync.captureOperationFailure = () => {
+    const captureBeforeFailureTest = operationDiagnostics.captureOperationFailure;
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('synthetic synchronous diagnostics dispatch failure');
     };
     try {
@@ -187,7 +187,7 @@ async function main() {
         'the failed report dispatch leaves the owner active',
       );
     } finally {
-      cloudSync.captureOperationFailure = captureBeforeFailureTest;
+      operationDiagnostics.captureOperationFailure = captureBeforeFailureTest;
     }
 
     const duplicateStaff = await api(baseUrl, '/api/staff', {
@@ -633,7 +633,7 @@ async function main() {
       'the changed group persists even when its add-on row is skipped',
     );
 
-    cloudSync.captureOperationFailure = () => {
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('synthetic synchronous diagnostics dispatch failure');
     };
     try {
@@ -837,7 +837,7 @@ async function main() {
         db.prepare("UPDATE users SET role = 'owner' WHERE id = ?").run(owner.userId);
       }
     } finally {
-      cloudSync.captureOperationFailure = captureBeforeFailureTest;
+      operationDiagnostics.captureOperationFailure = captureBeforeFailureTest;
     }
 
     assert.deepEqual(
@@ -1586,8 +1586,8 @@ async function main() {
       'the added feature rejections use exact closed facts, preserve no-write outcomes, and contain no request data',
     );
 
-    const reporterFailureHandler = cloudSync.captureOperationFailure;
-    cloudSync.captureOperationFailure = () => {
+    const reporterFailureHandler = operationDiagnostics.captureOperationFailure;
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('synthetic synchronous diagnostics dispatch failure');
     };
     try {
@@ -1622,7 +1622,7 @@ async function main() {
         'supply validation remains unchanged when diagnostics dispatch throws',
       );
     } finally {
-      cloudSync.captureOperationFailure = reporterFailureHandler;
+      operationDiagnostics.captureOperationFailure = reporterFailureHandler;
     }
 
     assert.equal(
@@ -1679,7 +1679,7 @@ async function main() {
       );
     }
   } finally {
-    cloudSync.captureOperationFailure = originalCapture;
+    operationDiagnostics.captureOperationFailure = originalCapture;
     await new Promise<void>((resolve, reject) =>
       server.close((error: Error | undefined) => (error ? reject(error) : resolve())),
     );

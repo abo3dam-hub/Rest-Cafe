@@ -26,7 +26,7 @@ import {
 } from './db';
 import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/catalog';
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
-import { cloudSync } from './services/cloud-sync';
+import { operationDiagnostics } from './services/operation-diagnostics';
 import { isOfflineMode } from './services/offline-mode';
 import { localBackup } from './services/local-backup';
 import { startKdsServer, stopKdsServer, getKdsPort, isKdsServerRunning } from './kds-server';
@@ -301,7 +301,7 @@ async function showRuntimeStuckDialog(reason: string): Promise<void> {
 
   if (response !== 0) return;
 
-  cloudSync.captureOperationFailure({
+  operationDiagnostics.captureOperationFailure({
     capture_point: 'fc.electron.runtime.relaunch_exhausted',
     outcome: 'unknown',
   });
@@ -563,7 +563,7 @@ function createWindow(): void {
       clearRendererStabilityResetTimer();
       if (!isQuitting && !isShutdownRequested()) {
         consecutiveRendererCrashes++;
-        cloudSync.captureOperationFailure({
+        operationDiagnostics.captureOperationFailure({
           capture_point: 'fc.electron.renderer.process_gone',
           outcome: 'unknown',
         });
@@ -728,7 +728,7 @@ function registerChildProcessCrashTelemetry(): void {
       clearRendererStabilityResetTimer();
     }
     if (details.reason !== 'clean-exit' && !isQuitting && !isShutdownRequested()) {
-      cloudSync.captureOperationFailure({
+      operationDiagnostics.captureOperationFailure({
         capture_point: 'fc.electron.child.process_gone',
         outcome: 'unknown',
       });
@@ -1275,7 +1275,7 @@ async function initialize(): Promise<void> {
 
     // Capture only a safe classification; exception text can contain business data.
     try {
-      cloudSync.captureOperationFailure({
+      operationDiagnostics.captureOperationFailure({
         capture_point: 'fc.electron.startup.failure',
         outcome: 'not_applied',
       });
@@ -1348,7 +1348,11 @@ const cleanupCoordinator = createShutdownCoordinator(
     { name: 'Server App', run: () => stopServerApp(), blocksDatabase: true },
     { name: 'Main server', run: () => stopServer(), blocksDatabase: true },
     { name: 'KDS server', run: () => stopKdsServer(), blocksDatabase: true },
-    { name: 'cloud sync', run: () => cloudSync.shutdown(), blocksDatabase: true },
+    {
+      name: 'operation diagnostics',
+      run: () => operationDiagnostics.shutdown(),
+      blocksDatabase: true,
+    },
     { name: 'local backup', run: () => localBackup.stop(), blocksDatabase: true },
     { name: 'Bonjour', run: () => stopMdns() },
     { name: 'HTTP handler cleanup', run: () => waitForHttpShutdownWork(), blocksDatabase: true },
@@ -1400,7 +1404,7 @@ process.on('uncaughtException', (error) => {
   log.error('[Flo] Uncaught exception:', error);
   console.error('[Flo] Uncaught exception:', error);
   if (!isQuitting && !isShutdownRequested()) {
-    cloudSync.captureOperationFailure({
+    operationDiagnostics.captureOperationFailure({
       capture_point: 'fc.electron.main.uncaught',
       outcome: 'unknown',
     });
@@ -1411,7 +1415,7 @@ process.on('unhandledRejection', (reason) => {
   log.error('[Flo] Unhandled rejection:', reason);
   console.error('[Flo] Unhandled rejection:', reason);
   if (!isQuitting && !isShutdownRequested()) {
-    cloudSync.captureOperationFailure({
+    operationDiagnostics.captureOperationFailure({
       capture_point: 'fc.electron.main.unhandled_rejection',
       outcome: 'unknown',
     });

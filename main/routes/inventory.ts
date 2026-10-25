@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../db';
 import { requirePermission } from '../services/authorization';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { InventoryMovementType, listInventoryMovements } from '../services/inventory';
 
@@ -25,7 +25,7 @@ function captureInventoryQueryRejection(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change the movement query response.
   }

@@ -35,7 +35,7 @@ const {
 const { classifyOrderRequestFailure } = require('../frontend/src/lib/order-attempt');
 const { buildDiagnosticEvent } = require('../main/routes/diagnostics');
 const { registerRoutes } = require('../main/routes/index');
-const { cloudSync } = require('../main/services/cloud-sync');
+const { operationDiagnostics } = require('../main/services/operation-diagnostics');
 
 function latestLocalDiagnostic(db: any, reasonCode: string): any | null {
   const row = db
@@ -609,14 +609,14 @@ async function main() {
       false,
       'the request path is never included in the fallback payload',
     );
-    const originalCapture = cloudSync.captureOperationFailure;
-    cloudSync.captureOperationFailure = () => {
+    const originalCapture = operationDiagnostics.captureOperationFailure;
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('capture unavailable');
     };
     const captureFailureResponse = await api(baseUrl, '/api/test-unhandled-diagnostic', {
       headers: owner.authHeader,
     });
-    cloudSync.captureOperationFailure = originalCapture;
+    operationDiagnostics.captureOperationFailure = originalCapture;
     assertEqual(
       captureFailureResponse.status,
       500,
@@ -657,8 +657,8 @@ async function main() {
       'the quantity reason is recorded locally',
     );
 
-    const throwingCapture = cloudSync.captureOperationFailure;
-    cloudSync.captureOperationFailure = () => {
+    const throwingCapture = operationDiagnostics.captureOperationFailure;
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('local diagnostics unavailable');
     };
     try {
@@ -682,7 +682,7 @@ async function main() {
         'the original order rejection is returned when diagnostics fails',
       );
     } finally {
-      cloudSync.captureOperationFailure = throwingCapture;
+      operationDiagnostics.captureOperationFailure = throwingCapture;
     }
 
     const stockId = crypto.randomUUID();
@@ -1399,8 +1399,8 @@ async function main() {
       'the bill state reflects the committed refund',
     );
 
-    const originalRefundCapture = cloudSync.captureOperationFailure;
-    cloudSync.captureOperationFailure = () => {
+    const originalRefundCapture = operationDiagnostics.captureOperationFailure;
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('local diagnostics unavailable');
     };
     try {
@@ -1420,7 +1420,7 @@ async function main() {
         'the original refund rejection remains structured',
       );
     } finally {
-      cloudSync.captureOperationFailure = originalRefundCapture;
+      operationDiagnostics.captureOperationFailure = originalRefundCapture;
     }
 
     console.log(
@@ -1531,7 +1531,7 @@ async function main() {
       'customer_mismatch',
       'the local payment event retains only the safe display code',
     );
-    cloudSync.captureOperationFailure = () => {
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('local diagnostics unavailable');
     };
     try {
@@ -1551,7 +1551,7 @@ async function main() {
         'the safe payment validation code survives diagnostics failure',
       );
     } finally {
-      cloudSync.captureOperationFailure = throwingCapture;
+      operationDiagnostics.captureOperationFailure = throwingCapture;
     }
 
     console.log(
@@ -1810,7 +1810,7 @@ async function main() {
         )
         .get() as { count: number }
     ).count;
-    cloudSync.captureOperationFailure = () => {
+    operationDiagnostics.captureOperationFailure = () => {
       throw new Error('local diagnostics unavailable');
     };
     try {
@@ -1857,7 +1857,7 @@ async function main() {
       );
     } finally {
       kds.notifyOrderUpdated = priorNotifyOrderUpdated;
-      cloudSync.captureOperationFailure = throwingCapture;
+      operationDiagnostics.captureOperationFailure = throwingCapture;
     }
 
     console.log('\n5. No raw request or exception contents enter the v2 queue');

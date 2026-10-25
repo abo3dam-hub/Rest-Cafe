@@ -26,12 +26,7 @@ import {
   resolveRegionalSnapshot,
   type RegionalSnapshot,
 } from '../countries';
-import {
-  cloudSync,
-  CloudRequestError,
-  DEFAULT_CLOUD_SERVER_URL,
-  normalizeCloudServerUrl,
-} from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { asyncHandler } from '../middleware/async-handler';
 import { getHttpRequestSignal } from '../shutdown';
 import { PASSWORD_POLICY_MESSAGE } from '../../shared/password-policy';
@@ -562,7 +557,7 @@ function applyOwnerRecovery(
       outcome: 'not_applied',
     });
     try {
-      if (failure) cloudSync.captureOperationFailure(failure);
+      if (failure) operationDiagnostics.captureOperationFailure(failure);
     } catch {
       // Diagnostics cannot change the recovery conflict response.
     }
@@ -655,168 +650,6 @@ router.post('/recover-password', authRateLimit(), (req: Request, res: Response) 
   }
 });
 
-// ── Cloud email recovery (FloAdmin) ───────────────────────────────────────────
-// The owner approves a reset from the email FloAdmin sends; the new password is
-// chosen and stored here and never leaves this device.
-
-const RESET_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
-
-function cloudRecoveryPrecheck(req: Request, res: Response): boolean {
-  if (!requireLocalSetup(req, res)) return false;
-  if (getUserCount(getDatabase()) === 0) {
-    res.status(409).json({
-      error: 'Setup has not been completed yet. Use first-run setup to create the owner account.',
-    });
-    return false;
-  }
-  if (!cloudSync.isEmailRecoveryAvailable()) {
-    res.status(409).json({ error: 'Email recovery is not available on this install.' });
-    return false;
-  }
-  return true;
-}
-
-function maskEmail(email: string): string {
-  const [local, domain] = email.split('@');
-  return local && domain ? `${local[0]}***@${domain}` : '';
-}
-
-function sendCloudRecoveryFailure(res: Response, error: unknown) {
-  if (error instanceof CloudRequestError) {
-    if (error.status === 429) {
-      return res.status(429).json({ error: 'Too many reset requests. Try again later.' });
-    }
-    if (error.status === 409) {
-      return res.status(409).json({ error: 'Email recovery is not available on this install.' });
-    }
-    if (error.status === 404) {
-      return res.status(404).json({ error: 'Reset request not found.' });
-    }
-  }
-  console.error('[Auth] Cloud password recovery error:', error);
-  return res.status(502).json({ error: 'Could not reach FloAdmin.' });
-}
-
-router.post(
-  '/recover-password/cloud/request',
-  authRateLimit(),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudRecoveryPrecheck(req, res)) return;
-    const email = cloudSync.getRegisteredOwnerEmail();
-    const owner = getDatabase()
-      .prepare('SELECT id FROM users WHERE lower(email) = ? AND role = ? AND is_active = 1')
-      .get(email, INITIAL_ADMIN_ROLE);
-    if (!owner) {
-      return res.status(409).json({ error: 'Email recovery is not available on this install.' });
-    }
-    try {
-      const signal = getHttpRequestSignal(req);
-      // An unverified owner email gets the verification email first; the reset follows once verified.
-      if (!(await cloudSync.ensureOwnerEmailVerification(signal))) {
-        return res.status(202).json({
-          step: 'verify_email',
-          email_hint: maskEmail(email),
-        });
-      }
-      const data = await cloudSync.requestPasswordReset(signal);
-      res.status(202).json({
-        step: 'reset',
-        reset_id: String(data.reset_id || ''),
-        expires_at: typeof data.expires_at === 'string' ? data.expires_at : null,
-        email_hint: typeof data.email_hint === 'string' ? data.email_hint : null,
-      });
-    } catch (error) {
-      sendCloudRecoveryFailure(res, error);
-    }
-  }),
-);
-
-router.get(
-  '/recover-password/cloud/verification',
-  authRateLimit({ max: 600 }),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudRecoveryPrecheck(req, res)) return;
-    try {
-      res.json({ verified: await cloudSync.isOwnerEmailVerified(getHttpRequestSignal(req)) });
-    } catch (error) {
-      sendCloudRecoveryFailure(res, error);
-    }
-  }),
-);
-
-router.get(
-  '/recover-password/cloud/status',
-  authRateLimit({ max: 600 }),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudRecoveryPrecheck(req, res)) return;
-    const resetId = String(req.query.reset_id || '');
-    if (!RESET_ID_PATTERN.test(resetId)) {
-      return res.status(400).json({ error: 'A valid reset_id is required' });
-    }
-    try {
-      const data = await cloudSync.getPasswordResetStatus(resetId, getHttpRequestSignal(req));
-      res.json({ status: String(data.status || 'pending') });
-    } catch (error) {
-      sendCloudRecoveryFailure(res, error);
-    }
-  }),
-);
-
-router.post(
-  '/recover-password/cloud/complete',
-  authRateLimit(),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudRecoveryPrecheck(req, res)) return;
-    const db = getDatabase();
-    const resetId = String(req.body?.reset_id || '');
-    const newPassword = req.body?.new_password;
-    if (!RESET_ID_PATTERN.test(resetId)) {
-      return res.status(400).json({ error: 'A valid reset_id is required' });
-    }
-    if (!newPassword || !validatePassword(newPassword)) {
-      return res.status(400).json({
-        error: PASSWORD_POLICY_MESSAGE,
-      });
-    }
-
-    // Resolve the account before consuming the single-use grant.
-    const email = cloudSync.getRegisteredOwnerEmail();
-    const user = db
-      .prepare('SELECT * FROM users WHERE lower(email) = ? AND role = ? AND is_active = 1')
-      .get(email, INITIAL_ADMIN_ROLE) as any;
-    if (!user) {
-      return res
-        .status(404)
-        .json({ error: 'No active owner account matches the registered email.' });
-    }
-
-    try {
-      await cloudSync.redeemPasswordReset(resetId, getHttpRequestSignal(req));
-    } catch (error) {
-      if (error instanceof CloudRequestError && error.status === 409) {
-        return res.status(409).json({ error: 'This reset has not been approved or has expired.' });
-      }
-      return sendCloudRecoveryFailure(res, error);
-    }
-
-    const recovery = applyOwnerRecovery(db, user, newPassword, 'FloAdmin email approval');
-    if (!recovery.ok) {
-      return res.status(409).json({
-        error:
-          'Owner access changed during recovery. This reset approval was used and cannot be reused. Request a new password reset.',
-      });
-    }
-    res.json({
-      message: recovery.restoredOwnerAccess
-        ? 'Owner access restored. You can now log in with your new password.'
-        : 'Password reset successfully. You can now log in with your new password.',
-    });
-  }),
-);
-
-// ── GET /api/auth/setup/status ──────────────────────────────────────────────────
-// Returns whether the app needs setup (no users exist yet)
-
 router.get('/setup/status', (_req: Request, res: Response) => {
   try {
     const db = getDatabase();
@@ -829,7 +662,6 @@ router.get('/setup/status', (_req: Request, res: Response) => {
       initialRole: INITIAL_ADMIN_ROLE,
       schemaVersion: getCurrentSchemaVersion(),
       masterPinAvailable: isMasterPinAvailable(),
-      cloudRecoveryAvailable: cloudSync.isEmailRecoveryAvailable(),
       currencyReset,
     });
   } catch (error: any) {
@@ -994,20 +826,6 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid service model' });
     }
 
-    // Rest&Cafe: new installs start local-only; cloud coordination stays off
-    // and no cloud server URL is validated or seeded.
-    const cloudSyncEnabled = false;
-    let normalizedCloudServerUrl: string | undefined;
-    if (cloudSyncEnabled) {
-      try {
-        normalizedCloudServerUrl = normalizeCloudServerUrl(
-          cloud_server_url || DEFAULT_CLOUD_SERVER_URL,
-        );
-      } catch {
-        return res.status(400).json({ error: 'Cloud server URL must be a valid HTTPS URL' });
-      }
-    }
-
     let userId = '';
     const hashedPassword = bcrypt.hashSync(password, 10);
     const hashedApprovalPin = bcrypt.hashSync(ownerApprovalPin, 10);
@@ -1075,13 +893,8 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
         anonymous_data_consent: 'false',
         telemetry_enabled: 'false',
         split_checks_enabled: 'false',
-        // '1'/'0', not 'true'/'false' — mirrors FloAdmin's own `stores` table and
-        // matches how cloud-sync.ts reads this key everywhere else.
-        cloud_sync_enabled: cloudSyncEnabled ? '1' : '0',
-        cloud_server_url: normalizedCloudServerUrl || DEFAULT_CLOUD_SERVER_URL,
         email_product_updates: email_product_updates === true ? 'true' : 'false',
         email_marketing: email_marketing === true ? 'true' : 'false',
-        cloud_services_disabled_by_user: 'false',
       });
 
       if (!pendingCurrencyReset) {
@@ -1091,18 +904,6 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
         db.prepare("DELETE FROM _flo_meta WHERE key = 'currency_reset_pending'").run();
       }
     })();
-
-    // Reload cloud sync and registration profile immediately after setup.
-    try {
-      cloudSync.reload();
-    } catch (error) {
-      console.warn('[Auth] Cloud settings reload deferred after setup:', error);
-    }
-    try {
-      cloudSync.refreshRegistrationProfile();
-    } catch (error) {
-      console.warn('[Auth] Cloud registration profile refresh deferred after setup:', error);
-    }
 
     const token = jwt.sign(
       { userId, email, role: INITIAL_ADMIN_ROLE, jti: randomUUID() },

@@ -3,7 +3,7 @@ import { getDatabase, now, generateShortId, getSettingValue } from '../db';
 import { randomUUID } from 'node:crypto';
 import { requirePermission } from '../services/authorization';
 import { adjustProductStock } from '../services/inventory';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { getActiveCountryPack, hasConfiguredTaxCategories } from '../services/tax';
 import {
@@ -69,7 +69,7 @@ function captureInvalidMenuCsvInput(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change CSV import responses.
   }
@@ -83,7 +83,7 @@ function captureMenuCsvRowRejections(failedCount: number, changedCount: number):
     facts: { failed_count: failedCount, changed_count: changedCount },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change CSV import responses.
   }

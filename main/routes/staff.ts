@@ -10,7 +10,7 @@ import {
   AdministrationUnreachableError,
   assertAdministrationReachable,
 } from '../services/authorization';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { isValidEmail } from './auth';
 import { ROLE_ACCESS, ROLE_KEYS, OPERATIONAL_ROLES, hasRole } from '../../shared/role-permissions';
@@ -37,7 +37,7 @@ function captureAdministrationAccessGuard(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change a protected staff decision.
   }
@@ -53,7 +53,7 @@ function captureStaffValidation(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change staff validation responses.
   }
@@ -66,7 +66,7 @@ function captureStaffTargetAccessDenied(action: string): void {
     facts: { action },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change staff authorization decisions.
   }
@@ -328,7 +328,7 @@ router.post('/', requireStaffWrite, authRateLimit(), (req: Request, res: Respons
         outcome: 'not_applied',
       });
       try {
-        if (failure) cloudSync.captureOperationFailure(failure);
+        if (failure) operationDiagnostics.captureOperationFailure(failure);
       } catch {
         // Diagnostics cannot change the duplicate-email response.
       }
@@ -460,7 +460,7 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
           outcome: 'not_applied',
         });
         try {
-          if (failure) cloudSync.captureOperationFailure(failure);
+          if (failure) operationDiagnostics.captureOperationFailure(failure);
         } catch {
           // Diagnostics cannot change the duplicate-email response.
         }
@@ -561,7 +561,6 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
     invalidateUserAuthCache(req.params.id as string);
     if (ownerEmailSynced) {
       try {
-        cloudSync.refreshRegistrationProfile();
       } catch {
         // Cloud profile refresh is best-effort and must not fail staff updates.
       }
@@ -625,7 +624,6 @@ router.post('/:id/deactivate', requireStaffWrite, (req: Request, res: Response) 
     invalidateUserAuthCache(req.params.id as string);
     if (ownerEmailSynced) {
       try {
-        cloudSync.refreshRegistrationProfile();
       } catch {
         // Cloud profile refresh is best-effort and must not fail staff deactivation.
       }

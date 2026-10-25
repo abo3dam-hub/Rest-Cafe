@@ -49,7 +49,7 @@ const {
   nextZNumber,
 } = require('../main/db');
 const { getJWTSecret } = require('../main/routes/auth');
-const { cloudSync } = require('../main/services/cloud-sync');
+const { operationDiagnostics } = require('../main/services/operation-diagnostics');
 const { cashClosureRoutes } = require('../main/routes/cash-closures');
 const { reportRoutes } = require('../main/routes/reports');
 const { getCurrencyFractionDigits, resolveTenantCurrency } = require('../main/countries');
@@ -3061,8 +3061,8 @@ async function main() {
         'movement reason text stays out of the local diagnostic facts',
       );
 
-      const originalCapture = cloudSync.captureOperationFailure;
-      cloudSync.captureOperationFailure = () => {
+      const originalCapture = operationDiagnostics.captureOperationFailure;
+      operationDiagnostics.captureOperationFailure = () => {
         throw new Error('private diagnostics sink failure');
       };
       let sinkFailureResponse: any;
@@ -3072,7 +3072,7 @@ async function main() {
           .set('Authorization', `Bearer ${cashierToken}`)
           .send(diagnosticsMovementBody('pay_in', 100, 'capture_failure_probe'));
       } finally {
-        cloudSync.captureOperationFailure = originalCapture;
+        operationDiagnostics.captureOperationFailure = originalCapture;
       }
       assertEqual(
         sinkFailureResponse.status,

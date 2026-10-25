@@ -37,7 +37,6 @@ const {
   getCurrentSchemaVersion,
   MIGRATIONS,
 } = require('../main/db');
-const { cloudSync } = require('../main/services/cloud-sync');
 const { authRoutes } = require('../main/routes/auth');
 
 function count(table: string): number {
@@ -81,12 +80,6 @@ async function main() {
   console.log('🧪 FloDesktop First-Run Setup Tests');
   console.log('='.repeat(60));
 
-  let profileRefreshes = 0;
-  const originalRefreshRegistrationProfile = cloudSync.refreshRegistrationProfile.bind(cloudSync);
-  cloudSync.refreshRegistrationProfile = () => {
-    profileRefreshes++;
-  };
-
   try {
     initDatabase();
   } catch (error: any) {
@@ -112,17 +105,14 @@ async function main() {
   assert.equal(count('printers'), 0, 'fresh install starts with no default printer');
   assert.equal(
     setting('cloud_server_url'),
-    '',
-    'cloud server URL is empty in the Rest&Cafe local-only build',
+    null,
+    'no cloud server URL is seeded in the local-only build',
   );
-  assert.match(
-    setting('cloud_pos_hash') || '',
-    /^pos_[a-f0-9]{40}$/,
-    'fresh install has a POS hash',
-  );
-  assert.ok(
-    (setting('cloud_device_secret') || '').length >= 32,
-    'fresh install has a local cloud secret',
+  assert.equal(setting('cloud_pos_hash'), null, 'no cloud POS hash is minted on a fresh install');
+  assert.equal(
+    setting('cloud_device_secret'),
+    null,
+    'no cloud device secret is minted on a fresh install',
   );
   assert.equal(count('cloud_sync_outbox'), 0, 'fresh install starts with an empty cloud outbox');
   assert.equal(count('country_packs'), 1, 'fresh install registers only the generic tax pack');
@@ -431,11 +421,6 @@ async function main() {
       'false',
       'Rest&Cafe: store diagnostics consent is off by default for a new install',
     );
-    assert.equal(
-      profileRefreshes,
-      1,
-      'setup immediately refreshes the completed store profile in FloAdmin',
-    );
     assert.equal(count('categories'), 2, 'express setup seeds minimal categories');
     assert.equal(count('products'), 4, 'express setup seeds minimal products');
     assert.equal(count('tables'), 0, 'qsr express setup does not seed dine-in tables');
@@ -488,17 +473,16 @@ async function main() {
     // and no cloud server URL is seeded (the local build never phones home).
     assert.equal(
       setting('cloud_sync_enabled'),
-      '0',
-      'cloud coordination stays disabled on setup in the local-only build',
+      null,
+      'no cloud sync flag is seeded on setup in the local-only build',
     );
     assert.equal(
       setting('cloud_server_url'),
-      '',
-      'cloud server URL is empty in the local-only build',
+      null,
+      'no cloud server URL is seeded in the local-only build',
     );
     console.log('   ✓ setup endpoint keeps the install local-only');
   } finally {
-    cloudSync.refreshRegistrationProfile = originalRefreshRegistrationProfile;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 
@@ -558,10 +542,10 @@ async function main() {
     assert.equal(count('users'), 1, 'the owner is created; cloud input does not block setup');
     assert.equal(
       setting('cloud_sync_enabled'),
-      '0',
-      'cloud sync stays disabled even when requested at setup',
+      null,
+      'cloud sync is never enabled, even when requested at setup',
     );
-    assert.equal(setting('cloud_server_url'), '', 'no cloud server URL is persisted at setup');
+    assert.equal(setting('cloud_server_url'), null, 'no cloud server URL is persisted at setup');
     console.log('   ✓ setup ignores cloud opt-in fields and stays local-only');
   } finally {
     await new Promise<void>((resolve) => cloudServer.close(() => resolve()));
@@ -570,14 +554,12 @@ async function main() {
 
 main()
   .then(() => {
-    cloudSync.stop();
     closeDatabase();
     Module._load = originalLoad;
     fs.rmSync(testDir, { recursive: true, force: true });
     console.log('\n✅ First-run setup tests passed');
   })
   .catch((error) => {
-    cloudSync.stop();
     try {
       closeDatabase();
     } catch {}

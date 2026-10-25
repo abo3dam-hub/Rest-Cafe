@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import expressRateLimit from 'express-rate-limit';
 import { getDatabase, now, generateShortId } from '../db';
 import { requirePermission } from '../services/authorization';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 
 const router = Router();
@@ -150,7 +150,7 @@ function captureParentCategoryRejection(kind: 'reference_invalid' | 'cycle'): vo
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change the category validation response.
   }
@@ -165,7 +165,7 @@ function captureCategoryValidation(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change category validation responses.
   }
@@ -185,7 +185,7 @@ function captureCategoryDeleteRejection(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change category deletion responses.
   }

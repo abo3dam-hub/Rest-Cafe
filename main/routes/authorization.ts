@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, now, verifyPin } from '../db';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { requirePermission } from '../services/authorization';
 import {
@@ -34,7 +34,7 @@ function captureAuthorizationRejection(capturePoint: string): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change an authorization decision.
   }
@@ -49,7 +49,7 @@ function captureAuthorizationInputRejection(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change permission configuration responses.
   }

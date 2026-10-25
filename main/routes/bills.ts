@@ -18,7 +18,7 @@ import {
 import { asyncHandler } from '../middleware/async-handler';
 import { notifyKdsUpdate, notifyOrderUpdated } from '../services/kds';
 import { printReceipt } from '../services/receipt';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { hasPermission, requirePermission } from '../services/authorization';
 import { ROLE_ACCESS, hasRole } from '../../shared/role-permissions';
 import { isExcludedFromBillReceipt } from '../../shared/order-item-status';
@@ -130,7 +130,7 @@ function structuredBillFailure(
   if (!failure) return { error };
   (req as Request & { diagnosticsCaptured?: boolean }).diagnosticsCaptured = true;
   try {
-    cloudSync.captureOperationFailure(failure);
+    operationDiagnostics.captureOperationFailure(failure);
   } catch {
     /* Diagnostics must not affect billing. */
   }

@@ -8,7 +8,7 @@ import {
   RecipeServiceError,
   saveRecipe,
 } from '../services/recipes';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 
 const router = Router();
@@ -23,7 +23,7 @@ function sendError(res: Response, error: unknown): void {
       facts: { validation_code: error.diagnosticCode },
     });
     try {
-      if (failure) cloudSync.captureOperationFailure(failure);
+      if (failure) operationDiagnostics.captureOperationFailure(failure);
     } catch {
       // Diagnostics cannot change the recipe validation response.
     }

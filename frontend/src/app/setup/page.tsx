@@ -14,7 +14,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Cloud,
   Database,
   KeyRound,
   Sparkles,
@@ -58,9 +57,6 @@ const SELECTABLE_LANGUAGES: Language[] = (Object.keys(LANGUAGES) as Language[]).
   (lang) => LANGUAGES[lang].selectable,
 );
 
-// Mirrors main/services/cloud-sync.ts DEFAULT_CLOUD_SERVER_URL — kept in sync
-// manually since the frontend can't import backend TS modules directly.
-const DEFAULT_CLOUD_SERVER_URL = 'https://blue.flopos.com/';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUSPECT_EMAIL_TLDS = new Set(['example', 'invalid', 'lcaol', 'local', 'localhost', 'test']);
 
@@ -123,9 +119,6 @@ export default function SetupPage() {
   const [ownerApprovalPinConfirm, setOwnerApprovalPinConfirm] = useState('');
   const ownerApprovalPinValid =
     /^\d{4,6}$/.test(ownerApprovalPin) && ownerApprovalPin === ownerApprovalPinConfirm;
-
-  const cloudEnabled = true;
-  const [cloudServerUrl, setCloudServerUrl] = useState(DEFAULT_CLOUD_SERVER_URL);
 
   const isPasswordValid = validatePassword;
   const passwordMeetsRequirements = form.password.length === 0 || isPasswordValid(form.password);
@@ -232,24 +225,6 @@ export default function SetupPage() {
       return;
     }
 
-    if (cloudEnabled && cloudServerUrl.trim()) {
-      try {
-        const parsed = new URL(cloudServerUrl.trim());
-        const localHttp =
-          parsed.protocol === 'http:' &&
-          ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
-        if (parsed.protocol !== 'https:' && !localHttp) {
-          toast.error(t('cloudUrlHttpsRequired'));
-          setStep(5);
-          return;
-        }
-      } catch {
-        toast.error(t('cloudUrlInvalid'));
-        setStep(5);
-        return;
-      }
-    }
-
     setLoading(true);
     try {
       const regionalPayload = {
@@ -271,8 +246,6 @@ export default function SetupPage() {
         master_pin: masterPinAvailable ? masterPin : undefined,
         owner_approval_pin: ownerApprovalPin,
         owner_approval_pin_confirmation: ownerApprovalPinConfirm,
-        cloud_sync_enabled: true,
-        cloud_server_url: cloudServerUrl.trim() || DEFAULT_CLOUD_SERVER_URL,
         email_product_updates: productUpdates,
         email_marketing: marketing,
         ...regionalPayload,
@@ -818,65 +791,6 @@ export default function SetupPage() {
                   })}
                 </div>
 
-                <Button onClick={() => setStep(5)} className="w-full" size="lg">
-                  {t('continue')} <ArrowRight className="w-4 h-4 ms-2 rtl-flip" />
-                </Button>
-              </div>
-            )}
-
-            {step === 5 && (
-              <div className="space-y-6">
-                <button
-                  onClick={() => setStep(4)}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4 rtl-flip" /> {t('back')}
-                </button>
-
-                <div className="text-center">
-                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Cloud className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-xl font-semibold mb-2">{t('cloudTitle')}</h2>
-                  <p className="text-muted-foreground text-sm">{t('cloudSubtitle')}</p>
-                </div>
-
-                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border-2 border-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={cloudEnabled}
-                    disabled
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                  />
-                  <span>
-                    <span className="font-medium text-foreground">
-                      {t('cloudManagedAutomaticallyTitle')}
-                    </span>
-                    <span className="block text-sm text-muted-foreground mt-1">
-                      {t('cloudManagedAutomaticallyDescription')}
-                    </span>
-                  </span>
-                </label>
-
-                {cloudEnabled && (
-                  <div className="space-y-2">
-                    <Label htmlFor="cloud-server-url">{t('cloudUrlLabel')}</Label>
-                    <Input
-                      id="cloud-server-url"
-                      type="url"
-                      value={cloudServerUrl}
-                      onChange={(e) => setCloudServerUrl(e.target.value)}
-                      placeholder={DEFAULT_CLOUD_SERVER_URL}
-                      dir="ltr"
-                    />
-                    <p className="text-xs text-muted-foreground">{t('cloudUrlHint')}</p>
-                  </div>
-                )}
-
-                <p className="text-xs text-muted-foreground bg-muted rounded-lg p-3">
-                  {cloudEnabled ? t('cloudRecoveryNoteEnabled') : t('cloudRecoveryNoteDisabled')}
-                </p>
-
                 <Button onClick={() => setStep(6)} className="w-full" size="lg">
                   {t('continue')} <ArrowRight className="w-4 h-4 ms-2 rtl-flip" />
                 </Button>
@@ -886,7 +800,7 @@ export default function SetupPage() {
             {step === 6 && (
               <div className="space-y-6">
                 <button
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(4)}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4 rtl-flip" /> {t('back')}

@@ -29,16 +29,10 @@ import {
   Lock,
   Smartphone,
   RefreshCw,
-  Copy,
-  Check,
   Trash2,
   Plus,
   ChefHat,
   QrCode,
-  CheckCircle2,
-  Cloud,
-  CloudOff,
-  Zap,
   Percent,
   AlertTriangle,
   SunMoon,
@@ -94,20 +88,13 @@ import { SettingsTabShell } from '@/components/settings/SettingsTabShell';
 import type { HealthCheckReport } from '@/types/electron';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
-import { useFormatDate } from '@/hooks/useFormatDate';
 import { tenantCan } from '@/lib/permissions';
 
-const CLOUD_ACCOUNT_STATUS_CHANGED_EVENT = 'flo:cloud-account-status-changed';
 // Must match RESTORE_CONFIRMATION in main/routes/database.ts.
 const RESTORE_CONFIRMATION = 'RESTORE BACKUP';
 
 function isRequestCancelled(error: unknown): boolean {
   return axios.isCancel(error);
-}
-
-function notifyCloudAccountStatusChanged(): void {
-  if (typeof window !== 'undefined')
-    window.dispatchEvent(new Event(CLOUD_ACCOUNT_STATUS_CHANGED_EVENT));
 }
 
 const CLASSIC_PREVIEW = `   STORE NAME
@@ -330,13 +317,11 @@ export default function SettingsPage() {
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const tRestore = useTranslations('restore');
-  const { formatDate, formatTime, formatDateTime } = useFormatDate();
   const isAdmin = tenantCan(currentTenant, 'settings.manage');
-  const isOwner = tenantCan(currentTenant, 'cloud.account.manage');
+  const isOwner = currentTenant?.role === 'owner';
   const canManageDatabase = tenantCan(currentTenant, 'database.manage');
   const canManageTaxPacks = tenantCan(currentTenant, 'tax-packs.manage');
   const canViewTaxConfiguration = tenantCan(currentTenant, 'tax-packs.view-test');
-  const canManageMobileAccess = tenantCan(currentTenant, 'mobile-access.manage');
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
@@ -418,17 +403,9 @@ export default function SettingsPage() {
   const loadedSettingsTabs = useRef(new Set<string>());
   const settingsTabLoadPromises = useRef(new Map<string, Promise<void>>());
   const settingsTabLoadControllers = useRef(new Map<string, AbortController>());
-  const mobileAccessRequestGeneration = useRef(0);
-  const mobileAccessRequestController = useRef<AbortController | null>(null);
   const businessHydrationPromise = useRef<Promise<void> | null>(null);
   const businessHydrationTenant = useRef<number | null>(null);
   const businessHydrated = useRef(false);
-  const cloudHydrationPromise = useRef<Promise<void> | null>(null);
-  const cloudHydrationTenant = useRef<number | null>(null);
-  const cloudHydrationGeneration = useRef(0);
-  const cloudHydrated = useRef(false);
-  const cloudHydrationSucceeded = useRef(false);
-  const cloudRegistrationStatus = useRef('unregistered');
   const healthCheckLoaded = useRef<string | null>(null);
   const [masterPinStatus, setMasterPinStatus] = useState<MasterPinStatus>({
     available: false,
@@ -534,57 +511,6 @@ export default function SettingsPage() {
   const [backupsLoadingMore, setBackupsLoadingMore] = useState(false);
   const [backupsLoadMoreError, setBackupsLoadMoreError] = useState<string | null>(null);
   const backupsGenerationRef = useRef(0);
-  const [cloudAccount, setCloudAccount] = useState<{
-    email?: string | null;
-    cloud_account_available?: boolean;
-    verified?: boolean;
-    verified_at?: string | null;
-    verification_sent_at?: string | null;
-    product_updates?: boolean;
-    marketing?: boolean;
-    deletion_request?: {
-      id?: string;
-      status?:
-        | 'pending'
-        | 'processing'
-        | 'approved'
-        | 'completed'
-        | 'deleted'
-        | 'failed'
-        | 'rejected'
-        | 'cancelled';
-      requested_at?: string;
-      reviewed_at?: string | null;
-      decision_note?: string | null;
-    } | null;
-  } | null>(null);
-  const [cloudAccountBusy, setCloudAccountBusy] = useState(false);
-  const [cloudAccountLoadFailed, setCloudAccountLoadFailed] = useState(false);
-  const [refreshingDeletionStatus, setRefreshingDeletionStatus] = useState(false);
-  const cloudAccountAvailable =
-    !cloudAccountLoadFailed && cloudAccount?.cloud_account_available !== false;
-  const cloudDeletionStatus = cloudAccount?.deletion_request?.status || '';
-  const cloudDeletionPending = cloudDeletionStatus === 'pending';
-  const cloudDeletionNeedsResolution = ['pending', 'processing', 'failed'].includes(
-    cloudDeletionStatus,
-  );
-  const cloudDeletionCanCancel =
-    ['pending', 'processing'].includes(cloudDeletionStatus) &&
-    Boolean(cloudAccount?.deletion_request?.id);
-
-  const fetchCloudAccount = async (signal?: AbortSignal): Promise<boolean> => {
-    try {
-      const { data } = await api.get('/settings/cloud/account', signal ? { signal } : undefined);
-      if (signal?.aborted) return false;
-      setCloudAccount(data);
-      setCloudAccountLoadFailed(false);
-      return true;
-    } catch (error) {
-      if (isRequestCancelled(error)) return false;
-      setCloudAccountLoadFailed(true);
-      return false;
-    }
-  };
 
   const fetchMasterPinStatus = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
     try {
@@ -795,37 +721,6 @@ export default function SettingsPage() {
       }
     }
 
-    if (pinGate.mode === 'delete-cloud') {
-      try {
-        await api.post('/settings/cloud/delete-data', {
-          master_pin: pin,
-          confirmation: 'DELETE CLOUD DATA',
-        });
-        toast.success(t('cloudDeletionSubmitted'));
-        await Promise.all([fetchCloudAccount(), refreshCloudStatus()]);
-        notifyCloudAccountStatusChanged();
-        setPinGate(null);
-        return { success: true };
-      } catch {
-        await Promise.all([fetchCloudAccount(), refreshCloudStatus()]);
-        notifyCloudAccountStatusChanged();
-        return { success: false, error: t('cloudDeletionFailed') };
-      }
-    }
-
-    if (pinGate.mode === 'cancel-cloud-deletion') {
-      try {
-        await api.post('/settings/cloud/delete-data/cancel', { master_pin: pin });
-        toast.success(t('cloudDeletionCancelled'));
-        await Promise.all([fetchCloudAccount(), refreshCloudStatus()]);
-        notifyCloudAccountStatusChanged();
-        setPinGate(null);
-        return { success: true };
-      } catch {
-        return { success: false, error: t('cloudDeletionCancelFailed') };
-      }
-    }
-
     // mode === 'import'
     const result = await runImport(pinGate.payload.data, pinGate.payload.overwrite, pin);
     if (result.success) setPinGate(null);
@@ -1026,7 +921,6 @@ export default function SettingsPage() {
   const [moreApps, setMoreApps] = useState<MoreApp[]>([]);
   // Starts true until the About tab performs its first load.
   const [moreAppsLoading, setMoreAppsLoading] = useState(true);
-  const [revflo, setRevflo] = useState<MoreApp | null>(null);
 
   // ── Printers ─────────────────────────────────────────────────────────────
   const [hwPrinters, setHwPrinters] = useState<HwPrinter[]>([]);
@@ -1285,28 +1179,6 @@ export default function SettingsPage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Mobile App Pairing
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
-  const [pairingQrDataUrl, setPairingQrDataUrl] = useState<string | null>(null);
-  // Defaults true so button cannot be clicked before registration status
-  // is known from /settings/cloud.
-  const [pairingUnavailable, setPairingUnavailable] = useState(true);
-  const [rotatingCode, setRotatingCode] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [pairedDevices, setPairedDevices] = useState<
-    Array<{
-      id: string;
-      platform: string | null;
-      app_version: string | null;
-      user_agent: string | null;
-      country: string | null;
-      first_seen_at: string | null;
-      last_seen_at: string | null;
-    }>
-  >([]);
-  const [devicesLoading, setDevicesLoading] = useState(false);
-
   // Printing local state (buffered — saved only on explicit Save)
   const initPrinting = (): PrintingForm => ({
     printerEnabled: posSettings.printerEnabled,
@@ -1525,84 +1397,6 @@ export default function SettingsPage() {
   );
   const [taxIdFormatCountryCode, setTaxIdFormatCountryCode] = useState('');
 
-  const [cloudSettings, setCloudSettings] = useState({
-    cloud_api_key: '',
-    cloud_store_id: '',
-    cloud_sync_enabled: false,
-    cloud_orders_enabled: false,
-    cloud_last_sync: null as string | null,
-  });
-  const [savedCloudSettings, setSavedCloudSettings] = useState(cloudSettings);
-  const cloudSettingsRef = useRef(cloudSettings);
-  const [cloudStatus, setCloudStatus] = useState({
-    cloud_registration_status: 'unregistered',
-    cloud_services_disabled_by_user: false,
-    cloud_connected: false,
-    cloud_relay_mode: 'disconnected',
-    cloud_last_heartbeat: null as string | null,
-    cloud_last_error: null as string | null,
-    cloud_deletion_status: '',
-  });
-  const [cloudPrivacyHydrated, setCloudPrivacyHydrated] = useState(false);
-
-  const [savingCloud, setSavingCloud] = useState(false);
-  const [registeringCloud, setRegisteringCloud] = useState(false);
-  const [showInitializeCloudConfirm, setShowInitializeCloudConfirm] = useState(false);
-
-  const cloudServicesStopped = cloudStatus.cloud_services_disabled_by_user;
-  const cloudDeletionFinal =
-    !cloudPrivacyHydrated ||
-    cloudAccountLoadFailed ||
-    cloudStatus.cloud_registration_status === 'deleted' ||
-    ['approved', 'completed', 'deleted'].includes(cloudStatus.cloud_deletion_status);
-  const cloudDeletionNeedsAction =
-    !cloudDeletionFinal &&
-    (cloudDeletionNeedsResolution ||
-      ['processing', 'failed'].includes(cloudStatus.cloud_deletion_status));
-
-  const refreshCloudStatus = async () => {
-    try {
-      const { data } = await api.get('/settings/cloud');
-      setCloudStatus({
-        cloud_registration_status: data.cloud_registration_status || 'unregistered',
-        cloud_services_disabled_by_user: !!data.cloud_services_disabled_by_user,
-        cloud_connected: !!data.cloud_connected,
-        cloud_relay_mode: data.cloud_relay_mode || 'disconnected',
-        cloud_last_heartbeat: data.cloud_last_heartbeat || null,
-        cloud_last_error: data.cloud_last_error || null,
-        cloud_deletion_status: data.cloud_deletion_status || '',
-      });
-      setCloudSettings((previous) => ({
-        ...previous,
-        cloud_sync_enabled: !!data.cloud_sync_enabled,
-        cloud_orders_enabled: !!data.cloud_orders_enabled,
-        cloud_last_sync: data.cloud_last_sync || null,
-      }));
-      setSavedCloudSettings((previous) => ({
-        ...previous,
-        cloud_sync_enabled: !!data.cloud_sync_enabled,
-        cloud_orders_enabled: !!data.cloud_orders_enabled,
-        cloud_last_sync: data.cloud_last_sync || null,
-      }));
-    } catch {
-      // Keep the last known status if the local settings request fails.
-    }
-  };
-
-  const refreshDeletionStatus = async () => {
-    setRefreshingDeletionStatus(true);
-    try {
-      await api.get('/settings/cloud/delete-data/status');
-      await Promise.all([fetchCloudAccount(), refreshCloudStatus()]);
-      notifyCloudAccountStatusChanged();
-      toast.success(t('cloudDeletionStatusRefreshed'));
-    } catch {
-      toast.error(t('cloudDeletionStatusRefreshFailed'));
-    } finally {
-      setRefreshingDeletionStatus(false);
-    }
-  };
-
   const [diagnosticsConsent, setDiagnosticsConsent] = useState(true);
   const [savingDiagnosticsConsent, setSavingDiagnosticsConsent] = useState(false);
 
@@ -1647,7 +1441,6 @@ export default function SettingsPage() {
     printingFormRef.current = printingForm;
     billFormRef.current = billForm;
     businessFormRef.current = form;
-    cloudSettingsRef.current = cloudSettings;
     orderNumberFormRef.current = orderNumberForm;
   }, [
     loyaltyEnabled,
@@ -1660,7 +1453,6 @@ export default function SettingsPage() {
     printingForm,
     billForm,
     form,
-    cloudSettings,
     orderNumberForm,
   ]);
 
@@ -1799,20 +1591,6 @@ export default function SettingsPage() {
     }
   };
 
-  const loadPairedDevices = async (signal?: AbortSignal) => {
-    setDevicesLoading(true);
-    try {
-      const res = await api.get('/mobile/devices', signal ? { signal } : undefined);
-      if (signal?.aborted) return;
-      setPairedDevices(res.data.devices || []);
-    } catch (error) {
-      if (isRequestCancelled(error)) return;
-      setPairedDevices([]);
-    } finally {
-      if (!signal?.aborted) setDevicesLoading(false);
-    }
-  };
-
   const applyKitchenSettingValue = (
     field: 'kdsEnabled' | 'kotPrintingEnabled' | 'requireKitchenDelivered',
     enabled: boolean,
@@ -1832,11 +1610,7 @@ export default function SettingsPage() {
     setRequireKitchenDeliveredSetting(enabled);
   };
 
-  const loadSettingsTab = async (
-    tab: string,
-    signal: AbortSignal,
-    includeStatusOnly = true,
-  ): Promise<void> => {
+  const loadSettingsTab = async (tab: string, signal: AbortSignal): Promise<void> => {
     const get = async (path: string) => {
       for (let attempt = 0; ; attempt += 1) {
         try {
@@ -1986,125 +1760,6 @@ export default function SettingsPage() {
         if (businessHydrationPromise.current === promise) businessHydrationPromise.current = null;
         throw error;
       }
-    };
-
-    const loadCloud = async (required = false) => {
-      const cloudSettingsAtHydrationStart = { ...cloudSettingsRef.current };
-      let registrationStatus = cloudRegistrationStatus.current;
-      const tenantId = currentTenant?.id ?? null;
-      if (cloudHydrationTenant.current !== tenantId) {
-        cloudHydrationTenant.current = tenantId;
-        cloudHydrationGeneration.current += 1;
-        cloudHydrated.current = false;
-        cloudHydrationSucceeded.current = false;
-        cloudHydrationPromise.current = null;
-        cloudRegistrationStatus.current = 'unregistered';
-        setCloudPrivacyHydrated(false);
-      }
-      const loadGeneration = cloudHydrationGeneration.current;
-      try {
-        if (cloudHydrated.current) {
-          if (required && !cloudHydrationSucceeded.current && active())
-            throw new Error('Cloud hydration failed');
-          registrationStatus = cloudRegistrationStatus.current;
-        } else {
-          if (cloudHydrationPromise.current) {
-            try {
-              await cloudHydrationPromise.current;
-            } catch (error) {
-              if (cloudHydrationGeneration.current !== loadGeneration || !active()) return;
-              if (!isRequestCancelled(error)) throw error;
-            }
-          }
-          if (cloudHydrationGeneration.current !== loadGeneration || !active()) {
-            return;
-          }
-          if (cloudHydrated.current) {
-            if (required && !cloudHydrationSucceeded.current && active())
-              throw new Error('Cloud hydration failed');
-            registrationStatus = cloudRegistrationStatus.current;
-          } else {
-            const requestGeneration = cloudHydrationGeneration.current;
-            const promise = (async () => {
-              const { data } = await get('/settings/cloud');
-              if (!active()) {
-                if (cloudHydrationGeneration.current === requestGeneration) {
-                  cloudHydrationPromise.current = null;
-                }
-                return;
-              }
-              if (cloudHydrationGeneration.current !== requestGeneration) return;
-              const settings = {
-                cloud_api_key: data.cloud_api_key || '',
-                cloud_store_id: data.cloud_store_id || '',
-                cloud_sync_enabled: !!data.cloud_sync_enabled,
-                cloud_orders_enabled: !!data.cloud_orders_enabled,
-                cloud_last_sync: data.cloud_last_sync || null,
-              };
-              registrationStatus = data.cloud_registration_status || 'unregistered';
-              cloudRegistrationStatus.current = registrationStatus;
-              const mergedCloudSettings = mergeHydratedValues(
-                cloudSettingsRef.current,
-                cloudSettingsAtHydrationStart,
-                settings,
-                hydrationTouchSnapshot,
-              );
-              setCloudSettings(mergedCloudSettings);
-              setSavedCloudSettings(settings);
-              setCloudStatus({
-                cloud_registration_status: data.cloud_registration_status || 'unregistered',
-                cloud_services_disabled_by_user: !!data.cloud_services_disabled_by_user,
-                cloud_connected: !!data.cloud_connected,
-                cloud_relay_mode: data.cloud_relay_mode || 'disconnected',
-                cloud_last_heartbeat: data.cloud_last_heartbeat || null,
-                cloud_last_error: data.cloud_last_error || null,
-                cloud_deletion_status: data.cloud_deletion_status || '',
-              });
-              cloudHydrationSucceeded.current = true;
-              cloudHydrated.current = true;
-            })();
-            cloudHydrationPromise.current = promise;
-            try {
-              await promise;
-            } catch (error) {
-              if (cloudHydrationPromise.current === promise && isRequestCancelled(error)) {
-                cloudHydrationPromise.current = null;
-              }
-              throw error;
-            }
-          }
-        }
-      } catch (error) {
-        if (!active() || isRequestCancelled(error) || required) throw error;
-        cloudHydrationSucceeded.current = false;
-        cloudHydrated.current = true;
-        cloudRegistrationStatus.current = 'unregistered';
-        registrationStatus = 'unregistered';
-        setCloudStatus((previous) => ({
-          ...previous,
-          cloud_registration_status: 'unregistered',
-          cloud_connected: false,
-          cloud_relay_mode: 'disconnected',
-        }));
-      }
-
-      if (tab !== 'mobile-access' || !includeStatusOnly || !active()) return;
-      if (registrationStatus !== 'registered') {
-        setPairingUnavailable(true);
-        return;
-      }
-      try {
-        const pairingResponse = await get('/mobile/pairing-code');
-        if (active()) {
-          setPairingCode(pairingResponse.data.pairing_code);
-          setPairingExpiresAt(pairingResponse.data.expires_at);
-          setPairingQrDataUrl(pairingResponse.data.qr_data_url || null);
-          setPairingUnavailable(false);
-        }
-      } catch (error) {
-        if (!isRequestCancelled(error) && active()) setPairingUnavailable(true);
-      }
-      await loadPairedDevices(signal);
     };
 
     const loadPrinting = async (
@@ -2491,23 +2146,11 @@ export default function SettingsPage() {
         return;
       }
       if (tab === 'privacy') {
-        setCloudPrivacyHydrated(false);
         const diagnosticsResponse = await get('/settings/diagnostics_consent').catch(() => null);
         if (!active()) return;
         setDiagnosticsConsent(
           diagnosticsResponse ? diagnosticsResponse.data.setting?.value !== 'false' : true,
         );
-        const [cloudLoaded, accountLoaded] = await Promise.all([
-          loadCloud(true)
-            .then(() => true)
-            .catch((error) => {
-              if (isRequestCancelled(error)) throw error;
-              return false;
-            }),
-          isOwner ? fetchCloudAccount(signal) : Promise.resolve(true),
-        ]);
-        if (!cloudLoaded || !accountLoaded) throw new Error('Privacy hydration failed');
-        if (active()) setCloudPrivacyHydrated(true);
         return;
       }
       if (tab === 'data') {
@@ -2516,10 +2159,6 @@ export default function SettingsPage() {
           fetchBackups(signal),
         ]);
         if (!masterPinLoaded || !backupsLoaded) throw new Error('Data hydration failed');
-        return;
-      }
-      if (tab === 'account') {
-        if (isOwner) await fetchCloudAccount(signal);
         return;
       }
       if (tab === 'about') {
@@ -2536,17 +2175,6 @@ export default function SettingsPage() {
         }
         return;
       }
-      if (tab === 'mobile-access' || tab === 'orderflow') {
-        if (tab === 'mobile-access' && includeStatusOnly) {
-          try {
-            const revfloResponse = await get('/more-apps/revflo');
-            if (active()) setRevflo(revfloResponse.data.app || null);
-          } catch (error) {
-            if (isRequestCancelled(error)) throw error;
-          }
-        }
-        await loadCloud(!includeStatusOnly);
-      }
     } catch (error) {
       if (!isRequestCancelled(error) && active()) {
         // Individual Settings sections are best-effort; the panel remains usable
@@ -2556,21 +2184,15 @@ export default function SettingsPage() {
     }
   };
 
-  const startSettingsTabLoad = (
-    tab: string,
-    controller: AbortController,
-    includeStatusOnly = true,
-  ): Promise<void> => {
+  const startSettingsTabLoad = (tab: string, controller: AbortController): Promise<void> => {
     const tenantId = currentTenant?.id;
     if (!tenantId) return Promise.resolve();
     const { signal } = controller;
-    const key = `${tenantId}:${tab}${tab === 'mobile-access' && !includeStatusOnly ? ':status' : ''}`;
-    const requiresCloudHydration =
-      tab === 'mobile-access' && !includeStatusOnly && !cloudHydrationSucceeded.current;
-    if (loadedSettingsTabs.current.has(key) && !requiresCloudHydration) return Promise.resolve();
+    const key = `${tenantId}:${tab}`;
+    if (loadedSettingsTabs.current.has(key)) return Promise.resolve();
     const existing = settingsTabLoadPromises.current.get(key);
     if (existing) return existing;
-    const promise = loadSettingsTab(tab, signal, includeStatusOnly).then(() => {
+    const promise = loadSettingsTab(tab, signal).then(() => {
       if (!signal.aborted) loadedSettingsTabs.current.add(key);
     });
     settingsTabLoadPromises.current.set(key, promise);
@@ -2616,18 +2238,6 @@ export default function SettingsPage() {
     // The tab and tenant identity are the intentional hydration boundaries.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentTenant?.id, isOwner]);
-
-  useEffect(() => {
-    mobileAccessRequestGeneration.current += 1;
-    mobileAccessRequestController.current?.abort();
-    mobileAccessRequestController.current = null;
-    return () => {
-      mobileAccessRequestGeneration.current += 1;
-      mobileAccessRequestController.current?.abort();
-      mobileAccessRequestController.current = null;
-      setRotatingCode(false);
-    };
-  }, [activeTab, currentTenant?.id]);
 
   useEffect(() => {
     if (requestedAction !== 'health-check' || !currentTenant?.id) return;
@@ -2694,101 +2304,6 @@ export default function SettingsPage() {
     router.replace(`/settings?tab=${activeTabRef.current || 'data'}`, { scroll: false });
     void handleRestoreFromFile();
   }, [requestedAction, handleRestoreFromFile, router]);
-
-  const saveCloud = async (silent = false) => {
-    setSavingCloud(true);
-    try {
-      const resumingStoppedCloud = cloudServicesStopped && cloudSettings.cloud_sync_enabled;
-      const res = await api.put('/settings/cloud', {
-        cloud_sync_enabled: cloudSettings.cloud_sync_enabled,
-        cloud_orders_enabled: resumingStoppedCloud ? true : cloudSettings.cloud_orders_enabled,
-        cloud_reports_enabled: resumingStoppedCloud ? true : undefined,
-        cloud_command_polling_enabled: resumingStoppedCloud ? true : undefined,
-      });
-      const next = { ...cloudSettings, ...res.data };
-      setCloudSettings(next);
-      setSavedCloudSettings(next);
-      setCloudStatus({
-        cloud_registration_status: res.data.cloud_registration_status || 'unregistered',
-        cloud_services_disabled_by_user: !!res.data.cloud_services_disabled_by_user,
-        cloud_connected: !!res.data.cloud_connected,
-        cloud_relay_mode: res.data.cloud_relay_mode || 'disconnected',
-        cloud_last_heartbeat: res.data.cloud_last_heartbeat || null,
-        cloud_last_error: res.data.cloud_last_error || null,
-        cloud_deletion_status: res.data.cloud_deletion_status || '',
-      });
-      await fetchCloudAccount();
-      notifyCloudAccountStatusChanged();
-      if (!silent) toast.success(t('cloudSaved'));
-    } catch (err) {
-      if (!silent) toast.error(t('cloudSaveFailed'));
-      throw err;
-    } finally {
-      setSavingCloud(false);
-    }
-  };
-
-  const resetCloud = () => {
-    setCloudSettings(savedCloudSettings);
-  };
-
-  const registerCloud = async (email: string) => {
-    setRegisteringCloud(true);
-    try {
-      const res = await api.post('/settings/cloud/register', { email });
-      const registrationStatus = res.data.cloud_registration_status || 'unregistered';
-      cloudRegistrationStatus.current = registrationStatus;
-      cloudHydrationGeneration.current += 1;
-      cloudHydrated.current = false;
-      cloudHydrationSucceeded.current = false;
-      cloudHydrationPromise.current = null;
-      setCloudStatus({
-        cloud_registration_status: registrationStatus,
-        cloud_services_disabled_by_user: !!res.data.cloud_services_disabled_by_user,
-        cloud_connected: !!res.data.cloud_connected,
-        cloud_relay_mode: res.data.cloud_relay_mode || 'disconnected',
-        cloud_last_heartbeat: res.data.cloud_last_heartbeat || null,
-        cloud_last_error: res.data.cloud_last_error || null,
-        cloud_deletion_status: res.data.cloud_deletion_status || '',
-      });
-      setCloudSettings((prev) => ({
-        ...prev,
-        cloud_api_key: res.data.cloud_api_key || prev.cloud_api_key,
-        cloud_store_id: res.data.cloud_store_id || prev.cloud_store_id,
-      }));
-      await fetchCloudAccount();
-      notifyCloudAccountStatusChanged();
-      if (registrationStatus === 'registered') {
-        const mobileAccessKeys = currentTenant?.id
-          ? [`${currentTenant.id}:mobile-access`, `${currentTenant.id}:mobile-access:status`]
-          : [];
-        mobileAccessKeys.forEach((key) => {
-          settingsTabLoadControllers.current.get(key)?.abort();
-          settingsTabLoadControllers.current.delete(key);
-          settingsTabLoadPromises.current.delete(key);
-          loadedSettingsTabs.current.delete(key);
-        });
-        if (activeTabRef.current === 'mobile-access') {
-          const controller = new AbortController();
-          mobileAccessRequestController.current = controller;
-          try {
-            await startSettingsTabLoad('mobile-access', controller);
-          } finally {
-            if (mobileAccessRequestController.current === controller) {
-              mobileAccessRequestController.current = null;
-            }
-            controller.abort();
-          }
-        }
-        toast.success(t('cloudRegistrationSuccess'));
-      }
-    } catch (error) {
-      if (isRequestCancelled(error)) return;
-      toast.error(t('cloudRegistrationFailed'));
-    } finally {
-      setRegisteringCloud(false);
-    }
-  };
 
   const saveDiagnosticsConsent = async (enabled: boolean) => {
     const previous = diagnosticsConsent;
@@ -3170,7 +2685,6 @@ export default function SettingsPage() {
   const resetAllSettings = async () => {
     resetPrinting();
     resetBillTemplate();
-    resetCloud();
     await resetBusiness();
   };
 
@@ -3180,10 +2694,10 @@ export default function SettingsPage() {
     setSavingAllSettings(true);
     try {
       await Promise.all(
-        ['store', 'receipts-printers', 'loyalty', 'discounts', 'mobile-access'].map((tab) => {
-          const key = `${currentTenant?.id}:${tab}${tab === 'mobile-access' ? ':status' : ''}`;
+        ['store', 'receipts-printers', 'loyalty', 'discounts'].map((tab) => {
+          const key = `${currentTenant?.id}:${tab}`;
           if (loadedSettingsTabs.current.has(key)) return Promise.resolve();
-          return startSettingsTabLoad(tab, new AbortController(), false);
+          return startSettingsTabLoad(tab, new AbortController());
         }),
       );
       // Hydration updates state asynchronously. Let the next render run the
@@ -3204,7 +2718,6 @@ export default function SettingsPage() {
           saveBusinessInfo(true),
           saveLoyalty(true),
           saveDiscount(true),
-          saveCloud(true),
           saveOrderNumbering(true),
         ]);
         await savePrinting(true);
@@ -3222,45 +2735,6 @@ export default function SettingsPage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [saveAllHydrationRun]);
 
-  const rotatePairingCode = async () => {
-    setRotatingCode(true);
-    const generation = mobileAccessRequestGeneration.current;
-    const controller = new AbortController();
-    mobileAccessRequestController.current = controller;
-    try {
-      const res = await api.post('/mobile/rotate-code', undefined, { signal: controller.signal });
-      if (
-        controller.signal.aborted ||
-        generation !== mobileAccessRequestGeneration.current ||
-        activeTabRef.current !== 'mobile-access'
-      )
-        return;
-      setPairingCode(res.data.pairing_code);
-      setPairingExpiresAt(res.data.expires_at);
-      setPairingQrDataUrl(res.data.qr_data_url || null);
-      setPairingUnavailable(false);
-      toast.success(t('pairingCodeRotated'));
-      await loadPairedDevices(controller.signal);
-    } catch (error) {
-      if (isRequestCancelled(error)) return;
-      // Show a localized failure; the specific backend reason stays in logs.
-      toast.error(t('pairingCodeFailed'));
-    } finally {
-      if (mobileAccessRequestController.current === controller) {
-        mobileAccessRequestController.current = null;
-        setRotatingCode(false);
-      }
-    }
-  };
-
-  const copyPairingCode = () => {
-    if (!pairingCode) return;
-    navigator.clipboard.writeText(pairingCode.toUpperCase()).then(() => {
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    });
-  };
-
   const isDirty =
     JSON.stringify(form) !== JSON.stringify(savedBusiness) ||
     JSON.stringify(printingForm) !== JSON.stringify(savedPrinting) ||
@@ -3270,8 +2744,7 @@ export default function SettingsPage() {
     discountMaxPct !== savedDiscountMaxPct ||
     discountMaxAmount !== savedDiscountMaxAmount ||
     discountMode !== savedDiscountMode ||
-    discountRequiresApproval !== savedDiscountRequiresApproval ||
-    JSON.stringify(cloudSettings) !== JSON.stringify(savedCloudSettings);
+    discountRequiresApproval !== savedDiscountRequiresApproval;
 
   useEffect(() => {
     if (!isDirty) return;
@@ -3419,14 +2892,6 @@ export default function SettingsPage() {
                 {t('navGroupData')}
               </p>
             </div>
-            {canManageMobileAccess && (
-              <SettingsNavItem
-                label={t('tabMobileAccess')}
-                value="mobile-access"
-                active={activeTab}
-                onClick={handleSettingsTabChange}
-              />
-            )}
             {canManageDatabase && (
               <SettingsNavItem
                 label={t('tabBackupData')}
@@ -3435,13 +2900,6 @@ export default function SettingsPage() {
                 onClick={handleSettingsTabChange}
               />
             )}
-            <SettingsNavItem
-              label={t('tabOrderflow')}
-              value="orderflow"
-              active={activeTab}
-              onClick={handleSettingsTabChange}
-            />
-
             {/* Account group */}
             <div className="hidden md:block px-3 pt-4 pb-2 mt-3 mb-1 border-b border-border">
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -3453,10 +2911,6 @@ export default function SettingsPage() {
               value="account"
               active={activeTab}
               onClick={handleSettingsTabChange}
-              attention={
-                cloudDeletionNeedsAction ||
-                (cloudAccountAvailable && Boolean(cloudAccount?.email && !cloudAccount?.verified))
-              }
             />
             <SettingsNavItem
               label={t('privacy')}
@@ -4931,141 +4385,10 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-              {isOwner && (
-                <div
-                  className={`rounded-xl border p-6 ${cloudAccountAvailable && cloudAccount?.email && !cloudAccount.verified ? 'border-red-200 dark:border-red-800/40 bg-red-50/40 dark:bg-red-950/20' : 'border-border bg-card'}`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="font-semibold text-foreground">{t('contactEmailTitle')}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {cloudAccountLoadFailed ? (
-                          t('cloudAccountLoadFailed')
-                        ) : cloudAccountAvailable ? (
-                          <Ltr>
-                            {cloudAccount?.email || user?.email || t('noCloudContactEmail')}
-                          </Ltr>
-                        ) : (
-                          t('cloudAccountUnavailable')
-                        )}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${!cloudAccountAvailable ? 'bg-muted text-muted-foreground' : cloudAccount?.verified ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300'}`}
-                    >
-                      {cloudAccountLoadFailed
-                        ? t('cloudStatusUnavailable')
-                        : !cloudAccountAvailable
-                          ? t('cloudUnavailableBadge')
-                          : cloudAccount?.verified
-                            ? t('cloudVerified')
-                            : t('cloudPendingVerification')}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {cloudAccountLoadFailed
-                      ? t('cloudAccountLoadError')
-                      : cloudAccountAvailable
-                        ? t('cloudVerificationHint')
-                        : cloudDeletionPending
-                          ? t('cloudDeletionPendingHint')
-                          : cloudDeletionStatus === 'processing'
-                            ? t('cloudDeletionProcessingHint')
-                            : cloudDeletionStatus === 'failed' ||
-                                cloudStatus.cloud_deletion_status === 'failed'
-                              ? t('cloudDeletionFailedHint')
-                              : t('cloudEnableHintAccount')}
-                  </p>
-                  {cloudAccountLoadFailed && (
-                    <Button
-                      variant="outline"
-                      className="mt-4"
-                      onClick={() => void fetchCloudAccount()}
-                    >
-                      {t('retry')}
-                    </Button>
-                  )}
-                  {cloudAccountAvailable && !cloudAccount?.verified && (
-                    <Button
-                      className="mt-4"
-                      disabled={cloudAccountBusy}
-                      onClick={async () => {
-                        setCloudAccountBusy(true);
-                        try {
-                          await api.post('/settings/cloud/account/verification');
-                          toast.success(t('verificationEmailQueued'));
-                          await fetchCloudAccount();
-                        } catch (err) {
-                          const detail = (err as { response?: { data?: { error?: string } } })
-                            .response?.data?.error;
-                          toast.error(
-                            detail
-                              ? `${t('verificationEmailFailed')}: ${detail}`
-                              : t('verificationEmailFailed'),
-                          );
-                        } finally {
-                          setCloudAccountBusy(false);
-                        }
-                      }}
-                    >
-                      {cloudAccountBusy
-                        ? t('cloudSendingVerification')
-                        : t('cloudSendVerificationEmail')}
-                    </Button>
-                  )}
-                  {cloudAccountAvailable && (
-                    <div className="mt-5 space-y-3 border-t border-border pt-4">
-                      <label className="flex items-center justify-between gap-4 text-sm">
-                        <span>{t('cloudPrefProductUpdates')}</span>
-                        <Toggle
-                          value={Boolean(cloudAccount?.product_updates)}
-                          label={t('cloudPrefProductUpdates')}
-                          onChange={async (value) => {
-                            setCloudAccountBusy(true);
-                            try {
-                              const { data } = await api.put(
-                                '/settings/cloud/account/preferences',
-                                { product_updates: value },
-                              );
-                              setCloudAccount(data);
-                            } catch {
-                              toast.error(t('couldNotSavePreference'));
-                            } finally {
-                              setCloudAccountBusy(false);
-                            }
-                          }}
-                        />
-                      </label>
-                      <label className="flex items-center justify-between gap-4 text-sm">
-                        <span>{t('cloudPrefMarketing')}</span>
-                        <Toggle
-                          value={Boolean(cloudAccount?.marketing)}
-                          label={t('cloudPrefMarketing')}
-                          onChange={async (value) => {
-                            setCloudAccountBusy(true);
-                            try {
-                              const { data } = await api.put(
-                                '/settings/cloud/account/preferences',
-                                { marketing: value },
-                              );
-                              setCloudAccount(data);
-                            } catch {
-                              toast.error(t('couldNotSavePreference'));
-                            } finally {
-                              setCloudAccountBusy(false);
-                            }
-                          }}
-                        />
-                      </label>
-                      <p className="text-xs text-muted-foreground">{t('cloudPrefNote')}</p>
-                    </div>
-                  )}
-                </div>
-              )}
             </SettingsTabShell>
           </TabsContent>
 
-          {/* Privacy — anonymous telemetry (from the old Integrations tab) + cloud privacy controls (from Account) */}
+          {/* Privacy */}
           <TabsContent value="privacy">
             <SettingsTabShell>
               <OfflineModeCard canManage={tenantCan(currentTenant, 'offline-mode.manage')} />
@@ -5091,115 +4414,6 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground mt-1">{t('storeDiagnosticsHint')}</p>
                 </div>
               </div>
-
-              {isOwner && (
-                <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="font-semibold text-foreground">{t('cloudPrivacyControls')}</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">{t('cloudStopReversible')}</p>
-                  {cloudAccount?.deletion_request && (
-                    <div
-                      className={`mt-4 rounded-lg border p-3 text-sm ${cloudAccount.deletion_request.status === 'pending' || cloudAccount.deletion_request.status === 'processing' ? 'border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300' : cloudAccount.deletion_request.status === 'approved' || cloudAccount.deletion_request.status === 'completed' || cloudAccount.deletion_request.status === 'deleted' ? 'border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-300' : cloudAccount.deletion_request.status === 'failed' ? 'border-red-200 dark:border-red-800/40 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300' : 'border-border bg-muted text-foreground'}`}
-                    >
-                      <p className="font-semibold">
-                        {t('cloudDeletionRequest', {
-                          status: cloudAccount.deletion_request.status || '',
-                        })}
-                      </p>
-                      {cloudAccount.deletion_request.id && (
-                        <p className="mt-1 font-mono text-xs">
-                          <Ltr>{cloudAccount.deletion_request.id}</Ltr>
-                        </p>
-                      )}
-                      {cloudAccount.deletion_request.decision_note && (
-                        <p className="mt-2">{cloudAccount.deletion_request.decision_note}</p>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        if (!(await confirm(t('cloudStopAllConfirm')))) return;
-                        try {
-                          const { data } = await api.post('/settings/cloud/stop-all');
-                          setCloudStatus({
-                            cloud_registration_status:
-                              data.cloud_registration_status || 'unregistered',
-                            cloud_services_disabled_by_user: !!data.cloud_services_disabled_by_user,
-                            cloud_connected: !!data.cloud_connected,
-                            cloud_relay_mode: data.cloud_relay_mode || 'disconnected',
-                            cloud_last_heartbeat: data.cloud_last_heartbeat || null,
-                            cloud_last_error: data.cloud_last_error || null,
-                            cloud_deletion_status: data.cloud_deletion_status || '',
-                          });
-                          setCloudSettings((previous) => ({
-                            ...previous,
-                            cloud_sync_enabled: !!data.cloud_sync_enabled,
-                            cloud_orders_enabled: !!data.cloud_orders_enabled,
-                            cloud_last_sync: data.cloud_last_sync || null,
-                          }));
-                          setSavedCloudSettings((previous) => ({
-                            ...previous,
-                            cloud_sync_enabled: !!data.cloud_sync_enabled,
-                            cloud_orders_enabled: !!data.cloud_orders_enabled,
-                            cloud_last_sync: data.cloud_last_sync || null,
-                          }));
-                          setDiagnosticsConsent(false);
-                          await fetchCloudAccount();
-                          notifyCloudAccountStatusChanged();
-                          toast.success(t('cloudAllStopped'));
-                        } catch {
-                          toast.error(t('cloudStopFailed'));
-                        }
-                      }}
-                    >
-                      <CloudOff size={16} className="me-2" />
-                      {t('cloudStopAllButton')}
-                    </Button>
-                    {!cloudDeletionFinal && (
-                      <Button
-                        variant="destructive"
-                        disabled={
-                          cloudAccount?.deletion_request?.status === 'pending' ||
-                          cloudAccount?.deletion_request?.status === 'processing' ||
-                          cloudAccount?.deletion_request?.status === 'approved' ||
-                          cloudStatus.cloud_deletion_status === 'processing'
-                        }
-                        onClick={() => {
-                          const phrase = window.prompt(t('cloudDeletePrompt'));
-                          if (phrase === 'DELETE CLOUD DATA') setPinGate({ mode: 'delete-cloud' });
-                          else if (phrase !== null) toast.error(t('confirmationPhraseMismatch'));
-                        }}
-                      >
-                        <Trash2 size={16} className="me-2" />
-                        {t('cloudDeleteDataButton')}
-                      </Button>
-                    )}
-                    {cloudDeletionNeedsAction && (
-                      <>
-                        <Button
-                          variant="outline"
-                          onClick={() => void refreshDeletionStatus()}
-                          disabled={refreshingDeletionStatus}
-                        >
-                          {refreshingDeletionStatus
-                            ? t('cloudRefreshingDeletion')
-                            : t('cloudRefreshDeletion')}
-                        </Button>
-                        {cloudDeletionCanCancel && (
-                          <Button
-                            variant="outline"
-                            onClick={() => setPinGate({ mode: 'cancel-cloud-deletion' })}
-                          >
-                            {t('cloudCancelDeletion')}
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <p className="mt-3 text-xs text-muted-foreground">{t('cloudTelemetryNote')}</p>
-                </div>
-              )}
             </SettingsTabShell>
           </TabsContent>
 
@@ -5250,386 +4464,6 @@ export default function SettingsPage() {
               onRequestInitializeDb={() => setInitializeDbOpen(true)}
               confirm={confirm}
             />
-          </TabsContent>
-
-          <TabsContent value="mobile-access">
-            {canManageMobileAccess ? (
-              <SettingsTabShell title={t('tabMobileAccess')}>
-                {/* FloAdmin — reporting sync */}
-                <div className="bg-card rounded-xl border border-border p-6 space-y-5">
-                  <div className="flex items-center gap-2">
-                    <Cloud size={20} className="text-brand" />
-                    <div>
-                      <h2 className="font-semibold text-foreground">
-                        {t('floadminSalesReporting')}
-                      </h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {t('floadminSalesReportingHint')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {cloudStatus.cloud_registration_status === 'unregistered' ? (
-                    <div className="bg-muted rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4">
-                      <div className="p-3 bg-card rounded-full shadow-sm">
-                        <Cloud className="w-6 h-6 text-brand" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-foreground">
-                          {t('cloudServicesDisabled')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                          {t('cloudServicesDisabledHint')}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowInitializeCloudConfirm(true)}
-                        className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90"
-                      >
-                        {t('cloudInitializeButton')}
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          {cloudStatus.cloud_registration_status === 'registered' &&
-                          !cloudServicesStopped ? (
-                            <CheckCircle2 size={16} className="text-green-600 shrink-0" />
-                          ) : (
-                            <CloudOff size={16} className="text-muted-foreground shrink-0" />
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-foreground">
-                              {cloudStatus.cloud_registration_status === 'registered' &&
-                                cloudServicesStopped &&
-                                t('cloudServicesStopped')}
-                              {cloudStatus.cloud_registration_status === 'registered' &&
-                                !cloudServicesStopped &&
-                                (cloudStatus.cloud_connected
-                                  ? t('connectedToFloadmin')
-                                  : t('registeredReconnecting'))}
-                              {cloudStatus.cloud_registration_status === 'rejected' &&
-                                t('registrationRejected')}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                (cloudStatus.cloud_last_error ||
-                                  cloudStatus.cloud_deletion_status === 'failed') &&
-                                t('cloudDeletionFailed')}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                cloudStatus.cloud_deletion_status === 'processing' &&
-                                t('cloudDeletionProcessing')}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                !cloudStatus.cloud_last_error &&
-                                cloudStatus.cloud_deletion_status !== 'failed' &&
-                                cloudStatus.cloud_deletion_status !== 'processing' &&
-                                t('cloudDeletionPending')}
-                              {cloudStatus.cloud_registration_status === 'deleted' &&
-                                t('cloudDataDeleted')}
-                              {(cloudStatus.cloud_registration_status === 'unregistered' ||
-                                cloudStatus.cloud_registration_status === 'registration_failed') &&
-                                t('notRegistered')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {cloudStatus.cloud_registration_status === 'registered' &&
-                                cloudServicesStopped &&
-                                t('cloudResumeHint')}
-                              {cloudStatus.cloud_registration_status === 'registered' &&
-                                !cloudServicesStopped &&
-                                (cloudStatus.cloud_last_heartbeat
-                                  ? t('liveChannelHeartbeat', {
-                                      mode: cloudStatus.cloud_relay_mode.replace('_', ' '),
-                                      time: formatTime(cloudStatus.cloud_last_heartbeat),
-                                    })
-                                  : t('liveChannel', {
-                                      mode: cloudStatus.cloud_relay_mode.replace('_', ' '),
-                                    }))}
-                              {cloudStatus.cloud_registration_status === 'rejected' &&
-                                t('registrationContactSupport')}
-                              {cloudStatus.cloud_registration_status === 'registration_failed' &&
-                                (cloudStatus.cloud_last_error
-                                  ? t('registrationLastError', {
-                                      error: cloudStatus.cloud_last_error,
-                                    })
-                                  : t('registrationLastFailed'))}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                (cloudStatus.cloud_last_error ||
-                                  cloudStatus.cloud_deletion_status === 'failed') &&
-                                t('cloudDeletionFailedHint2')}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                cloudStatus.cloud_deletion_status === 'processing' &&
-                                t('cloudDeletionProcessingHint2')}
-                              {cloudStatus.cloud_registration_status === 'deletion_pending' &&
-                                !cloudStatus.cloud_last_error &&
-                                cloudStatus.cloud_deletion_status !== 'failed' &&
-                                cloudStatus.cloud_deletion_status !== 'processing' &&
-                                t('cloudServicesStoppedHint')}
-                              {cloudStatus.cloud_registration_status === 'deleted' &&
-                                t('cloudDataDeletedHint')}
-                              {cloudStatus.cloud_registration_status === 'unregistered' &&
-                                t('registrationRegisterHelp')}
-                            </p>
-                          </div>
-                        </div>
-                        {cloudStatus.cloud_registration_status !== 'registered' &&
-                          cloudStatus.cloud_registration_status !== 'deletion_pending' &&
-                          cloudStatus.cloud_registration_status !== 'deleted' && (
-                            <button
-                              onClick={() => registerCloud('')}
-                              disabled={registeringCloud}
-                              className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:opacity-90 disabled:opacity-50 font-medium shrink-0"
-                            >
-                              {registeringCloud ? t('registering') : t('registerWithFloadmin')}
-                            </button>
-                          )}
-                      </div>
-
-                      {cloudStatus.cloud_registration_status !== 'deleted' && (
-                        <div className="space-y-3">
-                          <p className="text-sm text-muted-foreground">
-                            {t('cloudManagedAutomatically')}
-                          </p>
-
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={cloudSettings.cloud_sync_enabled}
-                              onChange={(e) => {
-                                markHydrationTouched('cloud_sync_enabled');
-                                setCloudSettings({
-                                  ...cloudSettings,
-                                  cloud_sync_enabled: e.target.checked,
-                                });
-                              }}
-                              className="mt-0.5 rounded border-gray-300 dark:border-border text-brand focus:ring-brand"
-                            />
-                            <div>
-                              <span className="text-sm font-medium text-foreground block">
-                                {cloudServicesStopped
-                                  ? t('cloudEnableButton')
-                                  : t('enableBillSync')}
-                              </span>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {cloudServicesStopped
-                                  ? t('cloudResumeHintStopped')
-                                  : t('enableBillSyncHint')}
-                              </p>
-                            </div>
-                          </label>
-
-                          {cloudSettings.cloud_last_sync && (
-                            <p className="text-xs text-muted-foreground">
-                              {t('lastSync', {
-                                time: formatDateTime(cloudSettings.cloud_last_sync),
-                              })}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* RevFlo — consolidated: download/QR + app (pairing) code + paired devices */}
-                <div className="bg-card rounded-xl border border-border p-6 space-y-5">
-                  <div className="flex items-center gap-2">
-                    <Smartphone size={20} className="text-muted-foreground" />
-                    <div>
-                      <h2 className="font-semibold text-foreground">
-                        {revflo?.name || t('revflo')}
-                      </h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {revflo?.tagline || t('revfloHint')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {revflo?.available && (
-                    <div className="flex flex-col sm:flex-row gap-5 items-start border border-border rounded-xl p-5">
-                      <div className="shrink-0">
-                        {revflo.qr_data_url ? (
-                          <img
-                            src={revflo.qr_data_url}
-                            alt={t('appQrAlt', { name: revflo.name })}
-                            className="w-28 h-28 rounded-lg border border-border"
-                          />
-                        ) : (
-                          <div className="w-28 h-28 rounded-lg border border-border flex items-center justify-center text-muted-foreground">
-                            <QrCode size={32} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-3 text-sm">
-                        {revflo.ios_url && (
-                          <a
-                            href={revflo.ios_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand hover:underline"
-                          >
-                            {t('downloadForIos')}
-                          </a>
-                        )}
-                        {revflo.android_url && (
-                          <a
-                            href={revflo.android_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand hover:underline"
-                          >
-                            {t('downloadForAndroid')}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">{t('mobileApp')}</p>
-                    <p className="text-xs text-muted-foreground mb-4">{t('mobileAppHint')}</p>
-                    {pairingUnavailable ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t('mobilePairingNeedsCloud')}
-                      </p>
-                    ) : pairingCode ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-4">
-                          {pairingQrDataUrl && (
-                            <img
-                              src={pairingQrDataUrl}
-                              alt={t('pairingQrAlt')}
-                              className="w-28 h-28 rounded-lg border border-border"
-                            />
-                          )}
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="flex-1 bg-muted border border-border rounded-lg px-4 py-3 text-center">
-                              <span className="font-mono text-2xl font-bold tracking-[0.3em] text-foreground">
-                                <Ltr>{pairingCode.toUpperCase()}</Ltr>
-                              </span>
-                            </div>
-                            <button
-                              onClick={copyPairingCode}
-                              className="p-2.5 border border-border rounded-lg hover:bg-muted text-muted-foreground"
-                              title={t('copyCode')}
-                            >
-                              {copiedCode ? (
-                                <Check size={18} className="text-green-600" />
-                              ) : (
-                                <Copy size={18} />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        {pairingExpiresAt && (
-                          <p className="text-xs text-muted-foreground">
-                            {t('codeExpires', { date: formatDate(pairingExpiresAt) })}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">{t('pairingCodeSingleUse')}</p>
-                        <button
-                          onClick={rotatePairingCode}
-                          disabled={rotatingCode}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
-                        >
-                          <RefreshCw size={14} className={rotatingCode ? 'animate-spin' : ''} />
-                          {rotatingCode ? t('generating') : t('generateNewCode')}
-                        </button>
-                        <p className="text-xs text-amber-600">{t('disconnectDevicesWarning')}</p>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={rotatePairingCode}
-                        disabled={rotatingCode}
-                        className="px-5 py-2 text-sm bg-brand text-white rounded-lg hover:opacity-90 disabled:opacity-50 font-medium"
-                      >
-                        {rotatingCode ? t('generating') : t('generatePairingCode')}
-                      </button>
-                    )}
-                  </div>
-
-                  {!pairingUnavailable && (
-                    <div className="pt-5 border-t border-border">
-                      <p className="text-sm font-medium text-foreground mb-3">
-                        {t('pairedDevices')}
-                      </p>
-                      {devicesLoading ? (
-                        <p className="text-sm text-muted-foreground">{t('loading')}</p>
-                      ) : pairedDevices.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t('noPairedDevices')}</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {pairedDevices.map((d) => (
-                            <div
-                              key={d.id}
-                              className="bg-muted border border-border rounded-lg px-4 py-3 text-sm"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-foreground capitalize">
-                                  {d.platform || t('unknownPlatform')}
-                                  {d.country ? ` · ${d.country}` : ''}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {t('lastActive', { date: formatDate(d.last_seen_at) })}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {t('firstPaired', { date: formatDate(d.first_seen_at) })}
-                                {d.app_version ? ` · v${d.app_version}` : ''}
-                              </p>
-                              {d.user_agent && (
-                                <p
-                                  className="text-xs text-muted-foreground mt-1 truncate"
-                                  title={d.user_agent}
-                                >
-                                  {d.user_agent}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </SettingsTabShell>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <h1 className="text-xl font-bold text-foreground mb-2">{t('tabMobileAccess')}</h1>
-                <p className="text-muted-foreground">{t('noAccessMobileAccess')}</p>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="orderflow">
-            <SettingsTabShell title={t('tabOrderflow')}>
-              {/* OrderFlow — online orders */}
-              <div className="bg-card rounded-xl border border-border p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <Zap size={20} className="text-amber-500" />
-                  <div>
-                    <h2 className="font-semibold text-foreground">{t('orderflowOnlineOrders')}</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {t('orderflowOnlineOrdersHint')}
-                    </p>
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cloudSettings.cloud_orders_enabled}
-                    onChange={(e) => {
-                      markHydrationTouched('cloud_orders_enabled');
-                      setCloudSettings({
-                        ...cloudSettings,
-                        cloud_orders_enabled: e.target.checked,
-                      });
-                    }}
-                    className="rounded border-gray-300 dark:border-border text-brand focus:ring-brand"
-                  />
-                  <span className="text-sm text-foreground">{t('enableOnlineOrderPolling')}</span>
-                </label>
-              </div>
-            </SettingsTabShell>
           </TabsContent>
 
           {/* About tab */}
@@ -5770,35 +4604,6 @@ export default function SettingsPage() {
       </Tabs>
       {ConfirmDialog}
 
-      {/* Initialize Cloud Disclaimer Dialog */}
-      <Dialog open={showInitializeCloudConfirm} onOpenChange={setShowInitializeCloudConfirm}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t('cloudInitializeDialogTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('cloudInitializeDialogBody')}
-              <br />
-              <br />
-              {t('cloudInitializeDialogBody2')}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInitializeCloudConfirm(false)}>
-              {t('cancel')}
-            </Button>
-            <Button
-              disabled={registeringCloud}
-              onClick={() => {
-                setShowInitializeCloudConfirm(false);
-                registerCloud('');
-              }}
-            >
-              {registeringCloud ? t('registering') : t('cloudInitializeAccept')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <MasterPinPrompt
         open={pinGate !== null}
         mode={pinGate?.mode === 'set' ? 'set' : 'verify'}
@@ -5812,11 +4617,7 @@ export default function SettingsPage() {
                 ? t('confirmImportTitle')
                 : pinGate?.mode === 'restore'
                   ? t('confirmRestoreTitle')
-                  : pinGate?.mode === 'delete-cloud'
-                    ? t('cloudConfirmDeletion')
-                    : pinGate?.mode === 'cancel-cloud-deletion'
-                      ? t('cloudCancelDeletionTitle')
-                      : undefined
+                  : undefined
         }
         onCancel={() => setPinGate(null)}
         onSubmit={handlePinGateSubmit}
@@ -5867,7 +4668,6 @@ export default function SettingsPage() {
                   savingBusiness ||
                   savingLoyalty ||
                   savingDiscount ||
-                  savingCloud ||
                   savingOrderNumbering ||
                   savingPrinting ||
                   savingAllSettings
@@ -5882,7 +4682,6 @@ export default function SettingsPage() {
                   savingBusiness ||
                   savingLoyalty ||
                   savingDiscount ||
-                  savingCloud ||
                   savingOrderNumbering ||
                   savingPrinting ||
                   savingAllSettings
@@ -5892,7 +4691,6 @@ export default function SettingsPage() {
                 {savingBusiness ||
                 savingLoyalty ||
                 savingDiscount ||
-                savingCloud ||
                 savingOrderNumbering ||
                 savingPrinting ||
                 savingAllSettings

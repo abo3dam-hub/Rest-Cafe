@@ -4,11 +4,11 @@ import expressRateLimit from 'express-rate-limit';
 import { requirePermission } from '../services/authorization';
 import { isAllowedPrivateIp } from '../middleware/security';
 import {
-  cloudSync,
+  operationDiagnostics,
   DiagnosticEventInput,
   DIAGNOSTIC_LOG_MAX_ROWS,
   isAllowedDiagnosticEventCode,
-} from '../services/cloud-sync';
+} from '../services/operation-diagnostics';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 import { buildSystemDiagnostics, resolveCategory } from './support-ticket';
 
@@ -159,7 +159,7 @@ router.post(
     if (!event) return res.status(400).json({ error: 'Invalid diagnostic event' });
     try {
       // Consent-gated, fire-and-forget: a rejected enqueue must never fail the request.
-      cloudSync.reportDiagnostic(event);
+      operationDiagnostics.reportDiagnostic(event);
     } catch {
       /* diagnostics must never mask the original failure */
     }
@@ -219,7 +219,7 @@ router.post('/capture', diagnosticsWriteRateLimit, (req: Request, res: Response)
     ...(hasFacts ? { facts: raw.facts } : {}),
   });
   if (!failure) return res.status(400).json({ error: 'Invalid diagnostic capture' });
-  cloudSync.captureOperationFailure({
+  operationDiagnostics.captureOperationFailure({
     capture_point: failure.capture_point,
     outcome: failure.outcome,
     correlation_id: failure.correlation_id,
@@ -237,7 +237,7 @@ router.post('/capture', diagnosticsWriteRateLimit, (req: Request, res: Response)
 });
 
 router.get('/health', requirePermission('support.use'), (_req: Request, res: Response) => {
-  res.json(cloudSync.listDiagnosticDeliveryHealth());
+  res.json(operationDiagnostics.listDiagnosticDeliveryHealth());
 });
 
 // Local read for the diagnostics screen; nothing here is transmitted.
@@ -247,13 +247,13 @@ router.get('/recent', requirePermission('support.use'), (req: Request, res: Resp
     Number.isSafeInteger(limitRaw) && limitRaw > 0
       ? Math.min(limitRaw, DIAGNOSTIC_LOG_MAX_ROWS)
       : 50;
-  res.json({ failures: cloudSync.listLocalDiagnostics(limit) });
+  res.json({ failures: operationDiagnostics.listLocalDiagnostics(limit) });
 });
 
 // Erasing the evidence is destructive, so it takes the same permission as
 // changing the transmission setting rather than the read path's support.use.
 router.delete('/recent', requirePermission('settings.manage'), (req: Request, res: Response) => {
-  res.json({ removed: cloudSync.clearLocalDiagnostics() });
+  res.json({ removed: operationDiagnostics.clearLocalDiagnostics() });
 });
 
 // The raw log tail is deliberately absent: it can carry order and customer
@@ -264,7 +264,7 @@ router.get('/support-bundle', requirePermission('support.use'), (req: Request, r
     Number.isSafeInteger(limitRaw) && limitRaw > 0
       ? Math.min(limitRaw, DIAGNOSTIC_LOG_MAX_ROWS)
       : 50;
-  const failures = cloudSync.listLocalDiagnostics(limit);
+  const failures = operationDiagnostics.listLocalDiagnostics(limit);
   res.json({
     bundle: {
       system: buildSystemDiagnostics(req, resolveCategory(req.query.category)),

@@ -51,7 +51,6 @@ const {
   fetchRemoteTaxPackCatalog,
   downloadAndVerifyTaxPack,
 } = require('../main/tax-packs/catalog');
-const { cloudSync } = require('../main/services/cloud-sync');
 const {
   createBackup,
   restoreBackup,
@@ -165,78 +164,6 @@ async function main() {
     console.log('\n--- 1. Backup restore and import preserve offline_mode ---');
 
     console.log('\n--- 3. Pending image and tax-pack requests abort on Offline mode ---');
-
-    console.log('\n--- 5. Offline mode stops cloud auto-registration retry loop ---');
-    {
-      const originalRegister = cloudSync.register.bind(cloudSync);
-      const prevRuntimeStarted = (cloudSync as any).runtimeStarted;
-      let registerCalls = 0;
-      let notifyRegisterStarted: (() => void) | null = null;
-      const registerStarted = new Promise<void>((resolve) => {
-        notifyRegisterStarted = resolve;
-      });
-      let rejectRegister: ((err: Error) => void) | null = null;
-
-      cloudSync.register = (() => {
-        registerCalls += 1;
-        notifyRegisterStarted?.();
-        return new Promise((_resolve, reject) => {
-          rejectRegister = reject;
-        });
-      }) as any;
-
-      try {
-        upsertSettings({
-          offline_mode: 'false',
-          cloud_sync_enabled: '1',
-          cloud_services_disabled_by_user: 'false',
-          business_name: 'Offline Retry Test Cafe',
-          cloud_registration_status: '',
-        });
-        (cloudSync as any).runtimeStarted = true;
-        (cloudSync as any).autoRegisterAttempts = 0;
-        cloudSync.refreshRegistrationProfile();
-        await registerStarted;
-        assertEqualOrThrow(registerCalls, 1, 'auto-registration starts while online');
-
-        await api(baseUrl, '/api/settings/offline-mode', {
-          method: 'PUT',
-          body: { offline_mode: true },
-          headers: ownerAuth,
-        });
-        (rejectRegister as ((err: Error) => void) | null)?.(new Error('Aborted for offline mode'));
-        await new Promise((resolve) => setTimeout(resolve, 30));
-
-        assertEqualOrThrow(
-          (cloudSync as any).autoRegisterTimer,
-          null,
-          'aborted registration does not schedule a retry timer while Offline mode is on',
-        );
-        assertEqualOrThrow(
-          registerCalls,
-          1,
-          'attemptAutoRegister is not re-entered while Offline mode is on',
-        );
-        assertEqualOrThrow(
-          getSettingValue('cloud_registration_status') ?? '',
-          '',
-          'intentional Offline mode does not record registration_failed',
-        );
-      } finally {
-        cloudSync.register = originalRegister;
-        (cloudSync as any).runtimeStarted = prevRuntimeStarted;
-        if ((cloudSync as any).autoRegisterTimer) {
-          clearTimeout((cloudSync as any).autoRegisterTimer);
-          (cloudSync as any).autoRegisterTimer = null;
-        }
-        (cloudSync as any).autoRegisterInFlight = false;
-        await api(baseUrl, '/api/settings/offline-mode', {
-          method: 'PUT',
-          body: { offline_mode: false },
-          headers: ownerAuth,
-        });
-      }
-    }
   } finally {
     server.close();
     closeDatabase();

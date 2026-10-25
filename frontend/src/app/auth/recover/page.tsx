@@ -10,12 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
-
-const RESET_POLL_INTERVAL_MS = 3000;
-
-type RecoveryMethod = 'email' | 'pin';
-type EmailStep = 'idle' | 'verifying' | 'waiting' | 'approved';
+import { ArrowLeft, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 export default function RecoverAccessPage() {
   const router = useRouter();
@@ -32,20 +27,7 @@ export default function RecoverAccessPage() {
   const [formError, setFormError] = useState<string | null>(null);
   // Master PIN availability status (null = checking, true/false = resolved).
   const [pinAvailable, setPinAvailable] = useState<boolean | null>(null);
-  const [cloudAvailable, setCloudAvailable] = useState(false);
-  const [method, setMethod] = useState<RecoveryMethod>('pin');
-  const [emailStep, setEmailStep] = useState<EmailStep>('idle');
-  const [resetId, setResetId] = useState('');
-  const [emailHint, setEmailHint] = useState('');
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollInFlight = useRef(false);
   const unmounted = useRef(false);
-
-  const stopPolling = () => {
-    if (pollTimer.current) clearInterval(pollTimer.current);
-    pollTimer.current = null;
-    pollInFlight.current = false;
-  };
 
   useEffect(() => {
     unmounted.current = false;
@@ -54,8 +36,6 @@ export default function RecoverAccessPage() {
       .then(({ data }) => {
         if (unmounted.current) return;
         setPinAvailable(!!data.masterPinAvailable);
-        setCloudAvailable(!!data.cloudRecoveryAvailable);
-        if (data.cloudRecoveryAvailable) setMethod('email');
       })
       .catch(() => {
         if (unmounted.current) return;
@@ -64,72 +44,8 @@ export default function RecoverAccessPage() {
       });
     return () => {
       unmounted.current = true;
-      stopPolling();
     };
   }, []);
-
-  const requestEmailReset = async () => {
-    setFormError(null);
-    setLoading(true);
-    try {
-      const { data } = await api.post('/auth/recover-password/cloud/request');
-      if (unmounted.current) return;
-      stopPolling();
-      setEmailHint(data.email_hint || '');
-      if (data.step === 'verify_email') {
-        setEmailStep('verifying');
-        pollTimer.current = setInterval(async () => {
-          if (pollInFlight.current || unmounted.current) return;
-          pollInFlight.current = true;
-          try {
-            const { data: verification } = await api.get(
-              '/auth/recover-password/cloud/verification',
-            );
-            if (unmounted.current) return;
-            if (verification.verified) {
-              stopPolling();
-              void requestEmailReset();
-            }
-          } catch {
-            // Transient failures keep polling; the owner can resend.
-          } finally {
-            pollInFlight.current = false;
-          }
-        }, RESET_POLL_INTERVAL_MS);
-        return;
-      }
-      setResetId(data.reset_id);
-      setEmailStep('waiting');
-      pollTimer.current = setInterval(async () => {
-        if (pollInFlight.current || unmounted.current) return;
-        pollInFlight.current = true;
-        try {
-          const { data: status } = await api.get('/auth/recover-password/cloud/status', {
-            params: { reset_id: data.reset_id },
-          });
-          if (unmounted.current) return;
-          if (status.status === 'approved') {
-            stopPolling();
-            setEmailStep('approved');
-          } else if (status.status === 'expired' || status.status === 'consumed') {
-            stopPolling();
-            setEmailStep('idle');
-            setFormError(t('recoverEmailExpired'));
-          }
-        } catch {
-          // Transient failures keep polling; the owner can resend.
-        } finally {
-          pollInFlight.current = false;
-        }
-      }, RESET_POLL_INTERVAL_MS);
-    } catch (err: unknown) {
-      if (unmounted.current) return;
-      const status = (err as { response?: { status?: number } }).response?.status;
-      setFormError(status === 429 ? t('recoverEmailRateLimited') : t('recoverEmailUnavailable'));
-    } finally {
-      if (!unmounted.current) setLoading(false);
-    }
-  };
 
   const passwordsEntered = newPassword.length > 0 && confirmPassword.length > 0;
   const passwordsMatch = !passwordsEntered || newPassword === confirmPassword;
@@ -140,7 +56,7 @@ export default function RecoverAccessPage() {
     e.preventDefault();
     setFormError(null);
 
-    if (method === 'pin' && !/^\d{4}$/.test(masterPin)) {
+    if (!/^\d{4}$/.test(masterPin)) {
       setFormError(t('recoverPinFormat'));
       return;
     }
@@ -155,30 +71,18 @@ export default function RecoverAccessPage() {
 
     setLoading(true);
     try {
-      if (method === 'email') {
-        await api.post('/auth/recover-password/cloud/complete', {
-          reset_id: resetId,
-          new_password: newPassword,
-        });
-      } else {
-        await api.post('/auth/recover-password', {
-          email,
-          master_pin: masterPin,
-          new_password: newPassword,
-        });
-      }
+      await api.post('/auth/recover-password', {
+        email,
+        master_pin: masterPin,
+        new_password: newPassword,
+      });
       toast.success(t('recoverSuccess'));
       router.push('/auth/login');
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { error?: string } } };
       const status = error.response?.status;
 
-      if (method === 'email' && status === 409) {
-        setEmailStep('idle');
-        setFormError(t('recoverEmailExpired'));
-      } else if (method === 'email' && status === 502) {
-        setFormError(t('recoverEmailUnavailable'));
-      } else if (status === 503) {
+      if (status === 503) {
         setFormError(t('recoverPinUnavailable'));
       } else if (status === 409) {
         setFormError(t('recoverErrorGeneric'));
@@ -273,114 +177,60 @@ export default function RecoverAccessPage() {
               <p className="text-sm text-muted-foreground text-center py-6">
                 {t('recoverChecking')}
               </p>
-            ) : pinAvailable === false && !cloudAvailable ? (
+            ) : pinAvailable === false ? (
               <div className="text-center py-4">
                 <p className="text-sm text-destructive font-medium">{t('recoverPinUnavailable')}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
-                {cloudAvailable && pinAvailable && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['email', 'pin'] as const).map((m) => (
-                      <Button
-                        key={m}
-                        type="button"
-                        variant={method === m ? 'default' : 'outline'}
-                        onClick={() => {
-                          stopPolling();
-                          setEmailStep('idle');
-                          setFormError(null);
-                          setMethod(m);
-                        }}
-                      >
-                        {m === 'email' ? t('recoverMethodEmail') : t('recoverMethodPin')}
-                      </Button>
-                    ))}
+                <div className="space-y-2">
+                  <Label htmlFor="recover-email">{t('email')}</Label>
+                  <Input
+                    id="recover-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('emailPlaceholder')}
+                    dir="ltr"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="recover-pin">{t('recoverPinLabel')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('recoverPinHint')}</p>
+                  <div className="relative">
+                    <Input
+                      id="recover-pin"
+                      type={showPin ? 'text' : 'password'}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={masterPin}
+                      onChange={(e) => setMasterPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="••••"
+                      className="text-center text-lg tracking-[0.5em] pe-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                      tabIndex={-1}
+                    >
+                      {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
-                )}
+                </div>
 
-                {method === 'email' ? (
-                  emailStep === 'approved' ? null : (
-                    <div className="space-y-3 text-center">
-                      <Mail className="w-6 h-6 mx-auto text-primary" />
-                      <p className="text-sm text-muted-foreground">
-                        {emailStep === 'verifying'
-                          ? t('recoverEmailVerifying', { email: emailHint })
-                          : emailStep === 'waiting'
-                            ? t('recoverEmailSent', { email: emailHint })
-                            : t('recoverEmailIntro')}
-                      </p>
-                      <Button
-                        type="button"
-                        variant={emailStep === 'idle' ? 'default' : 'outline'}
-                        className="w-full"
-                        disabled={loading}
-                        onClick={requestEmailReset}
-                      >
-                        {loading
-                          ? t('recoverEmailSending')
-                          : emailStep === 'idle'
-                            ? t('recoverEmailSend')
-                            : t('recoverEmailResend')}
-                      </Button>
-                    </div>
-                  )
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="recover-email">{t('email')}</Label>
-                      <Input
-                        id="recover-email"
-                        type="email"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={t('emailPlaceholder')}
-                        dir="ltr"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="recover-pin">{t('recoverPinLabel')}</Label>
-                      <p className="text-xs text-muted-foreground">{t('recoverPinHint')}</p>
-                      <div className="relative">
-                        <Input
-                          id="recover-pin"
-                          type={showPin ? 'text' : 'password'}
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={4}
-                          value={masterPin}
-                          onChange={(e) =>
-                            setMasterPin(e.target.value.replace(/\D/g, '').slice(0, 4))
-                          }
-                          placeholder="••••"
-                          className="text-center text-lg tracking-[0.5em] pe-10"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPin(!showPin)}
-                          className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
-                          tabIndex={-1}
-                        >
-                          {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {(method === 'pin' || emailStep === 'approved') && passwordFields}
+                {passwordFields}
 
                 {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
 
-                {(method === 'pin' || emailStep === 'approved') && (
-                  <Button type="submit" disabled={loading} className="w-full" size="lg">
-                    {loading ? t('recoverSubmitting') : t('recoverSubmit')}
-                  </Button>
-                )}
+                <Button type="submit" disabled={loading} className="w-full" size="lg">
+                  {loading ? t('recoverSubmitting') : t('recoverSubmit')}
+                </Button>
               </form>
             )}
           </CardContent>

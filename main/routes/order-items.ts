@@ -20,7 +20,7 @@ import { parseCategoryIds } from './auth';
 import { requireKdsEnabled, isTokenRevoked, isTokenStale } from '../middleware/security';
 import { hasPermission, requirePermission } from '../services/authorization';
 import { ROLE_ACCESS, hasRole } from '../../shared/role-permissions';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 
 const router = Router();
@@ -42,7 +42,7 @@ function structuredKdsStatusFailure(
   if (!failure) return {};
   (req as Request & { diagnosticsCaptured?: boolean }).diagnosticsCaptured = true;
   try {
-    cloudSync.captureOperationFailure(failure);
+    operationDiagnostics.captureOperationFailure(failure);
   } catch {
     /* Diagnostics must not affect KDS state. */
   }

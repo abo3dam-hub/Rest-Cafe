@@ -30,7 +30,7 @@ import {
 } from '../services/print-templates';
 import { renderMerchantReceiptViaDocument } from './document-merchant';
 import { correlationId, type FloErrorCode } from '../errors';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { printLabel } from '../print/print-labels.generated';
 import { receiptChargeLines } from '../../shared/charges';
 import { isExcludedFromBillReceipt } from '../../shared/order-item-status';
@@ -1363,7 +1363,7 @@ function reportPrintFailure(kind: 'receipt' | 'kot' | 'delivery_slip', result: P
 
   const failureClass = result.failureClass || classifyPrintFailure(result.detail);
   const pointStage = failureClass === 'timeout' ? 'timeout' : 'queue';
-  cloudSync.captureOperationFailure({
+  operationDiagnostics.captureOperationFailure({
     capture_point: `fc.backend.printer.${kind}.${pointStage}`,
     outcome: result.stage === 'prepare' ? 'not_applied' : 'unknown',
     correlation_id: result.correlationId,

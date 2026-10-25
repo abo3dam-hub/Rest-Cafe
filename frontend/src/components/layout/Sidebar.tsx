@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -150,7 +150,6 @@ export default function AppSidebar() {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const { confirm, ConfirmDialog } = useConfirm();
-  const [emailNeedsAttention, setEmailNeedsAttention] = useState(false);
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);
   };
@@ -184,8 +183,6 @@ export default function AppSidebar() {
               'print-templates.view',
               'print-templates.manage',
               'payment-methods.manage',
-              'cloud.manage',
-              'cloud.account.manage',
               'database.manage',
               'mobile-access.manage',
               'kitchen.stations.manage',
@@ -204,37 +201,6 @@ export default function AppSidebar() {
         .catch(() => {});
     }
   }, [currentTenant, setKdsEnabled]);
-
-  useEffect(() => {
-    if (!tenantCan(currentTenant, 'cloud.account.manage')) return;
-    let active = true;
-    const refreshCloudAttention = async () => {
-      try {
-        const [accountResponse, cloudResponse] = await Promise.all([
-          api.get('/settings/cloud/account'),
-          api.get('/settings/cloud'),
-        ]);
-        if (!active) return;
-        const deletionStatus =
-          accountResponse.data?.deletion_request?.status ||
-          cloudResponse.data?.cloud_deletion_status;
-        setEmailNeedsAttention(
-          (accountResponse.data?.cloud_account_available !== false &&
-            Boolean(accountResponse.data?.email) &&
-            !accountResponse.data?.verified) ||
-            ['pending', 'processing', 'failed'].includes(deletionStatus),
-        );
-      } catch {
-        if (active) setEmailNeedsAttention(false);
-      }
-    };
-    void refreshCloudAttention();
-    window.addEventListener('flo:cloud-account-status-changed', refreshCloudAttention);
-    return () => {
-      active = false;
-      window.removeEventListener('flo:cloud-account-status-changed', refreshCloudAttention);
-    };
-  }, [currentTenant]);
 
   return (
     <Sidebar collapsible="icon">
@@ -273,12 +239,6 @@ export default function AppSidebar() {
                         <Link href={item.href} onClick={closeMobile}>
                           <span className="relative flex size-4 shrink-0 items-center justify-center">
                             <item.icon className="size-4 shrink-0" />
-                            {item.href === '/settings' && emailNeedsAttention && (
-                              <span
-                                aria-label="Email verification required"
-                                className="absolute -end-1 -top-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-sidebar"
-                              />
-                            )}
                           </span>
                           <span>{t(item.labelKey)}</span>
                         </Link>

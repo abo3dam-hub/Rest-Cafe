@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import Decimal from 'decimal.js';
 import {
@@ -56,7 +56,7 @@ function captureFinancialSummaryDateRangeRejection(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change report validation responses.
   }
@@ -71,7 +71,7 @@ function captureReportsDateRangeRejection(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change report validation responses.
   }

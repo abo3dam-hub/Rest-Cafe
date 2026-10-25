@@ -487,8 +487,6 @@ export function withDatabaseMaintenanceLock<T>(
   });
 }
 
-const DEFAULT_CLOUD_SERVER_URL = ''; // Rest&Cafe: no upstream cloud endpoint in this build.
-
 function randomSecret(): string {
   return crypto
     .randomBytes(32)
@@ -1472,46 +1470,9 @@ export function initDatabase(
   }
 }
 
-export function ensureCloudIdentity(): { posHash: string; deviceSecret: string } {
-  let deviceSecret = getSettingValue('cloud_device_secret');
-  if (!deviceSecret) {
-    deviceSecret = randomSecret();
-    upsertSetting('cloud_device_secret', deviceSecret);
-  }
-
-  let posHash = getSettingValue('cloud_pos_hash');
-  if (!posHash) {
-    posHash = `pos_${sha256Hex(deviceSecret).slice(0, 40)}`;
-    upsertSetting('cloud_pos_hash', posHash);
-  }
-
-  insertSettingIfMissing('cloud_device_created_at', now());
-  return { posHash, deviceSecret };
-}
-
 /** Locally-cached RevFlo pairing code (plaintext) — FloAdmin only ever returns it once. */
-export function getCachedPairingCode(): { code: string; expiresAt: string } | null {
-  const code = getSettingValue('mobile_pairing_code');
-  const expiresAt = getSettingValue('mobile_pairing_code_expires_at');
-  if (!code || !expiresAt) return null;
-  if (new Date(expiresAt).getTime() <= Date.now()) return null;
-  return { code, expiresAt };
-}
-
-export function setCachedPairingCode(code: string, expiresAt: string): void {
-  upsertSetting('mobile_pairing_code', code);
-  upsertSetting('mobile_pairing_code_expires_at', expiresAt);
-}
 
 /** Random UUID, generated once and persisted — never derived from store/device identity. */
-export function ensureTelemetryAnonId(): string {
-  let anonId = getSettingValue('telemetry_anon_id');
-  if (!anonId) {
-    anonId = crypto.randomUUID();
-    upsertSetting('telemetry_anon_id', anonId);
-  }
-  return anonId;
-}
 
 /** Anonymous telemetry toggle; enabled by default, reconfigurable in Settings > Privacy. */
 export function isTelemetryEnabled(): boolean {
@@ -3195,11 +3156,6 @@ export function mergeRestoreProtectedSettings(
   } catch {
     // Skip owner email resync if users table is unavailable in a partial fixture.
   }
-  const hasDeviceSecret = states.some(
-    (state) => state.key === 'cloud_device_secret' && state.present,
-  );
-  const hasPosHash = states.some((state) => state.key === 'cloud_pos_hash' && state.present);
-  if (!hasDeviceSecret || !hasPosHash) ensureCloudIdentity();
   settingsRevision += 1;
 }
 
@@ -4597,7 +4553,7 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
     name: 'cloud_identity_and_outbox',
     up: () => {
       createCloudSyncSchema();
-      seedCloudSyncDefaults();
+      seedOfflineModeDefault();
     },
   },
   {
@@ -8467,22 +8423,9 @@ function createWhatsAppSchema(): void {
   `);
 }
 
-function seedCloudSyncDefaults(): void {
-  createCloudSyncSchema();
-
-  const serverUrl = getSettingValue('cloud_server_url');
-  if (!serverUrl) upsertSetting('cloud_server_url', DEFAULT_CLOUD_SERVER_URL);
-
-  // Defaults mirror FloAdmin store defaults; actual transmission is gated on api_key.
-  insertSettingIfMissing('offline_mode', 'true'); // Rest&Cafe: local-only by default.
-  insertSettingIfMissing('cloud_sync_enabled', '0');
-  insertSettingIfMissing('cloud_orders_enabled', '0');
-  insertSettingIfMissing('cloud_reports_enabled', '0');
-  insertSettingIfMissing('cloud_command_polling_enabled', '0');
-  insertSettingIfMissing('cloud_connected', 'false');
-  insertSettingIfMissing('cloud_registration_status', 'unregistered');
-
-  ensureCloudIdentity();
+function seedOfflineModeDefault(): void {
+  // Rest&Cafe is local-only: offline mode defaults on for new installs.
+  insertSettingIfMissing('offline_mode', 'true');
 }
 
 function seedWhatsAppDefaults(): void {
@@ -8535,13 +8478,6 @@ function seedInstallDefaults(): void {
   // Unified charges & fees engine: JSON array of ChargeDefinition objects.
   // Validated only by the dedicated /settings/charges endpoints.
   insert('custom_charges', '[]');
-  insert('cloud_server_url', DEFAULT_CLOUD_SERVER_URL);
-  insert('cloud_connected', 'false');
-  insert('cloud_sync_enabled', '0');
-  insert('cloud_orders_enabled', '0');
-  insert('cloud_reports_enabled', '0');
-  insert('cloud_command_polling_enabled', '0');
-  insert('cloud_registration_status', 'unregistered');
   insert('anonymous_data_consent', 'false');
   insert('telemetry_enabled', 'false');
   insert(
@@ -8576,7 +8512,7 @@ function seedInstallDefaults(): void {
   insert('invoice_financial_year_start_month', '4');
   insert('invoice_financial_year_start_day', '1');
 
-  seedCloudSyncDefaults();
+  seedOfflineModeDefault();
 
   console.log('[DB] Install defaults loaded; first-run setup pending');
 }

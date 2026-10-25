@@ -167,8 +167,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           'print-templates.view',
           'print-templates.manage',
           'payment-methods.manage',
-          'cloud.manage',
-          'cloud.account.manage',
           'database.manage',
           'mobile-access.manage',
           'kitchen.stations.manage',

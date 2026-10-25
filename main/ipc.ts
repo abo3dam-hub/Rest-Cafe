@@ -41,7 +41,7 @@ import { rasterizeKotDocumentForWebUsb, rasterizePrintDocumentForWebUsb } from '
 import { isKotDocument, isPrintDocument } from '../shared/print/document';
 import log from 'electron-log/main';
 import { randomUUID } from 'crypto';
-import { cloudSync } from './services/cloud-sync';
+import { operationDiagnostics } from './services/operation-diagnostics';
 import {
   isLocalBackupEnabled,
   retainBackupLocally,
@@ -678,7 +678,7 @@ export function registerIpcHandlers(
   // Renderer failures are classified locally; message, stack, digest and route
   // can contain business data and are never sent automatically.
   handle('report-renderer-error', async () => {
-    cloudSync.captureOperationFailure({
+    operationDiagnostics.captureOperationFailure({
       capture_point: 'fc.electron.renderer.exception',
       outcome: 'unknown',
       correlation_id: randomUUID(),

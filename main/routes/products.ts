@@ -11,7 +11,7 @@ import { hasPermission, requirePermission } from '../services/authorization';
 import { getHttpRequestSignal } from '../shutdown';
 import { getActiveCountryPack, hasConfiguredTaxCategories } from '../services/tax';
 import { adjustProductStock } from '../services/inventory';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import * as crypto from 'crypto';
 import * as dns from 'dns';
@@ -44,7 +44,7 @@ function captureProductValidation(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change product validation responses.
   }
@@ -59,7 +59,7 @@ function captureProductStockValidation(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change stock validation responses.
   }
@@ -2105,7 +2105,7 @@ router.delete('/:id', requirePermission('catalog.manage'), (req: Request, res: R
         outcome: 'not_applied',
       });
       try {
-        if (failure) cloudSync.captureOperationFailure(failure);
+        if (failure) operationDiagnostics.captureOperationFailure(failure);
       } catch {
         // Diagnostics cannot change the inventory-link protection.
       }

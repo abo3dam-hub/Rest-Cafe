@@ -12,7 +12,7 @@ import {
   softDeleteSupply,
   updateSupply,
 } from '../services/supplies';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { UnitConversionError } from '../services/units';
 
@@ -57,7 +57,7 @@ function captureSupplyValidation(validationCode: string): void {
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change supply validation responses.
   }
@@ -69,7 +69,7 @@ function captureSupplyMovementQueryRejection(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change supply query validation.
   }
@@ -95,7 +95,7 @@ function captureSupplyDeleteBlocked(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change supply deletion behavior.
   }

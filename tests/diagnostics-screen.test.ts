@@ -38,7 +38,7 @@ const {
   now,
 } = require('./helpers/test-setup');
 const { registerRoutes } = require('../main/routes/index');
-const { cloudSync } = require('../main/services/cloud-sync');
+const { operationDiagnostics } = require('../main/services/operation-diagnostics');
 
 const settle = async (predicate: () => boolean, timeoutMs = 5000) => {
   const deadline = Date.now() + timeoutMs;
@@ -67,7 +67,7 @@ async function main() {
   console.log('\n1. A real failure is captured locally and shown by the recent-failures endpoint');
   db.prepare('DELETE FROM local_diagnostics').run();
   const captured = await (async () => {
-    cloudSync.reportDiagnostic(
+    operationDiagnostics.reportDiagnostic(
       {
         event_id: '0f2c1d9e-1111-4a4a-9a4a-111111111111',
         event_code: 'server.internal_error',
@@ -195,7 +195,7 @@ async function main() {
     '\n5. A print failure whose message redacts to a placeholder still reads as a reason',
   );
   db.prepare('DELETE FROM local_diagnostics').run();
-  cloudSync.reportDiagnostic({
+  operationDiagnostics.reportDiagnostic({
     event_id: '0f2c1d9e-2222-4a4a-9a4a-222222222222',
     event_code: 'print.receipt.failed',
     severity: 'error',
@@ -212,7 +212,7 @@ async function main() {
   await settle(
     () => (db.prepare('SELECT COUNT(*) AS c FROM local_diagnostics').get() as { c: number }).c >= 1,
   );
-  const printRow = cloudSync.listLocalDiagnostics(1)[0];
+  const printRow = operationDiagnostics.listLocalDiagnostics(1)[0];
   assertEqualOrThrow(
     printRow.summary,
     'The printer was offline or disconnected.',
@@ -247,7 +247,7 @@ async function main() {
   console.log(
     '\n6. A print failure the classifier could not narrow falls back to the class clause',
   );
-  cloudSync.reportDiagnostic({
+  operationDiagnostics.reportDiagnostic({
     event_id: '0f2c1d9e-3333-4a4a-9a4a-333333333333',
     event_code: 'print.receipt.failed',
     severity: 'error',
@@ -264,7 +264,7 @@ async function main() {
     () => (db.prepare('SELECT COUNT(*) AS c FROM local_diagnostics').get() as { c: number }).c >= 1,
   );
   assertEqualOrThrow(
-    cloudSync.listLocalDiagnostics(1)[0].summary,
+    operationDiagnostics.listLocalDiagnostics(1)[0].summary,
     'An unexpected problem occurred.',
     'an unclassified print failure is honest rather than a bare placeholder',
   );
@@ -280,7 +280,7 @@ async function main() {
     ['write_error', 'The printer failed while writing the job.'],
   ] as const) {
     db.prepare('DELETE FROM local_diagnostics').run();
-    cloudSync.reportDiagnostic({
+    operationDiagnostics.reportDiagnostic({
       event_id: crypto.randomUUID(),
       event_code: 'print.receipt.failed',
       severity: 'error',
@@ -299,7 +299,7 @@ async function main() {
         (db.prepare('SELECT COUNT(*) AS c FROM local_diagnostics').get() as { c: number }).c >= 1,
     );
     assertEqualOrThrow(
-      cloudSync.listLocalDiagnostics(1)[0].summary,
+      operationDiagnostics.listLocalDiagnostics(1)[0].summary,
       reason,
       `${failureClass} reads as a reason`,
     );
@@ -307,7 +307,7 @@ async function main() {
   // A failed WritePrinter call accepts nothing, so its reason must not claim
   // the printer took part of the job.
   assertOrThrow(
-    !cloudSync.listLocalDiagnostics(1)[0].summary.toLowerCase().includes('part of'),
+    !operationDiagnostics.listLocalDiagnostics(1)[0].summary.toLowerCase().includes('part of'),
     'a write failure does not claim the printer accepted part of the job',
   );
   db.prepare('DELETE FROM local_diagnostics').run();
@@ -323,7 +323,7 @@ async function main() {
     Authorization: `Bearer ${jwt.sign({ userId: 'srv-diag-001', email: 'server@diag.local', role: 'server' }, getJWTSecret(), { expiresIn: '1h' })}`,
   };
 
-  cloudSync.reportDiagnostic(
+  operationDiagnostics.reportDiagnostic(
     {
       event_id: crypto.randomUUID(),
       event_code: 'server.internal_error',

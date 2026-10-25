@@ -3,7 +3,7 @@ import expressRateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
 import { getDatabase, now, getSettingValue } from '../db';
 import { requirePermission } from '../services/authorization';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { parsePhoneE164, stripPhoneDigits } from '../lib/phone';
 import { validateCustomerAddress } from './orders-validation';
@@ -49,7 +49,7 @@ function captureCustomerValidation(
     facts: { validation_code: validationCode },
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change customer validation responses.
   }
@@ -61,7 +61,7 @@ function captureCustomerPaginationRejection(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change customer query validation.
   }
@@ -592,7 +592,7 @@ router.post(
               outcome: 'not_applied',
             });
             try {
-              if (failure) cloudSync.captureOperationFailure(failure);
+              if (failure) operationDiagnostics.captureOperationFailure(failure);
             } catch {
               // Diagnostics cannot change the duplicate-customer response.
             }
@@ -676,7 +676,7 @@ router.put(
               outcome: 'not_applied',
             });
             try {
-              if (failure) cloudSync.captureOperationFailure(failure);
+              if (failure) operationDiagnostics.captureOperationFailure(failure);
             } catch {
               // Diagnostics cannot change the duplicate-customer response.
             }

@@ -23,10 +23,16 @@ off by default and is restore-protected across database restore and import.
   routes, and its settings UI are deleted. Local backup and restore are unchanged; legacy
   `google_drive_*` credential rows in existing databases are inert and are still scrubbed
   when a database is imported or reset.
-- **FloAdmin cloud sync** — never started (`cloudSync.start()` is not called) and the vendor
-  endpoints are emptied in code, so there is nowhere to sync to. The module's local diagnostics
-  recorders (for example print-failure capture into local tables) still run; only transmission
-  is gone.
+- **FloAdmin cloud sync** — removed end to end: the sync service, its registration and
+  pairing flows, the cloud account and email-recovery routes, the OrderFlow polling toggle,
+  and the RevFlo mobile pairing endpoints are deleted, and no cloud identity is minted for
+  new installs. The local diagnostics recorders that used to live inside the sync module
+  (operation-failure capture, the diagnostics screen data) moved to a local-only module,
+  `main/services/operation-diagnostics.ts`, and still write only to local tables. Existing
+  databases keep their cloud settings rows and outbox tables as inert data.
+- **Support tickets** — the ticket submission flow queued tickets for delivery to the
+  vendor cloud; the routes, the settings/support forms, and the POS "get help" submission
+  are removed. The diagnostics screen (local failure log and support bundle) remains.
 - **Anonymous telemetry** — removed end to end: the service, its startup path, and its
   settings surface are deleted, and no anonymous id is created for a new install.
 - **WhatsApp receipt delivery** — removed end to end: service, routes, IPC, and UI. The dormant

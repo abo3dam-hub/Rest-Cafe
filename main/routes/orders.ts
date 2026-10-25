@@ -63,7 +63,7 @@ import {
   type PriceOverrideInput,
 } from '../services/item-price-override';
 import { notifyKdsUpdate, notifyOrderUpdated } from '../services/kds';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import {
   validateOrderNotes,
   validateItemNotes,
@@ -194,7 +194,7 @@ function structuredOperationFailure(
   if (!failure) return { error };
   (req as Request & { diagnosticsCaptured?: boolean }).diagnosticsCaptured = true;
   try {
-    cloudSync.captureOperationFailure(failure);
+    operationDiagnostics.captureOperationFailure(failure);
   } catch {
     /* Diagnostics must not affect order handling. */
   }
@@ -2049,7 +2049,6 @@ router.post(
 
       if (!result.idempotentReplay) {
         notifyKdsUpdate();
-        cloudSync.recordOrderChanged(result.order.id, 'order.created');
 
         if (result.order.customer_id) {
           try {
@@ -2370,7 +2369,6 @@ router.post(
       operationCommitted = true;
 
       if (result.replayResponse) return res.json(result.replayResponse);
-      cloudSync.recordOrderChanged(req.params.id as string, 'order.updated');
       notifyKdsUpdate();
 
       res.json({ order: Object.assign({}, result.updatedOrder, { items: result.updatedItems }) });
@@ -2990,7 +2988,6 @@ router.patch(
       });
 
       if (changed) {
-        cloudSync.recordOrderChanged(req.params.id as string, `order.${status}`);
         notifyKdsUpdate();
       }
 
@@ -3311,7 +3308,6 @@ router.patch(
         ? db.prepare('SELECT * FROM customers WHERE id = ?').get(updatedOrder.customer_id)
         : null;
 
-      cloudSync.recordOrderChanged(req.params.id as string, 'order.updated');
       notifyOrderUpdated();
 
       res.json({ order: { ...updatedOrder, customer } });
@@ -3503,7 +3499,6 @@ router.patch(
           .map(parseItemJson) as any[],
       );
 
-      cloudSync.recordOrderChanged(req.params.id as string, 'order.type_changed');
       notifyKdsUpdate();
 
       res.json({ order: Object.assign({}, updatedOrder, { items: orderItems, table: null }) });
@@ -4812,7 +4807,6 @@ const handleItemPriceOverride = asyncHandler(async (req: Request, res: Response)
       };
     });
 
-    cloudSync.recordOrderChanged(req.params.id as string, 'order.updated');
     notifyOrderUpdated();
     res.json({ item: updatedItem });
   } catch (error: unknown) {
@@ -5372,7 +5366,6 @@ router.patch(
       });
 
       if (result.eventType) {
-        cloudSync.recordOrderChanged(orderId, result.eventType);
         notifyKdsUpdate();
       }
       res.json({ order: { ...result.updatedOrder, items: result.items } });
@@ -5897,7 +5890,6 @@ router.patch(
       });
 
       if (!result.idempotentReplay) {
-        cloudSync.recordOrderChanged(orderId, 'order.item_edited');
         notifyKdsUpdate();
       }
       res.json({ order: result.order });
@@ -6141,7 +6133,6 @@ router.patch(
       });
 
       if (result.changed) {
-        cloudSync.recordOrderChanged(orderId, 'order.item_restored');
         notifyKdsUpdate();
       }
       res.json({ order: { ...result.updatedOrder, items: result.items } });

@@ -5,24 +5,12 @@ import {
   FileText,
   Database,
   RefreshCw,
-  HardDrive,
   AlertTriangle,
-  CheckCircle2,
-  CloudOff,
-  UploadCloud,
   Wrench,
   KeyRound,
   Trash2,
-  Folder,
-  Info,
-  Copy,
-  Calendar,
-  History,
-  RotateCcw,
-  Check,
 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
-import { Ltr } from '@/components/layout/Ltr';
 import { Button } from '@/components/ui/button';
 import { SettingsTabShell } from '@/components/settings/SettingsTabShell';
 import { LocalBackupCard } from '@/components/settings/LocalBackupCard';
@@ -66,8 +54,6 @@ export type PinGate =
   | { mode: 'import'; payload: { data: ImportPayload; overwrite: boolean } }
   | { mode: 'restore'; payload: { backupPath: string } }
   | { mode: 'delete-backup'; payload: { fileName: string } }
-  | { mode: 'delete-cloud' }
-  | { mode: 'cancel-cloud-deletion' }
   | null;
 
 export interface DatabaseSettingsTabProps {

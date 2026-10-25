@@ -11,20 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, LifeBuoy, Ticket } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { ROLE_LABEL_KEYS } from '@/lib/i18n-enums';
-import {
-  SupportTicketForm,
-  PRE_LOGIN_SUPPORT_ENDPOINTS,
-} from '@/components/support/SupportTicketForm';
 
 // Backend enum → leaf key maps for the tenant picker.
 type BusinessTypeKey = keyof AppConfig['Messages']['businessType'];
@@ -48,8 +37,6 @@ function LoginContent() {
   const [dbError, setDbError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
-  const tSupport = useTranslations('support');
 
   useEffect(() => {
     fetch('/api/auth/setup/status')
@@ -259,36 +246,7 @@ function LoginContent() {
             </form>
           </CardContent>
         </Card>
-
-        <div className="mt-4 flex justify-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                <LifeBuoy className="size-4" />
-                {tSupport('menuLabel')}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              <DropdownMenuItem onClick={() => setTicketDialogOpen(true)}>
-                <Ticket className="size-4" />
-                {tSupport('menuSubmitTicket')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
-
-      <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{tSupport('dialogTitle')}</DialogTitle>
-          </DialogHeader>
-          <SupportTicketForm
-            endpoints={PRE_LOGIN_SUPPORT_ENDPOINTS}
-            showDiagnosticsPreview={false}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -3,12 +3,6 @@ import expressRateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
 import { getDatabase, getSettingValue, now, parseBackupPaginationQuery } from '../db';
 import {
-  CloudRequestError,
-  cloudSync,
-  DEFAULT_CLOUD_SERVER_URL,
-  normalizeCloudServerUrl,
-} from '../services/cloud-sync';
-import {
   requireAnyPermission,
   requirePermission,
   resolveEffectivePermissions,
@@ -494,7 +488,6 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       receipt_logo_raster: normalizedReceiptLogoRaster,
       ...localeUpdates,
     });
-    cloudSync.refreshRegistrationProfile();
 
     res.json(businessShape(getAllSettings(db)));
   } catch (error: any) {
@@ -550,7 +543,6 @@ router.put('/tax', requirePermission('tax-configuration.manage'), (req: Request,
             )
           : undefined,
     });
-    cloudSync.refreshRegistrationProfile();
     res.json(taxShape(getAllSettings(db)));
   } catch (error: any) {
     console.error('[API] Internal error:', error);
@@ -951,350 +943,6 @@ router.put(
   },
 );
 
-function publicDeletionRequest(
-  request: Record<string, unknown> | null,
-): Record<string, unknown> | null {
-  if (!request) return null;
-  const safe: Record<string, unknown> = {};
-  const requestId = request.request_id ?? request.id;
-  if (typeof requestId === 'string' && requestId) safe.id = requestId;
-  if (typeof request.status === 'string') safe.status = request.status;
-  if (typeof request.requested_at === 'string') safe.requested_at = request.requested_at;
-  if (typeof request.reviewed_at === 'string' || request.reviewed_at === null)
-    safe.reviewed_at = request.reviewed_at;
-  if (typeof request.decision_note === 'string') safe.decision_note = request.decision_note;
-  return safe;
-}
-
-function publicEmailPreferences(data: Record<string, unknown>): Record<string, unknown> {
-  return {
-    email: typeof data.email === 'string' ? data.email : null,
-    verified: data.verified === true,
-    verified_at:
-      typeof data.verified_at === 'string' || data.verified_at === null ? data.verified_at : null,
-    verification_sent_at:
-      typeof data.verification_sent_at === 'string' || data.verification_sent_at === null
-        ? data.verification_sent_at
-        : null,
-    product_updates: data.product_updates === true,
-    marketing: data.marketing === true,
-  };
-}
-
-const CLOUD_ACCOUNT_UNAVAILABLE_ERROR =
-  'Cloud account services are unavailable while Cloud services are stopped or unregistered';
-
-// ─── Cloud Sync settings (must come BEFORE /:key wildcard) ──────────────────
-
-router.get('/cloud', requirePermission('cloud.manage'), (req: Request, res: Response) => {
-  try {
-    res.json(cloudSync.getStatus());
-  } catch (error: any) {
-    console.error('[API] Internal error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.put('/cloud', requirePermission('cloud.manage'), (req: Request, res: Response) => {
-  try {
-    const {
-      cloud_server_url,
-      cloud_api_key,
-      cloud_store_id,
-      cloud_sync_enabled,
-      cloud_orders_enabled,
-      cloud_reports_enabled,
-      cloud_command_polling_enabled,
-    } = req.body;
-    const isOwner = (req as Request & { user?: { role?: string } }).user?.role === 'owner';
-    const hasUnmaskedApiKey = cloud_api_key !== undefined && !isMaskedSecret(cloud_api_key);
-    if (
-      !isOwner &&
-      (cloud_server_url !== undefined || hasUnmaskedApiKey || cloud_store_id !== undefined)
-    ) {
-      return res
-        .status(403)
-        .json({ error: 'Only the store owner can modify cloud credentials or server URL' });
-    }
-    const db = getDatabase();
-    const updates: Record<string, string | undefined> = {
-      cloud_store_id: cloud_store_id === undefined ? undefined : String(cloud_store_id || ''),
-      cloud_sync_enabled: bool01Flag(cloud_sync_enabled),
-      cloud_orders_enabled: bool01Flag(cloud_orders_enabled),
-      cloud_reports_enabled: bool01Flag(cloud_reports_enabled),
-      cloud_command_polling_enabled: bool01Flag(cloud_command_polling_enabled),
-    };
-
-    if (cloud_server_url !== undefined) {
-      updates.cloud_server_url = normalizeCloudServerUrl(
-        cloud_server_url || DEFAULT_CLOUD_SERVER_URL,
-      );
-    }
-    if (hasUnmaskedApiKey) {
-      updates.cloud_api_key = String(cloud_api_key || '');
-    }
-    const enablingCloud = [
-      cloud_sync_enabled,
-      cloud_orders_enabled,
-      cloud_reports_enabled,
-      cloud_command_polling_enabled,
-    ].some((value) => bool01Flag(value) === '1');
-    const resumingStoppedCloud =
-      cloudSync.getStatus().cloud_services_disabled_by_user && enablingCloud;
-    if (resumingStoppedCloud) {
-      // Stop All disables every cloud feature. Re-enabling the Cloud Services
-      // control is a resume action, not just a sync preference change.
-      updates.cloud_sync_enabled = '1';
-      updates.cloud_orders_enabled = '1';
-      updates.cloud_reports_enabled = '1';
-      updates.cloud_command_polling_enabled = '1';
-    }
-    if (enablingCloud) updates.cloud_services_disabled_by_user = 'false';
-    if (enablingCloud && cloudSync.getStatus().cloud_deletion_blocked) {
-      return res.status(409).json({
-        error:
-          'Cloud deletion is unresolved; retry or cancel it before re-enabling cloud services.',
-      });
-    }
-
-    upsertSettings(db, updates);
-    cloudSync.reload();
-    cloudSync.refreshRegistrationProfile();
-    res.json(cloudSync.getStatus());
-  } catch (error: any) {
-    console.error('[API] Cloud settings update failed:', error);
-    res.status(400).json({ error: 'Invalid cloud settings' });
-  }
-});
-
-router.post(
-  '/cloud/register',
-  requirePermission('cloud.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      let requestedUrl: string | undefined;
-      if (req.body?.cloud_server_url !== undefined) {
-        if ((req as Request & { user?: { role?: string } }).user?.role !== 'owner') {
-          return res
-            .status(403)
-            .json({ error: 'Only the store owner can modify cloud credentials or server URL' });
-        }
-        requestedUrl = normalizeCloudServerUrl(
-          req.body.cloud_server_url || DEFAULT_CLOUD_SERVER_URL,
-        );
-      }
-      const deletionRequest = await cloudSync.getDeletionRequestStatus({
-        allowRemote: cloudSync.isCloudAccountAvailable(),
-        signal: getHttpRequestSignal(req),
-      });
-      if (deletionRequest?.status === 'pending') {
-        return res.status(409).json({
-          error:
-            'A cloud deletion request is pending review. Cancel it before re-enabling cloud services.',
-        });
-      }
-      const currentStatus = cloudSync.getStatus();
-      if (currentStatus.cloud_services_disabled_by_user) {
-        return res.status(409).json({ error: CLOUD_ACCOUNT_UNAVAILABLE_ERROR });
-      }
-      if (currentStatus.cloud_deletion_blocked) {
-        return res.status(409).json({
-          error:
-            'Cloud deletion is unresolved; retry or cancel it before re-enabling cloud services.',
-        });
-      }
-      if (requestedUrl !== undefined) {
-        upsertSettings(getDatabase(), {
-          cloud_server_url: requestedUrl,
-        });
-        cloudSync.reload();
-      }
-      // Registration sends contact metadata for FloAdmin support; it does not
-      // create a cloud owner account or grant authentication access.
-      await cloudSync.register(getHttpRequestSignal(req));
-      upsertSettings(getDatabase(), {
-        cloud_sync_enabled: '1',
-        cloud_reports_enabled: '1',
-        cloud_command_polling_enabled: '1',
-        cloud_services_disabled_by_user: 'false',
-      });
-      cloudSync.reload();
-      res.json(cloudSync.getStatus());
-    } catch (error: any) {
-      console.error('[API] Cloud registration failed:', error);
-      res.status(502).json({ error: 'Cloud registration failed' });
-    }
-  }),
-);
-
-router.post(
-  '/cloud/test',
-  requirePermission('cloud.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const result = await cloudSync.testConnection(getHttpRequestSignal(req));
-      res.json(result);
-    } catch (error: any) {
-      console.error('[API] Cloud test failed:', error);
-      res.status(502).json({ error: 'Cloud test failed' });
-    }
-  }),
-);
-
-router.get(
-  '/cloud/account',
-  requirePermission('cloud.account.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const cloudAccountAvailable = cloudSync.isCloudAccountAvailable();
-      const signal = getHttpRequestSignal(req);
-      const deletionRequest = await cloudSync.getDeletionRequestStatus({
-        allowRemote: cloudAccountAvailable,
-        signal,
-      });
-      const safeDeletionRequest = publicDeletionRequest(deletionRequest);
-      if (deletionRequest?.status === 'approved' || !cloudSync.isCloudAccountAvailable()) {
-        return res.json({
-          email: null,
-          verified: false,
-          verified_at: null,
-          verification_sent_at: null,
-          product_updates: false,
-          marketing: false,
-          cloud_account_available: false,
-          deletion_request: safeDeletionRequest,
-        });
-      }
-      res.json({
-        ...publicEmailPreferences(await cloudSync.getEmailPreferences(signal)),
-        cloud_account_available: true,
-        deletion_request: safeDeletionRequest,
-      });
-    } catch {
-      res.status(502).json({ error: 'Could not load cloud account status' });
-    }
-  }),
-);
-
-router.put(
-  '/cloud/account/preferences',
-  requirePermission('cloud.account.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudSync.isCloudAccountAvailable()) {
-      return res.status(409).json({ error: CLOUD_ACCOUNT_UNAVAILABLE_ERROR });
-    }
-    try {
-      res.json(
-        publicEmailPreferences(
-          await cloudSync.updateEmailPreferences(
-            {
-              product_updates: req.body?.product_updates,
-              marketing: req.body?.marketing,
-            },
-            getHttpRequestSignal(req),
-          ),
-        ),
-      );
-    } catch {
-      res.status(502).json({ error: 'Could not update email preferences' });
-    }
-  }),
-);
-
-function describeVerificationFailure(error: unknown): string {
-  if (error instanceof CloudRequestError) {
-    return `FloAdmin rejected the request (HTTP ${error.status}): ${error.message}`;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-    return 'FloAdmin did not respond in time';
-  }
-  if (error instanceof TypeError) {
-    const cause = (error as { cause?: { code?: string } }).cause?.code;
-    return `Could not reach FloAdmin${cause ? ` (${cause})` : ''}`;
-  }
-  return message;
-}
-
-router.post(
-  '/cloud/account/verification',
-  requirePermission('cloud.account.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!cloudSync.isCloudAccountAvailable()) {
-      return res.status(409).json({ error: CLOUD_ACCOUNT_UNAVAILABLE_ERROR });
-    }
-    try {
-      res.json(
-        publicEmailPreferences(
-          await cloudSync.requestEmailVerification(
-            { source: 'settings' },
-            getHttpRequestSignal(req),
-          ),
-        ),
-      );
-    } catch (error) {
-      console.error('[Cloud] Verification email request failed:', error);
-      res.status(502).json({ error: describeVerificationFailure(error) });
-    }
-  }),
-);
-
-router.get(
-  '/cloud/delete-data/status',
-  requirePermission('cloud.account.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const deletionRequest = await cloudSync.getDeletionRequestStatus({
-        allowRemote: true,
-        signal: getHttpRequestSignal(req),
-      });
-      res.json({
-        cloud_account_available: cloudSync.isCloudAccountAvailable(),
-        deletion_request: publicDeletionRequest(deletionRequest),
-      });
-    } catch {
-      res.status(502).json({ error: 'Could not refresh cloud deletion status' });
-    }
-  }),
-);
-
-router.post(
-  '/cloud/stop-all',
-  requirePermission('cloud.account.manage'),
-  asyncHandler(async (req: Request, res: Response) => {
-    res.json(await cloudSync.stopAllCloudServices(getHttpRequestSignal(req)));
-  }),
-);
-
-router.post(
-  '/cloud/delete-data',
-  requirePermission('cloud.account.manage'),
-  requireMasterPin,
-  asyncHandler(async (req: Request, res: Response) => {
-    if (req.body?.confirmation !== 'DELETE CLOUD DATA') {
-      return res.status(400).json({ error: 'Type DELETE CLOUD DATA to confirm' });
-    }
-    try {
-      res.json(await cloudSync.deleteCloudData(getHttpRequestSignal(req)));
-    } catch {
-      res.status(502).json({ error: 'Cloud data deletion failed' });
-    }
-  }),
-);
-
-router.post(
-  '/cloud/delete-data/cancel',
-  requirePermission('cloud.account.manage'),
-  requireMasterPin,
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      res.json(await cloudSync.cancelDeletionRequest(getHttpRequestSignal(req)));
-    } catch {
-      res.status(502).json({ error: 'Could not cancel deletion request' });
-    }
-  }),
-);
-
 // ── Charges & fees (must come BEFORE /:key wildcard) ───────────────────────
 
 /**
@@ -1401,11 +1049,7 @@ router.put(
         )
         .run(OFFLINE_MODE_SETTING, value ? 'true' : 'false', now());
       if (value) {
-        cloudSync.suspendForOfflineMode();
         notifyOfflineModeEnabled();
-      } else {
-        cloudSync.reload();
-        cloudSync.refreshRegistrationProfile();
       }
       res.json({ offline_mode: isOfflineMode() });
     } catch (error: unknown) {
@@ -1801,15 +1445,6 @@ router.put(
         valueToPersist = validation.stored;
       }
       const db = getDatabase();
-      if (
-        diagnosticsChoice &&
-        valueToPersist === 'true' &&
-        ['pending', 'processing', 'approved', 'completed', 'deleted', 'failed', 'unknown'].includes(
-          getAllSettings(db).cloud_deletion_status || '',
-        )
-      ) {
-        return res.status(409).json({ error: 'cloud_deletion_pending' });
-      }
       if (req.params.key === 'currency') {
         const currentCurrency = getAllSettings(db).currency || '';
         if (valueToPersist !== currentCurrency) {
@@ -1856,34 +1491,17 @@ router.put(
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
     `);
       if (diagnosticsChoice) {
-        const changeId = randomUUID();
         db.transaction(() => {
           saveSetting.run(req.params.key, valueToPersist as string, now());
           db.prepare(`
           INSERT INTO settings (key, value, updated_at) VALUES ('diagnostics_settings_explicit', 'true', ?)
           ON CONFLICT(key) DO UPDATE SET value = 'true', updated_at = excluded.updated_at
         `).run(now());
-          db.prepare(`
-          INSERT INTO settings (key, value, updated_at) VALUES ('diagnostics_consent_sync_pending', 'true', ?)
-          ON CONFLICT(key) DO UPDATE SET value = 'true', updated_at = excluded.updated_at
-        `).run(now());
-          db.prepare(`
-          INSERT INTO settings (key, value, updated_at) VALUES ('diagnostics_consent_change_id', ?, ?)
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-        `).run(changeId, now());
         })();
       } else {
         saveSetting.run(req.params.key, valueToPersist as string, now());
       }
 
-      // Best-effort push of the effective diagnostics permission to FloAdmin.
-      if (diagnosticsChoice) {
-        const settings = getAllSettings(db);
-        const enabled =
-          settings.diagnostics_consent !== 'false' &&
-          settings.diagnostics_transmission_enabled === 'true';
-        void cloudSync.setDiagnosticsConsent(enabled);
-      }
       const setting = db.prepare('SELECT * FROM settings WHERE key = ?').get(req.params.key);
       res.json({ setting });
     } catch (error: any) {

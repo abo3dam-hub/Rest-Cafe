@@ -69,7 +69,7 @@ import {
 } from '../lib/print-language-settings';
 import { resolveReceiptLanguages, type ReceiptLanguagePolicy } from '../../shared/print';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 
 const router = Router();
 const MAX_NOTES_LENGTH = 500;
@@ -93,7 +93,7 @@ export function cashOperationFailurePayload(
   if (!failure) return { error: errorMessage };
   (req as Request & { diagnosticsCaptured?: boolean }).diagnosticsCaptured = true;
   try {
-    cloudSync.captureOperationFailure(failure);
+    operationDiagnostics.captureOperationFailure(failure);
   } catch {
     /* Diagnostics must not affect cash handling. */
   }

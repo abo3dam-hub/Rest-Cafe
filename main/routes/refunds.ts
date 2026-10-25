@@ -12,7 +12,7 @@ import {
   PreVerifiedRefundApprover,
 } from '../services/refund';
 import { getCurrencyFractionDigits, getCurrencyMinorUnitFactor } from '../countries';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 
 const router = Router();
@@ -123,7 +123,7 @@ function structuredRefundFailure(
   if (!failure) return { error };
   (req as Request & { diagnosticsCaptured?: boolean }).diagnosticsCaptured = true;
   try {
-    cloudSync.captureOperationFailure(failure);
+    operationDiagnostics.captureOperationFailure(failure);
   } catch {
     /* Diagnostics must not affect refunds. */
   }

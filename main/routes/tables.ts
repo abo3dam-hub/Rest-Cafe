@@ -3,7 +3,6 @@ import { getDatabase, now, parseRowJson, withTxn } from '../db';
 import { randomUUID } from 'crypto';
 import { hasPermission, requirePermission } from '../services/authorization';
 import { notifyKdsUpdate } from '../services/kds';
-import { cloudSync } from '../services/cloud-sync';
 
 const router = Router();
 
@@ -637,7 +636,6 @@ router.post(
         };
       });
 
-      cloudSync.recordOrderChanged(moved.order.id, 'order.table_moved');
       notifyKdsUpdate();
 
       res.json({

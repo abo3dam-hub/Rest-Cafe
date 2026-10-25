@@ -40,31 +40,16 @@ import { printTemplateRoutes } from './print-templates';
 import { supportTicketRoutes } from './support-ticket';
 import { diagnosticsRoutes } from './diagnostics';
 import { authorizationRoutes } from './authorization';
-import { getDatabase, getSettingValue, getCachedPairingCode, setCachedPairingCode } from '../db';
+import { getDatabase, getSettingValue } from '../db';
 
 import { getActiveCountryPack } from '../services/tax';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 import { parsePhoneE164, stripPhoneDigits } from '../lib/phone';
-import QRCode from 'qrcode';
 import { asyncHandler } from '../middleware/async-handler';
 import expressRateLimit from 'express-rate-limit';
 
 // Distinguish unregistered store error from cloud connectivity failure.
-function isUnregisteredCloudError(error: any): boolean {
-  return typeof error?.message === 'string' && error.message.includes('is not registered');
-}
-
-function mobilePairingErrorStatus(error: any): number {
-  return isUnregisteredCloudError(error) ? 409 : 502;
-}
-
-function mobilePairingErrorMessage(error: any): string {
-  if (isUnregisteredCloudError(error)) {
-    return 'This POS hasn’t been claimed in FloAdmin yet. Complete registration in FloAdmin, then try generating a pairing code again.';
-  }
-  return error?.message || 'Could not reach FloAdmin';
-}
 
 const inlineCustomerLookupRateLimit = expressRateLimit({
   windowMs: 60 * 1000,
@@ -94,7 +79,7 @@ export function registerRoutes(app: Express): void {
         });
         if (failure) {
           request.diagnosticsCaptured = true;
-          cloudSync.captureOperationFailure(failure);
+          operationDiagnostics.captureOperationFailure(failure);
         }
       } catch {
         // Diagnostics are best-effort and must not disrupt a completed response.
@@ -199,73 +184,9 @@ export function registerRoutes(app: Express): void {
     }),
   );
 
-  // Returns cached mobile pairing code or generates fresh code if missing or expired.
-  app.get(
-    '/api/mobile/pairing-code',
-    requirePermission('mobile-access.manage'),
-    asyncHandler(async (req, res) => {
-      try {
-        const cached = getCachedPairingCode();
-        if (cached) {
-          return res.json({
-            pairing_code: cached.code,
-            expires_at: cached.expiresAt,
-            qr_data_url: await QRCode.toDataURL(cached.code, {
-              errorCorrectionLevel: 'M',
-              width: 256,
-            }),
-          });
-        }
-        const { code, expires_at } = await cloudSync.generatePairingCode(false);
-        setCachedPairingCode(code, expires_at);
-        res.json({
-          pairing_code: code,
-          expires_at,
-          qr_data_url: await QRCode.toDataURL(code, { errorCorrectionLevel: 'M', width: 256 }),
-        });
-      } catch (error: any) {
-        res
-          .status(mobilePairingErrorStatus(error))
-          .json({ error: mobilePairingErrorMessage(error) });
-      }
-    }),
-  );
-
   // Explicit rotate — disconnects every currently-paired RevFlo device.
-  app.post(
-    '/api/mobile/rotate-code',
-    requirePermission('mobile-access.manage'),
-    asyncHandler(async (req, res) => {
-      try {
-        const { code, expires_at } = await cloudSync.generatePairingCode(true);
-        setCachedPairingCode(code, expires_at);
-        res.json({
-          pairing_code: code,
-          expires_at,
-          qr_data_url: await QRCode.toDataURL(code, { errorCorrectionLevel: 'M', width: 256 }),
-        });
-      } catch (error: any) {
-        res
-          .status(mobilePairingErrorStatus(error))
-          .json({ error: mobilePairingErrorMessage(error) });
-      }
-    }),
-  );
 
   // Paired RevFlo devices for this store — Settings > Mobile App session list.
-  app.get(
-    '/api/mobile/devices',
-    requirePermission('mobile-access.manage'),
-    asyncHandler(async (req, res) => {
-      try {
-        const devices = await cloudSync.listPairedDevices();
-        res.json({ devices });
-      } catch (error: any) {
-        console.error('[API] FloAdmin request failed:', error);
-        res.status(502).json({ error: 'Could not reach FloAdmin' });
-      }
-    }),
-  );
 
   // Legacy/flat customer search endpoint (frontend uses this)
   app.get(

@@ -42,7 +42,6 @@ const { authRoutes, getJWTSecret } = require('../main/routes/auth');
 const { orderRoutes } = require('../main/routes/orders');
 const { settingsRoutes } = require('../main/routes/settings');
 const { registerRoutes } = require('../main/routes');
-const { setCachedPairingCode } = require('../main/db');
 
 function seedUser(db: any, id: string, role: string, email: string, categoryIds?: string[]) {
   db.prepare(`
@@ -503,85 +502,28 @@ async function main() {
     'bulk settings returns empty string when mobile_pairing_code is empty',
   );
 
-  // ── Dedicated mobile pairing endpoint remains reachable for mobile-access.manage ─
+  // ── The dedicated mobile pairing endpoint was removed with cloud sync ──
+  // The route no longer exists for anyone, and a legacy cached pairing code
+  // in settings is never disclosed through it.
   const registeredApp = createApp({});
   registerRoutes(registeredApp);
-  const syntheticPairingExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  setCachedPairingCode(syntheticPairingCode, syntheticPairingExpiry);
+  db.prepare(`
+    INSERT OR REPLACE INTO settings (key, value, updated_at)
+    VALUES ('mobile_pairing_code_expires_at', ?, ?)
+  `).run(new Date(Date.now() + 60 * 60 * 1000).toISOString(), now());
 
-  const defaultServerDedicatedPairing = await request(registeredApp)
-    .get('/api/mobile/pairing-code')
-    .set(waiterAuth);
-  assertEqualOrThrow(
-    defaultServerDedicatedPairing.status,
-    403,
-    'default server cannot access dedicated /api/mobile/pairing-code route',
-  );
-  assertOrThrow(
-    !JSON.stringify(defaultServerDedicatedPairing.body).includes(syntheticPairingCode),
-    'dedicated pairing denial omits pairing code',
-  );
-
-  const ownerDedicatedPairing = await request(registeredApp)
+  const removedPairingRoute = await request(registeredApp)
     .get('/api/mobile/pairing-code')
     .set(ownerAuth);
   assertEqualOrThrow(
-    ownerDedicatedPairing.status,
-    200,
-    'owner can access dedicated /api/mobile/pairing-code route',
+    removedPairingRoute.status,
+    404,
+    'dedicated /api/mobile/pairing-code route no longer exists',
   );
   assertOrThrow(
-    ownerDedicatedPairing.body?.pairing_code === syntheticPairingCode,
-    'owner dedicated pairing route returns cached synthetic pairing code',
+    !JSON.stringify(removedPairingRoute.body).includes(syntheticPairingCode),
+    'removed pairing route omits pairing code',
   );
-  assertEqualOrThrow(
-    ownerDedicatedPairing.body?.expires_at,
-    syntheticPairingExpiry,
-    'owner dedicated pairing route returns cached expiry',
-  );
-  assertOrThrow(
-    typeof ownerDedicatedPairing.body?.qr_data_url === 'string' &&
-      ownerDedicatedPairing.body.qr_data_url.startsWith('data:image/png;base64,'),
-    'owner dedicated pairing route returns QR data URL',
-  );
-
-  db.prepare(`
-    INSERT OR REPLACE INTO user_permission_overrides
-      (user_id, permission_id, effect, updated_by, created_at, updated_at)
-    VALUES ('security-server', 'mobile-access.manage', 'allow', 'security-owner', ?, ?)
-  `).run(now(), now());
-
-  const grantedServerDedicatedPairing = await request(registeredApp)
-    .get('/api/mobile/pairing-code')
-    .set(waiterAuth);
-  assertEqualOrThrow(
-    grantedServerDedicatedPairing.status,
-    200,
-    'server with database-granted mobile-access.manage can access dedicated pairing route',
-  );
-  assertOrThrow(
-    grantedServerDedicatedPairing.body?.pairing_code === syntheticPairingCode,
-    'granted server dedicated pairing route returns cached synthetic pairing code',
-  );
-  assertEqualOrThrow(
-    grantedServerDedicatedPairing.body?.expires_at,
-    syntheticPairingExpiry,
-    'granted server dedicated pairing route returns cached expiry',
-  );
-
-  const grantedServerScalarSettings = await request(registeredApp)
-    .get('/api/settings/mobile_pairing_code')
-    .set(waiterAuth);
-  assertEqualOrThrow(
-    grantedServerScalarSettings.status,
-    403,
-    'generic scalar settings route stays blocked even with mobile-access.manage',
-  );
-
-  db.prepare(`
-    DELETE FROM user_permission_overrides
-    WHERE user_id = 'security-server' AND permission_id = 'mobile-access.manage'
-  `).run();
 
   const results = getResults();
   if (results.failed > 0) {

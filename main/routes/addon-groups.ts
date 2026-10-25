@@ -3,7 +3,7 @@ import expressRateLimit from 'express-rate-limit';
 import { getDatabase, now, withTxn, getSettingValue } from '../db';
 import { randomUUID } from 'crypto';
 import { hasPermission, requirePermission } from '../services/authorization';
-import { cloudSync } from '../services/cloud-sync';
+import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { adjustProductStock } from '../services/inventory';
 import { getActiveCountryPack, hasConfiguredTaxCategories } from '../services/tax';
@@ -18,7 +18,7 @@ function captureSelectionBoundsRejection(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change the add-on selection response.
   }
@@ -30,7 +30,7 @@ function captureAddonGroupInputValidation(): void {
     outcome: 'not_applied',
   });
   try {
-    if (failure) cloudSync.captureOperationFailure(failure);
+    if (failure) operationDiagnostics.captureOperationFailure(failure);
   } catch {
     // Diagnostics cannot change add-on validation responses.
   }

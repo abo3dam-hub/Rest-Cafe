@@ -55,7 +55,6 @@ import { dispatchQuickSearchRequest } from '@/lib/quick-search';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
-import { useSupportTicketStatus } from '@/hooks/useSupportTicketStatus';
 import {
   captureClientOperationFailure,
   createOperationReference,
@@ -312,10 +311,6 @@ export default function POSPage() {
     clientTicketId: string;
     payload: Record<string, unknown>;
   } | null>(null);
-  const [supportSubmitting, setSupportSubmitting] = useState(false);
-  const supportSubmittingRef = useRef(false);
-  const [sentTicketId, setSentTicketId] = useState<string | null>(null);
-  const delivery = useSupportTicketStatus(sentTicketId);
   const activeUserId = user?.id == null ? null : String(user.id);
   const prepaidAttemptRef = useRef<PrepaidAttempt | null>(null);
   const prepaidAttemptKeyRef = useRef<string | null>(null);
@@ -2452,127 +2447,61 @@ export default function POSPage() {
     <>
       {supportError && (
         <div className="fixed bottom-4 start-4 z-50 w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-red-200 bg-card p-4 shadow-xl">
-          {sentTicketId ? (
-            <>
-              <p className="font-semibold text-red-800">{tSupport('requestQueued')}</p>
-              {delivery.status === 'delivered' && delivery.supportCode ? (
-                <>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
-                    {tSupport('supportCode')}:{' '}
-                    <Ltr as="span" className="font-mono">
-                      {delivery.supportCode}
-                    </Ltr>
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {tSupport('supportCodeHint')}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {delivery.status === 'failed'
-                    ? tSupport('stillQueuedLocally')
-                    : tSupport('confirmingDelivery')}
-                </p>
-              )}
-              <div className="mt-3">
+          <>
+            <p className="font-semibold text-red-800">{supportError.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{supportError.message}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{supportError.nextStep}</p>
+            <details className="mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer">{tSupport('showPayload')}</summary>
+              <Ltr as="pre" className="mt-2 max-h-32 overflow-auto rounded bg-muted p-2">
+                {JSON.stringify(
+                  {
+                    ...supportError.payload,
+                    subject: supportError.subject,
+                    correlation_id: supportError.ticketCorrelationId,
+                    client_ticket_id: supportError.clientTicketId,
+                  },
+                  null,
+                  2,
+                )}
+              </Ltr>
+            </details>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {AI_HELP_PROVIDERS.map((provider) => (
                 <button
+                  key={provider.id}
                   className="rounded border px-3 py-2 text-sm"
                   onClick={() => {
-                    setSupportError(null);
-                    setSentTicketId(null);
+                    window.open(provider.url, '_blank', 'noopener,noreferrer');
+                    void (async () => {
+                      const diagnosticsMessage =
+                        typeof supportError.payload.message === 'string'
+                          ? supportError.payload.message
+                          : undefined;
+                      const copied = await copyPrinterDiagnostic(
+                        supportError.message,
+                        diagnosticsMessage,
+                      );
+                      toast(
+                        copied
+                          ? tSupport('askAiCopied', { provider: provider.label })
+                          : tSupport('askAiCopyFailed', { provider: provider.label }),
+                        { icon: copied ? '📋' : 'ℹ️' },
+                      );
+                    })();
                   }}
                 >
-                  {tSupport('dismiss')}
+                  {tSupport('askAi')} · {provider.label}
                 </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold text-red-800">{supportError.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{supportError.message}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{supportError.nextStep}</p>
-              <details className="mt-2 text-xs text-muted-foreground">
-                <summary className="cursor-pointer">{tSupport('showPayload')}</summary>
-                <Ltr as="pre" className="mt-2 max-h-32 overflow-auto rounded bg-muted p-2">
-                  {JSON.stringify(
-                    {
-                      ...supportError.payload,
-                      subject: supportError.subject,
-                      correlation_id: supportError.ticketCorrelationId,
-                      client_ticket_id: supportError.clientTicketId,
-                    },
-                    null,
-                    2,
-                  )}
-                </Ltr>
-              </details>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className="rounded bg-brand px-3 py-2 text-sm font-medium text-white"
-                  disabled={
-                    supportSubmitting ||
-                    !supportError.clientTicketId ||
-                    !supportError.ticketCorrelationId
-                  }
-                  onClick={async () => {
-                    if (supportSubmittingRef.current) return;
-                    supportSubmittingRef.current = true;
-                    setSupportSubmitting(true);
-                    try {
-                      await api.post('/support-ticket', {
-                        ...supportError.payload,
-                        subject: supportError.subject,
-                        correlation_id: supportError.ticketCorrelationId,
-                        client_ticket_id: supportError.clientTicketId,
-                      });
-                      toast.success(tSupport('queued'));
-                      setSentTicketId(supportError.clientTicketId);
-                    } catch {
-                      toast.error(t('supportRequestQueueFailed'));
-                    } finally {
-                      supportSubmittingRef.current = false;
-                      setSupportSubmitting(false);
-                    }
-                  }}
-                >
-                  {supportSubmitting ? tSupport('submitting') : tSupport('getHelp')}
-                </button>
-                {AI_HELP_PROVIDERS.map((provider) => (
-                  <button
-                    key={provider.id}
-                    className="rounded border px-3 py-2 text-sm"
-                    onClick={() => {
-                      window.open(provider.url, '_blank', 'noopener,noreferrer');
-                      void (async () => {
-                        const diagnosticsMessage =
-                          typeof supportError.payload.message === 'string'
-                            ? supportError.payload.message
-                            : undefined;
-                        const copied = await copyPrinterDiagnostic(
-                          supportError.message,
-                          diagnosticsMessage,
-                        );
-                        toast(
-                          copied
-                            ? tSupport('askAiCopied', { provider: provider.label })
-                            : tSupport('askAiCopyFailed', { provider: provider.label }),
-                          { icon: copied ? '📋' : 'ℹ️' },
-                        );
-                      })();
-                    }}
-                  >
-                    {tSupport('askAi')} · {provider.label}
-                  </button>
-                ))}
-                <button
-                  className="rounded border px-3 py-2 text-sm"
-                  onClick={() => setSupportError(null)}
-                >
-                  {tSupport('dismiss')}
-                </button>
-              </div>
-            </>
-          )}
+              ))}
+              <button
+                className="rounded border px-3 py-2 text-sm"
+                onClick={() => setSupportError(null)}
+              >
+                {tSupport('dismiss')}
+              </button>
+            </div>
+          </>
         </div>
       )}
       <PosTopbar
