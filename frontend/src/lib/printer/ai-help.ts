@@ -12,8 +12,8 @@ export const AI_HELP_PROVIDERS: readonly AiProvider[] = [
   { id: 'claude', label: 'Claude', url: 'https://claude.ai/new' },
 ];
 
-const TROUBLESHOOTING_URL = 'https://flopos.com/documentation/troubleshooting';
-const SUPPORT_EMAIL = 'support@flopos.com';
+const TROUBLESHOOTING_URL = 'AliCoding';
+const SUPPORT_EMAIL = 'abo3dam@gmail.com';
 
 async function resolveAppContext(): Promise<string> {
   try {
