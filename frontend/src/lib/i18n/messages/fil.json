@@ -1856,6 +1856,7 @@
     "createBackup": "Gumawa ng Backup",
     "createBackupHint": "Gumawa ng kumpletong .db backup na naglalaman ng mga user, PIN, setting, order, at produkto.",
     "currency": "Currency",
+    "currencyUnit": "Yunit ng pera",
     "currencyAutoFilled": "Currency (kusang napunan)",
     "currencyRecommended": "Inirerekomenda",
     "currencyPopular": "Mga sikat na currency",

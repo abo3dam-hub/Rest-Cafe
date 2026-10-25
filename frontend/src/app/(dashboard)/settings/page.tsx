@@ -1575,6 +1575,7 @@ export default function SettingsPage() {
     timezone: '',
     businessDayStartTime: '00:00',
     currency: '',
+    currencySymbol: '',
     billingType: 'postpaid',
     tablesRequired: true,
     taxRegistered: false,
@@ -1585,7 +1586,7 @@ export default function SettingsPage() {
     receiptLogo: '',
     receiptLogoRaster: '',
     currencyDisplay: 'rial',
-    numberDigits: 'locale',
+    numberDigits: 'latin',
     calendar: 'locale',
   });
   const [form, setForm] = useState<BusinessForm>(savedBusiness);
@@ -1815,6 +1816,7 @@ export default function SettingsPage() {
         timezone: d.timezone || '',
         businessDayStartTime: d.business_day_start_time || '00:00',
         currency: d.currency || '',
+        currencySymbol: d.currency_symbol || '',
         billingType: d.billing_type === 'prepaid' ? 'prepaid' : 'postpaid',
         tablesRequired: typeof d.tables_required === 'boolean' ? d.tables_required : true,
         taxRegistered:
@@ -1831,7 +1833,7 @@ export default function SettingsPage() {
             : d.currency_display === 'toman_short'
               ? 'toman_short'
               : 'rial',
-        numberDigits: d.number_digits === 'latin' ? 'latin' : 'locale',
+        numberDigits: d.number_digits === 'locale' ? 'locale' : 'latin',
         calendar:
           d.calendar === 'persian'
             ? 'persian'
@@ -2154,6 +2156,7 @@ export default function SettingsPage() {
           timezone: d.timezone || '',
           businessDayStartTime: d.business_day_start_time || '00:00',
           currency: d.currency || '',
+          currencySymbol: d.currency_symbol || '',
           billingType: d.billing_type === 'prepaid' ? 'prepaid' : 'postpaid',
           tablesRequired: typeof d.tables_required === 'boolean' ? d.tables_required : true,
           taxRegistered:
@@ -2170,7 +2173,7 @@ export default function SettingsPage() {
               : d.currency_display === 'toman_short'
                 ? 'toman_short'
                 : 'rial',
-          numberDigits: d.number_digits === 'latin' ? 'latin' : 'locale',
+          numberDigits: d.number_digits === 'locale' ? 'locale' : 'latin',
           calendar:
             d.calendar === 'persian'
               ? 'persian'
@@ -3503,7 +3506,7 @@ export default function SettingsPage() {
   };
 
   const saveBusinessInfo = async (silent = false) => {
-    const norm = normalizeOptionalPhone(form.businessPhone, form.countryCode || '');
+    const norm = normalizeOptionalPhone(form.businessPhone, 'SY');
     if (!norm.valid) {
       toast.error(t('invalidPhoneFormat'));
       return;
@@ -3517,7 +3520,8 @@ export default function SettingsPage() {
         timezone: form.timezone,
         business_day_start_time: form.businessDayStartTime,
         currency: form.currency,
-        country: form.countryCode,
+        currency_symbol: form.currencySymbol,
+        country: '',
         billing_type: form.billingType,
         tables_required: form.tablesRequired,
         tax_registered: form.taxRegistered,
@@ -3536,41 +3540,7 @@ export default function SettingsPage() {
             }
           : {}),
       });
-      let resolvedTaxIdFormat = putRes.data?.tax_id_format || null;
-      if (savedBusiness.countryCode !== form.countryCode) {
-        const taxSetting = await api.get('/settings/taxes_enabled').catch(() => null);
-        if (taxSetting?.data.setting?.value === 'true') {
-          try {
-            const ensureRes = await api.post('/tax-packs/ensure-country', {
-              country: form.countryCode,
-            });
-            resolvedTaxIdFormat = ensureRes.data?.tax_id_format || null;
-          } catch (error) {
-            const status = (error as { response?: { status?: number } }).response?.status;
-            if (status === 404) {
-              const key = `tax_plugin_request:${form.countryCode}`;
-              const requestSetting = await api.get(`/settings/${key}`).catch(() => null);
-              const clientTicketId = requestSetting?.data.setting?.value || crypto.randomUUID();
-              if (!requestSetting?.data.setting?.value) {
-                await api.put(`/settings/${key}`, { value: clientTicketId });
-              }
-              await api
-                .post('/support-ticket', {
-                  client_ticket_id: clientTicketId,
-                  subject: `Request tax support for ${form.countryCode}`,
-                  event_code: 'tax.country_plugin_unavailable',
-                  message: `The merchant changed country to ${form.countryCode} while taxes were enabled, but no verified country tax plugin is available. Please create and publish it.`,
-                  diagnostics: { country: form.countryCode },
-                })
-                .catch(() => {});
-              await api.put('/settings/taxes_enabled', { value: 'false' }).catch(() => {});
-              toast.error(t('taxSupportUnavailable', { country: form.countryCode }));
-            } else {
-              toast.error(t('countrySavedTaxPluginFailed'));
-            }
-          }
-        }
-      }
+      const resolvedTaxIdFormat = putRes.data?.tax_id_format || null;
       const updatedForm = { ...form, businessPhone: normalizedBusinessPhone };
       setSavedBusiness(updatedForm);
       setForm(updatedForm);
@@ -3589,9 +3559,10 @@ export default function SettingsPage() {
         business_name: form.businessName,
         brand_logo: form.receiptLogo || '',
         currency: form.currency,
+        currency_symbol: form.currencySymbol || undefined,
         timezone: form.timezone,
         business_day_start_time: form.businessDayStartTime,
-        country: form.countryCode,
+        country: '',
         currency_display: form.currencyDisplay,
         number_digits: form.numberDigits,
         calendar: form.calendar,

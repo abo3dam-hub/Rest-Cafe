@@ -8,17 +8,41 @@
   "currency": "XXX",
   "effectiveFrom": "2026-01-01",
   "publishedAt": "2026-01-01",
-  "minFloVersion": "2.4.0",
+  "minFloVersion": "1.0.0",
   "taxPoint": "finalized_at",
   "inclusivePricingDefault": false,
   "registrationNumberLabel": "Tax registration",
   "categories": [
-    { "id": "standard", "label": "Standard", "ruleIds": [] },
-    { "id": "packaging", "label": "Packaging", "ruleIds": [] },
-    { "id": "delivery", "label": "Delivery", "ruleIds": [] },
-    { "id": "service_charge", "label": "Service charge", "ruleIds": [] },
-    { "id": "addon", "label": "Add-on", "ruleIds": [] },
-    { "id": "unclassified", "label": "Unclassified", "ruleIds": [] }
+    {
+      "id": "standard",
+      "label": "Standard",
+      "ruleIds": []
+    },
+    {
+      "id": "packaging",
+      "label": "Packaging",
+      "ruleIds": []
+    },
+    {
+      "id": "delivery",
+      "label": "Delivery",
+      "ruleIds": []
+    },
+    {
+      "id": "service_charge",
+      "label": "Service charge",
+      "ruleIds": []
+    },
+    {
+      "id": "addon",
+      "label": "Add-on",
+      "ruleIds": []
+    },
+    {
+      "id": "unclassified",
+      "label": "Unclassified",
+      "ruleIds": []
+    }
   ],
   "defaultCategories": {
     "product": "standard",

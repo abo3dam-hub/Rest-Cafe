@@ -7,18 +7,9 @@ import { processReceiptLogoFile } from '@/lib/printer/logo-processor';
 import { Ltr } from '@/components/layout/Ltr';
 import { Toggle } from '@/components/settings/Toggle';
 import { SettingsTabShell } from '@/components/settings/SettingsTabShell';
-import { LocalePreferencesPanel } from '@/components/settings/LocalePreferencesPanel';
 import { TimeZoneSelect } from '@/components/TimeZoneSelect';
 import { CurrencySelect } from '@/components/CurrencySelect';
-import {
-  COUNTRIES,
-  getCountryByCode,
-  getLocalizedCountryName,
-  sortCountriesByLocalizedName,
-  type CurrencyDisplay,
-  type DigitMode,
-  type CalendarMode,
-} from '@/lib/countries';
+import type { CurrencyDisplay, DigitMode, CalendarMode } from '@/lib/countries';
 import { dialCodeFor } from '@/lib/phone';
 import { usePosSettingsStore } from '@/store/pos-settings';
 import { useAuthStore } from '@/store/auth';
@@ -65,6 +56,7 @@ export interface BusinessForm {
   timezone: string;
   businessDayStartTime: string;
   currency: string;
+  currencySymbol: string;
   currencyDisplay: CurrencyDisplay;
   numberDigits: DigitMode;
   calendar: CalendarMode;
@@ -155,7 +147,6 @@ export function GeneralSettingsTab({
     [],
   );
 
-  const sortedCountries = useMemo(() => sortCountriesByLocalizedName(COUNTRIES, locale), [locale]);
   const [sampleOrderDate] = useState(() => new Date().toISOString().slice(0, 10).replace(/-/g, ''));
 
   const TAX_ID_WARNING_MAX_LENGTH = 24;
@@ -203,65 +194,16 @@ export function GeneralSettingsTab({
               </p>
             )}
           </div>
-          {/* Country, Timezone, Currency in single line with individual headings */}
+          {/* Timezone, Currency, Currency unit (no country profiles in Rest&Cafe) */}
           <div className="md:col-span-2 space-y-2">
-            {/* Headings */}
             <div className="grid grid-cols-3 gap-2">
-              <label className="text-sm text-muted-foreground">{t('country')}</label>
               <label className="text-sm text-muted-foreground">{t('timezone')}</label>
               <label className="text-sm text-muted-foreground">{t('currency')}</label>
+              <label className="text-sm text-muted-foreground">{t('currencyUnit')}</label>
             </div>
 
-            {/* Input fields */}
             {isAdmin ? (
               <div className="grid grid-cols-3 gap-2">
-                <select
-                  value={form.countryCode}
-                  onChange={(e) => {
-                    markHydrationTouched('countryCode');
-                    markHydrationTouched('timezone');
-                    markHydrationTouched('currencyDisplay');
-                    markHydrationTouched('numberDigits');
-                    markHydrationTouched('calendar');
-                    const country = COUNTRIES.find((c) => c.code === e.target.value);
-                    setForm((p) => {
-                      const previousCountry = getCountryByCode(p.countryCode);
-                      const timezoneWasDefault =
-                        !previousCountry || p.timezone === previousCountry.timezone;
-                      const options = country?.localeOptions;
-                      const currencyDisplay =
-                        options?.currencyDisplay?.includes(p.currencyDisplay) ||
-                        p.currencyDisplay === 'rial'
-                          ? p.currencyDisplay
-                          : 'rial';
-                      const numberDigits =
-                        options?.digits?.includes(p.numberDigits) || p.numberDigits === 'locale'
-                          ? p.numberDigits
-                          : 'locale';
-                      const calendar =
-                        options?.calendar?.includes(p.calendar) || p.calendar === 'locale'
-                          ? p.calendar
-                          : 'locale';
-                      return {
-                        ...p,
-                        countryCode: e.target.value,
-                        timezone: timezoneWasDefault ? country?.timezone || p.timezone : p.timezone,
-                        currencyDisplay,
-                        numberDigits,
-                        calendar,
-                      };
-                    });
-                  }}
-                  aria-label={t('country')}
-                  className="px-3 py-2 text-sm border border-border rounded-lg outline-none focus:ring-2 focus:ring-brand bg-card"
-                >
-                  <option value="">{t('selectCountry')}</option>
-                  {sortedCountries.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {getLocalizedCountryName(c.code, locale)}
-                    </option>
-                  ))}
-                </select>
                 <TimeZoneSelect
                   value={form.timezone}
                   onChange={(timezone) => {
@@ -275,7 +217,7 @@ export function GeneralSettingsTab({
                 {isOwner ? (
                   <CurrencySelect
                     value={form.currency}
-                    recommendedCurrency={getCountryByCode(form.countryCode)?.currency}
+                    recommendedCurrency="SYP"
                     locale={locale}
                     onChange={(currency) => {
                       if (currency !== form.currency) onRequestCurrencyChange(currency);
@@ -291,17 +233,29 @@ export function GeneralSettingsTab({
                     <Ltr>{form.currency || '-'}</Ltr>
                   </p>
                 )}
+                <input
+                  type="text"
+                  value={form.currencySymbol}
+                  onChange={(e) => {
+                    markHydrationTouched('currencySymbol');
+                    setForm((p) => ({ ...p, currencySymbol: e.target.value }));
+                  }}
+                  placeholder="SP"
+                  maxLength={12}
+                  aria-label={t('currencyUnit')}
+                  className="px-3 py-2 text-sm border border-border rounded-lg outline-none focus:ring-2 focus:ring-brand bg-card"
+                />
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
-                <p className="font-medium text-foreground">
-                  {form.countryCode ? getLocalizedCountryName(form.countryCode, locale) : '-'}
-                </p>
                 <p className="font-medium text-foreground">
                   <Ltr>{form.timezone || '-'}</Ltr>
                 </p>
                 <p className="font-medium text-foreground">
                   <Ltr>{form.currency || '-'}</Ltr>
+                </p>
+                <p className="font-medium text-foreground">
+                  <Ltr>{form.currencySymbol || '-'}</Ltr>
                 </p>
               </div>
             )}
@@ -338,26 +292,6 @@ export function GeneralSettingsTab({
             <p className="text-xs text-muted-foreground">{t('businessDayStartTimeDesc')}</p>
           </div>
 
-          <LocalePreferencesPanel
-            options={getCountryByCode(form.countryCode)?.localeOptions}
-            currencyDisplay={form.currencyDisplay}
-            digits={form.numberDigits}
-            calendar={form.calendar}
-            isAdmin={isAdmin}
-            onChange={(patch) => {
-              if (patch.currencyDisplay !== undefined) markHydrationTouched('currencyDisplay');
-              if (patch.digits !== undefined) markHydrationTouched('numberDigits');
-              if (patch.calendar !== undefined) markHydrationTouched('calendar');
-              setForm((p) => ({
-                ...p,
-                ...(patch.currencyDisplay !== undefined
-                  ? { currencyDisplay: patch.currencyDisplay }
-                  : {}),
-                ...(patch.digits !== undefined ? { numberDigits: patch.digits } : {}),
-                ...(patch.calendar !== undefined ? { calendar: patch.calendar } : {}),
-              }));
-            }}
-          />
           <div>
             <label className="block text-sm text-muted-foreground mb-1">{t('billingType')}</label>
             {isAdmin ? (
@@ -460,7 +394,7 @@ export function GeneralSettingsTab({
                   setForm((p) => ({ ...p, businessPhone: e.target.value }));
                 }}
                 placeholder={t('phonePlaceholder', {
-                  dialCode: dialCodeFor(form.countryCode) || '+1',
+                  dialCode: dialCodeFor('SY') || '+963',
                 })}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg outline-none focus:ring-2 focus:ring-brand"
                 dir="ltr"

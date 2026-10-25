@@ -1856,6 +1856,7 @@
     "createBackup": "Krijo kopje rezerve",
     "createBackupHint": "Krijo një kopje rezervë të plotë .db që ruan përdoruesit, kodet PIN, cilësimet, porositë, produktet dhe historinë. Përdoreni këtë për të zhvendosur FloCafe në një kompjuter tjetër.",
     "currency": "Monedhë",
+    "currencyUnit": "Njësia e monedhës",
     "currencyAutoFilled": "Monedha (e mbushur automatikisht)",
     "currencyRecommended": "Rekomanduar",
     "currencyPopular": "Monedhat e njohura",

@@ -223,20 +223,21 @@ tier boundaries, or store-credit accounting needs explicit confirmation.
 
 ---
 
-## Regional settings come from signup, never from a fallback
+## Regional settings are the store's own plain settings (Rest&Cafe)
 
-**Rule:** The country selected during first-run setup, and the ISO 4217 currency selected alongside
-it, are the only source of a store's regional identity. The country's currency is recommended, but
-the owner may choose another supported currency. Currency symbol, symbol position, fraction digits,
-number separators, and the default timezone are **derived** from those two values through
-international conventions (CLDR via `Intl`, ISO 4217, IANA time zones).
+**Rule:** Rest&Cafe ships no country profiles. A store's regional identity is
+its own settings: the ISO 4217 `currency`, an optional merchant-editable
+`currency_symbol` (the "currency unit", e.g. `SP`), and `timezone`. First-run
+setup applies the product defaults — Syrian pound (`SYP`), unit `SP`, timezone
+`Asia/Damascus` — and every value stays editable in Settings. Fraction digits
+follow ISO 4217 via `Intl` (SYP is a whole-unit currency: amounts render as
+`10`, never `10.00`), and digits always render Latin (`latn`) product-wide.
 
-There is no default country, no hard-coded currency symbol, and no per-store override of a derived
-value. When regional settings are missing, code fails loudly with `RegionalNotConfiguredError` and
-HTTP 409 rather than rendering a fallback currency.
-
-`settings.timezone` is the single legitimate stored override. It is not a per-store override of a
-derived country value; it is a configured zone within the resolved country.
+`resolveRegionalSnapshot` resolves a store with no country through the
+generic settings-driven snapshot (`resolveGenericSnapshot`): the stored
+currency unit wins over the CLDR symbol, and SYP amounts place the unit as a
+suffix. Stores that still carry a country code from the upstream product
+keep resolving through that country's reference data.
 
 **Post-setup currency changes are destructive.** A configured store cannot reinterpret existing
 amounts in a new currency. Only an owner may change currency, through the Master-PIN-gated reset
@@ -244,20 +245,19 @@ flow at `POST /api/db-tools/currency-reset`. The app takes a full recovery backu
 local database, and preserves only categories, products, add-on groups, add-ons, and their
 relationships. Product prices, product costs, stock balances, tax assignments, cashback
 percentages, and add-on prices reset to zero or defaults, all other local data is erased, and
-first-run setup is required again. Changing country alone changes the recommendation, never the
-active currency. Ordinary business and wildcard settings writes reject an actual currency change
-with `currency_change_requires_reset`.
+first-run setup is required again. Ordinary business and wildcard settings writes reject an
+actual currency change with `currency_change_requires_reset`.
 
-**Reason:** The install seed used to write `'IN'`, `'INR'`, `'₹'`, and `'Asia/Kolkata'` as silent
-fallbacks in more than a dozen places before the owner had chosen anything, and surfaces disagreed
-about which symbol to print, so a non-Indian store could see one currency on a receipt and another
-on screen. The owner's instruction was that the user picks country and currency at signup, it stays
-consistent throughout the application, and the app follows existing conventions rather than
-inventing overrides.
+**Reason:** The product is sold per-restaurant in one home market; the owner
+ configures currency, unit, timezone, and taxes directly, without a country
+ profile standing in between. Taxes are likewise manual: the owner enables
+ them and defines rates in the manual tax configuration; there are no
+ bundled country tax packs beyond the empty generic framework.
 
-**What this rules out:** merchant-editable currency symbols and merchant-selectable symbol
-placement. If a locale's rendering is wrong, the fix is the country profile in `main/countries.ts`,
-which corrects every store in that country.
+**What this rules out:** country pickers in setup or Settings, bundled
+ country tax packs, and any flow that requires a country before the store
+ can operate.
+
 
 **Enforced by:** `resolveRegionalSnapshot()` in `main/countries.ts`, the first-run wizard requiring
 a country, setup rejecting a missing country, `seedInstallDefaults()` in `main/db.ts` not writing

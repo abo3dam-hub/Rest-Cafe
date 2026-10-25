@@ -1235,8 +1235,10 @@ export async function printDeliverySlip(
     const currencyDisplay = ['rial', 'toman', 'toman_short'].includes(currencyDisplayValue ?? '')
       ? (currencyDisplayValue as CurrencyDisplay)
       : undefined;
-    const digits: DigitMode = getSettingValue('number_digits') === 'latin' ? 'latin' : 'locale';
-    const currencySymbol = getCurrencySymbol(currency, currencyLocale);
+    // Rest&Cafe renders Latin digits product-wide.
+    const digits: DigitMode = 'latin';
+    const currencySymbol =
+      getSettingValue('currency_symbol') || getCurrencySymbol(currency, currencyLocale);
 
     const warnings: PrintWarning[] = [];
     const nativeCapabilities = nativeFallbackCapabilities(capabilities);
@@ -2248,10 +2250,10 @@ function renderEscposLineTemplateV1(
   const fractionDigits = getCurrencyFractionDigits(currency);
   const trimDecimals = biz.trim_decimals === true;
   const locale = getCountryByCode(biz.country)?.locale ?? 'en-US';
-  // CLDR-derived only — a stored currency_symbol setting is not an input
-  // (docs/reference/product-invariants.md: no per-store override of a snapshot value).
+  // Rest&Cafe: the owner's stored currency unit (biz.currency_symbol, e.g.
+  // SP) wins over the CLDR symbol on printed bills.
   const prefix = resolveCurrencyPrefix(
-    getCurrencySymbol(currency, locale) || currency,
+    biz.currency_symbol || getCurrencySymbol(currency, locale) || currency,
     useUnicode,
     capabilities,
     false,
@@ -3105,7 +3107,10 @@ export function buildZReportBody(
   const factor = 10 ** fractionDigits;
   const locale = snapshot.locale;
   const tz = snapshot.timezone;
-  const prefix = resolveCurrencyPrefix(getCurrencySymbol(currency, locale), false);
+  const prefix = resolveCurrencyPrefix(
+    snapshot.currencySymbol || getCurrencySymbol(currency, locale),
+    false,
+  );
   const trimDecimals = false;
   const centsToAmount = (cents: number): number => (Number(cents) || 0) / factor;
   const formatAmount = (cents: number): string =>

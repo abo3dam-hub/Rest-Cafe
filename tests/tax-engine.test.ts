@@ -1157,7 +1157,7 @@ test('3-decimal (KWD, BHD, OMR, JOD, TND) and 0-decimal (JPY, KRW, VND, COP) cur
   }
 
   const japanPack = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '../main/tax-packs/community-japan.json'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, 'fixtures/japan-pack.json'), 'utf8'),
   ) as CountryPack;
   assert.equal(japanPack.country, 'JP');
   assert.equal(japanPack.currency, 'JPY');

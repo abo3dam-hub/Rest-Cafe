@@ -1856,6 +1856,7 @@
     "createBackup": "Yedek Oluştur",
     "createBackupHint": "Kullanıcıları, PIN'leri, ayarları, siparişleri ve ürünleri içeren tam bir .db yedeği oluşturur. FloCafe'yi başka bir bilgisayara taşımak için bunu kullanın.",
     "currency": "Para Birimi",
+    "currencyUnit": "Para birimi",
     "currencyAutoFilled": "Para Birimi (Otomatik)",
     "currencyRecommended": "Önerilen",
     "currencyPopular": "Popüler para birimleri",

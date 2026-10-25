@@ -1856,6 +1856,7 @@
     "createBackup": "Tạo bản sao lưu",
     "createBackupHint": "Tạo bản sao lưu .db đầy đủ, giữ người dùng, PIN, cài đặt, đơn hàng, sản phẩm và lịch sử. Dùng để chuyển FloCafe sang máy tính khác.",
     "currency": "Tiền tệ",
+    "currencyUnit": "Đơn vị tiền tệ",
     "currencyAutoFilled": "Tiền tệ (tự động điền)",
     "currencyRecommended": "Đề xuất",
     "currencyPopular": "Tiền tệ phổ biến",

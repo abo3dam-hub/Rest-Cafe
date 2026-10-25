@@ -1856,6 +1856,7 @@
     "createBackup": "Créer une sauvegarde",
     "createBackupHint": "Créez une sauvegarde .db complète qui conserve les utilisateurs, les codes PIN, les paramètres, les commandes, les produits et l’historique. Utilisez-la pour transférer FloCafe vers un autre ordinateur.",
     "currency": "Devise",
+    "currencyUnit": "Unité monétaire",
     "currencyAutoFilled": "Devise (remplie automatiquement)",
     "currencyRecommended": "Recommandée",
     "currencyPopular": "Devises populaires",

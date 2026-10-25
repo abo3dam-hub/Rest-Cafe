@@ -1856,6 +1856,7 @@
     "createBackup": "بیک اپ بنائیں",
     "createBackupHint": "مکمل .db بیک اپ بنائیں جو صارفین، PIN، ترتیبات، آرڈرز، پروڈکٹس اور تاریخ محفوظ رکھتا ہے۔ FloCafe کو دوسرے کمپیوٹر پر منتقل کرنے کے لیے اسے استعمال کریں۔",
     "currency": "کرنسی",
+    "currencyUnit": "کرنسی کی اکائی",
     "currencyAutoFilled": "کرنسی (خودکار بھری ہوئی)",
     "currencyRecommended": "تجویز کردہ",
     "currencyPopular": "مقبول کرنسیاں",

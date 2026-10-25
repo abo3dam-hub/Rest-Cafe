@@ -313,8 +313,10 @@ async function main() {
     assert.equal(count('users'), 0, 'no owner is created when the currency is unsupported');
     console.log('   ✓ setup rejects an unsupported currency code');
 
-    // A non-string country must not reach getCountryByCode's .toUpperCase()
-    // call (which would throw and surface as a 500, not this 400).
+    // Rest&Cafe has no country profiles: the country field is ignored
+    // entirely, so a non-string country cannot fail setup — validation
+    // moves past it to the next required field (the owner Approval PIN,
+    // deliberately omitted from this payload).
     const nonStringCountry = await request(baseUrl, '/setup/initialize', {
       method: 'POST',
       body: JSON.stringify({
@@ -334,15 +336,15 @@ async function main() {
     assert.equal(
       nonStringCountry.status,
       400,
-      'setup rejects a non-string country with 400, not a crash',
+      'setup still validates the remaining required fields (no crash)',
     );
-    assert.equal(
-      nonStringCountry.data.error,
-      'A valid country is required',
-      'setup reports the country-specific validation error',
+    assert.match(
+      String(nonStringCountry.data.error || ''),
+      /Approval PIN/,
+      'setup ignores the country field and reports the next validation error',
     );
-    assert.equal(count('users'), 0, 'no owner is created when country is not a string');
-    console.log('   ✓ setup rejects a non-string country without crashing');
+    assert.equal(count('users'), 0, 'no owner is created when required fields are missing');
+    console.log('   ✓ setup ignores a non-string country without crashing');
 
     const first = await request(baseUrl, '/setup/initialize', {
       method: 'POST',
@@ -391,7 +393,11 @@ async function main() {
     assert.equal(setting('business_type'), 'restaurant');
     assert.equal(setting('setup_profile'), 'express');
     assert.equal(setting('service_model'), 'qsr');
-    assert.equal(setting('country'), 'CA', 'setup persists the chosen country');
+    assert.equal(
+      setting('country'),
+      '',
+      'Rest&Cafe: setup stores no country (no country profiles)',
+    );
     assert.equal(setting('currency'), 'CAD', 'setup persists the chosen currency');
     assert.equal(
       setting('timezone'),

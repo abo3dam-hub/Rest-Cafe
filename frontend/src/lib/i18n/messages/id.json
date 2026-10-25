@@ -1856,6 +1856,7 @@
     "createBackup": "Buat Cadangan",
     "createBackupHint": "Buat cadangan .db lengkap yang menyimpan pengguna, PIN, pengaturan, pesanan, produk, dan riwayat. Gunakan ini untuk memindahkan FloCafe ke komputer lain.",
     "currency": "Mata Uang",
+    "currencyUnit": "Satuan mata uang",
     "currencyAutoFilled": "Mata uang (terisi otomatis)",
     "currencyRecommended": "Direkomendasikan",
     "currencyPopular": "Mata uang populer",

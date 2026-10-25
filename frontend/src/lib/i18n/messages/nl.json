@@ -1856,6 +1856,7 @@
     "createBackup": "Maak een back-up",
     "createBackupHint": "Maak een volledige .db-back-up waarin gebruikers, PIN's, instellingen, bestellingen, producten en geschiedenis behouden blijven. Gebruik dit om FloCafe naar een andere computer te verplaatsen.",
     "currency": "Valuta",
+    "currencyUnit": "Valuta-eenheid",
     "currencyAutoFilled": "Valuta (automatisch ingevuld)",
     "currencyRecommended": "Aanbevolen",
     "currencyPopular": "Populaire valuta",

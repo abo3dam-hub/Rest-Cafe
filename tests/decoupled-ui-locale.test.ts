@@ -8,7 +8,7 @@
  *    preferences remain backend-authoritative and respected regardless of UI locale.
  * 3. Browser thermal receipts (web-print.ts / generateBillHtml) format receipt dates
  *    in the active UI language (including Albanian, Thai, and Urdu) for an Argentina tenant.
- * 4. WhatsApp share messages (whatsapp-share.ts) respect the active UI locale for date/amounts.
+ * 4. (Removed: WhatsApp sharing was removed from Rest&Cafe.)
  * 5. React useFormatDate hook correctly provides localized formatting based on useLocale().
  * 6. Reviewer-visible visual evidence artifacts (HTML & PNG screenshots) are generated
  *    in the evidence directory.
@@ -37,7 +37,12 @@ const moduleApi = require('module') as {
   _resolveFilename: (...args: any[]) => string;
 };
 const originalResolveFilename = moduleApi._resolveFilename;
-moduleApi._resolveFilename = function (request: string, parent: any, isMain: boolean, options?: any) {
+moduleApi._resolveFilename = function (
+  request: string,
+  parent: any,
+  isMain: boolean,
+  options?: any,
+) {
   let resolvedRequest = request;
   if (request.startsWith('@/')) {
     resolvedRequest = path.resolve(ROOT, 'frontend/src', request.slice(2));
@@ -58,15 +63,23 @@ React.useSyncExternalStore = function (subscribe: any, getSnapshot: any, getServ
 };
 
 const { IntlProvider, useLocale } = frontendRequire('use-intl');
-const { formatCurrencyForTenant, formatDateForTenant, formatNumberForTenant, getCountryByCode } = require('../main/countries');
+const {
+  formatCurrencyForTenant,
+  formatDateForTenant,
+  formatNumberForTenant,
+  getCountryByCode,
+} = require('../main/countries');
 const { generateBillHtml } = require('../frontend/src/lib/printer/web-print');
-const { getWhatsAppMessage, getWhatsAppShareUrl, sendBillViaFlo, shareBillViaWhatsApp } = require('../frontend/src/lib/whatsapp-share');
-const whatsappApi = frontendRequire('./src/lib/api').default;
 const { LANGUAGES } = require('../frontend/src/lib/i18n/languages');
 const { useFormatDate } = require('../frontend/src/hooks/useFormatDate');
 const { useAuthStore } = require('../frontend/src/store/auth');
 
-async function captureScreenshot(html: string, outputPath: string, width = 800, height = 900): Promise<void> {
+async function captureScreenshot(
+  html: string,
+  outputPath: string,
+  width = 800,
+  height = 900,
+): Promise<void> {
   try {
     const { chromium } = frontendRequire('playwright');
     const browser = await chromium.launch({ headless: true });
@@ -89,11 +102,21 @@ async function runTests() {
   console.log('='.repeat(70));
 
   const sqDecimal = new Intl.NumberFormat('sq-AL').format(1234567.89);
-  const sqCurrency = new Intl.NumberFormat('sq-AL', { style: 'currency', currency: 'ALL' }).format(1234.56);
-  const sqDate = new Intl.DateTimeFormat('sq-AL', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date('2026-09-25T12:00:00Z'));
+  const sqCurrency = new Intl.NumberFormat('sq-AL', { style: 'currency', currency: 'ALL' }).format(
+    1234.56,
+  );
+  const sqDate = new Intl.DateTimeFormat('sq-AL', { dateStyle: 'long', timeZone: 'UTC' }).format(
+    new Date('2026-09-25T12:00:00Z'),
+  );
   const albania = getCountryByCode('AL');
-  assert.ok(sqDecimal.includes(',') && /[\u00a0\u202f]/.test(sqDecimal), `sq-AL must use comma decimals and space grouping, got: ${sqDecimal}`);
-  assert.ok(sqCurrency.includes('Lekë'), `sq-AL ALL formatting must retain the Lekë label, got: ${sqCurrency}`);
+  assert.ok(
+    sqDecimal.includes(',') && /[\u00a0\u202f]/.test(sqDecimal),
+    `sq-AL must use comma decimals and space grouping, got: ${sqDecimal}`,
+  );
+  assert.ok(
+    sqCurrency.includes('Lekë'),
+    `sq-AL ALL formatting must retain the Lekë label, got: ${sqCurrency}`,
+  );
   assert.ok(sqDate.includes('shtator'), `sq-AL must format Albanian month names, got: ${sqDate}`);
   const urDecimal = new Intl.NumberFormat('ur-PK').format(1234567.89);
   const urCurrency = new Intl.NumberFormat('ur-PK', {
@@ -102,17 +125,30 @@ async function runTests() {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(1234.56);
-  const urDate = new Intl.DateTimeFormat('ur-PK', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date('2026-09-20T12:00:00Z'));
-  assert.equal(urDecimal, '1,234,567.89', `ur-PK must use Latin digits and Western separators, got: ${urDecimal}`);
-  assert.ok(urCurrency.includes('Rs') && urCurrency.includes('1,235'), `ur-PK PKR formatting must round to whole rupees with Latin digits, got: ${urCurrency}`);
-  assert.ok(urDate.includes('ستمبر') && urDate.includes('2026') && !/[۰-۹]/.test(urDate), `ur-PK must use localized month names with Latin digits, got: ${urDate}`);
+  const urDate = new Intl.DateTimeFormat('ur-PK', { dateStyle: 'long', timeZone: 'UTC' }).format(
+    new Date('2026-09-20T12:00:00Z'),
+  );
+  assert.equal(
+    urDecimal,
+    '1,234,567.89',
+    `ur-PK must use Latin digits and Western separators, got: ${urDecimal}`,
+  );
+  assert.ok(
+    urCurrency.includes('Rs') && urCurrency.includes('1,235'),
+    `ur-PK PKR formatting must round to whole rupees with Latin digits, got: ${urCurrency}`,
+  );
+  assert.ok(
+    urDate.includes('ستمبر') && urDate.includes('2026') && !/[۰-۹]/.test(urDate),
+    `ur-PK must use localized month names with Latin digits, got: ${urDate}`,
+  );
   assert.deepEqual(
     albania && { locale: albania.locale, currency: albania.currency, timezone: albania.timezone },
     { locale: 'sq-AL', currency: 'ALL', timezone: 'Europe/Tirane' },
     'Albania country profile must remain independent from UI-language selection',
   );
 
-  const { loadLocaleMessages } = require('../frontend/src/lib/i18n/loader') as typeof import('../frontend/src/lib/i18n/loader');
+  const { loadLocaleMessages } =
+    require('../frontend/src/lib/i18n/loader') as typeof import('../frontend/src/lib/i18n/loader');
   await Promise.all(Object.keys(LANGUAGES).map((language) => loadLocaleMessages(language as any)));
 
   const testDateUtc = new Date(Date.UTC(2026, 7, 20, 15, 30, 0)); // 2026-08-20 15:30:00 UTC = 12:30:00 in America/Argentina/Buenos_Aires (UTC-3)
@@ -133,9 +169,18 @@ async function runTests() {
     'en-US',
   );
   console.log(`  [AR store + en-US UI]: ${arEnDate}`);
-  assert.ok(arEnDate.includes('Aug') || arEnDate.includes('August'), `Expected English month in en-US output, got: ${arEnDate}`);
-  assert.ok(arEnDate.includes('PM') || arEnDate.includes('pm'), `Expected English 12-hour period in en-US output, got: ${arEnDate}`);
-  assert.ok(!arEnDate.includes('de ago'), `Unexpected Spanish 'de ago' preposition in en-US output: ${arEnDate}`);
+  assert.ok(
+    arEnDate.includes('Aug') || arEnDate.includes('August'),
+    `Expected English month in en-US output, got: ${arEnDate}`,
+  );
+  assert.ok(
+    arEnDate.includes('PM') || arEnDate.includes('pm'),
+    `Expected English 12-hour period in en-US output, got: ${arEnDate}`,
+  );
+  assert.ok(
+    !arEnDate.includes('de ago'),
+    `Unexpected Spanish 'de ago' preposition in en-US output: ${arEnDate}`,
+  );
 
   const neNumber = formatNumberForTenant(1234567.89, 'NP');
   const neCurrency = formatCurrencyForTenant(1234567.89, 'NP', 'NPR');
@@ -148,8 +193,14 @@ async function runTests() {
     'ne-NP',
   );
   assert.equal(neNumber, '१२,३४,५६७.८९', 'Nepal tenant uses its Intl digit and grouping profile');
-  assert.ok(neCurrency.includes('रू') && neCurrency.includes('१२,३४,५६७.८९'), 'Nepal tenant currency remains tenant-authoritative');
-  assert.ok(neDate.includes('२०२६') && neDate.includes('अगस्ट'), 'Nepali UI locale supplies date language without changing tenant timezone');
+  assert.ok(
+    neCurrency.includes('रू') && neCurrency.includes('१२,३४,५६७.८९'),
+    'Nepal tenant currency remains tenant-authoritative',
+  );
+  assert.ok(
+    neDate.includes('२०२६') && neDate.includes('अगस्ट'),
+    'Nepali UI locale supplies date language without changing tenant timezone',
+  );
 
   // Argentina store + Spanish UI
   const arEsDate = formatDateForTenant(
@@ -185,7 +236,10 @@ async function runTests() {
     'pt-BR',
   );
   console.log(`  [AR store + pt-BR UI]: ${arPtDate}`);
-  assert.ok(arPtDate.includes('ago'), `Expected Portuguese month in pt-BR output, got: ${arPtDate}`);
+  assert.ok(
+    arPtDate.includes('ago'),
+    `Expected Portuguese month in pt-BR output, got: ${arPtDate}`,
+  );
 
   // Argentina store + Persian UI
   const arFaDate = formatDateForTenant(
@@ -197,7 +251,10 @@ async function runTests() {
     'fa-IR',
   );
   console.log(`  [AR store + fa-IR UI]: ${arFaDate}`);
-  assert.ok(arFaDate.includes('مرداد') || arFaDate.includes('اوت') || /[\u0600-\u06FF]/.test(arFaDate), `Expected Persian script in fa-IR output, got: ${arFaDate}`);
+  assert.ok(
+    arFaDate.includes('مرداد') || arFaDate.includes('اوت') || /[\u0600-\u06FF]/.test(arFaDate),
+    `Expected Persian script in fa-IR output, got: ${arFaDate}`,
+  );
 
   // Timezone preservation check across timezone boundary
   // UTC 2026-08-20T01:30:00Z is 2026-08-19 22:30:00 in Argentina (UTC-3)
@@ -212,7 +269,10 @@ async function runTests() {
   );
   console.log(`  [Timezone Preservation Check]: UTC 01:30 -> AR local: ${tzCheckEn}`);
   assert.ok(tzCheckEn.includes('19'), `Expected day 19 due to UTC-3 offset, got: ${tzCheckEn}`);
-  assert.ok(tzCheckEn.includes('10:30') || tzCheckEn.includes('22:30'), `Expected 10:30 PM / 22:30, got: ${tzCheckEn}`);
+  assert.ok(
+    tzCheckEn.includes('10:30') || tzCheckEn.includes('22:30'),
+    `Expected 10:30 PM / 22:30, got: ${tzCheckEn}`,
+  );
 
   // Default fallback when localeOverride is undefined (preserves tenant country's default)
   const defaultAr = formatDateForTenant(
@@ -223,7 +283,10 @@ async function runTests() {
     { year: 'numeric', month: 'short', day: 'numeric' },
   );
   console.log(`  [Default AR fallback (no override)]: ${defaultAr}`);
-  assert.ok(defaultAr.includes('ago'), `Expected Spanish month in default AR formatting, got: ${defaultAr}`);
+  assert.ok(
+    defaultAr.includes('ago'),
+    `Expected Spanish month in default AR formatting, got: ${defaultAr}`,
+  );
 
   console.log('  ✓ formatDateForTenant unit assertions passed');
 
@@ -276,7 +339,11 @@ async function runTests() {
     },
   };
 
-  const receiptLanguages: Array<{ lang: 'en' | 'es' | 'fr' | 'pt' | 'ru' | 'fa' | 'ur' | 'ja' | 'hi' | 'ne' | 'sq' | 'th'; label: string; filePrefix: string }> = [
+  const receiptLanguages: Array<{
+    lang: 'en' | 'es' | 'fr' | 'pt' | 'ru' | 'fa' | 'ur' | 'ja' | 'hi' | 'ne' | 'sq' | 'th';
+    label: string;
+    filePrefix: string;
+  }> = [
     { lang: 'en', label: 'English UI', filePrefix: 'receipt-argentina-english-ui' },
     { lang: 'es', label: 'Spanish UI', filePrefix: 'receipt-argentina-spanish-ui' },
     { lang: 'fr', label: 'French UI', filePrefix: 'receipt-argentina-french-ui' },
@@ -350,185 +417,10 @@ async function runTests() {
       );
     }
 
-    console.log(`  ✓ Generated receipt artifact for ${label}: ${path.basename(htmlPath)} & ${path.basename(pngPath)}`);
-  }
-
-  // -------------------------------------------------------------------------
-  // 3. Testing WhatsApp Share Message Formatting
-  // -------------------------------------------------------------------------
-  console.log('\n--- 3. Testing WhatsApp Share Message (whatsapp-share.ts) ---');
-
-  const enWaMessage = getWhatsAppMessage(
-    mockBill as any,
-    mockArgentinaTenant,
-    { pointsEarned: 154, businessPhone: '+54 11 4321 9876' },
-    'en-US',
-  );
-  console.log(`  [WhatsApp Message with en-US UI]:\n${enWaMessage.split('\n').map((l) => '    ' + l).join('\n')}`);
-  assert.ok(enWaMessage.includes('Date: Aug 20, 2026') || enWaMessage.includes('Aug'), `Expected English date in en-US WhatsApp message, got: ${enWaMessage}`);
-
-  const esWaMessage = getWhatsAppMessage(
-    mockBill as any,
-    mockArgentinaTenant,
-    { pointsEarned: 154, businessPhone: '+54 11 4321 9876' },
-    'es-AR',
-  );
-  console.log(`  [WhatsApp Message with es-AR UI]:\n${esWaMessage.split('\n').map((l) => '    ' + l).join('\n')}`);
-  assert.ok(esWaMessage.includes('ago') || esWaMessage.includes('20/8/2026') || esWaMessage.includes('20 de ago'), `Expected Spanish date in es-AR WhatsApp message, got: ${esWaMessage}`);
-
-  const enWaUrl = getWhatsAppShareUrl(
-    mockBill as any,
-    mockArgentinaTenant,
-    { phone: '1155551234', country_code: '+54' },
-    { pointsEarned: 154 },
-    'en-US',
-  );
-  assert.ok(enWaUrl.startsWith('https://wa.me/1155551234?text='), `Expected valid wa.me URL, got: ${enWaUrl}`);
-
-  const originalWindow = (globalThis as any).window;
-  let popupOpener: unknown = {};
-  const popup = {
-    location: { href: '' },
-    get opener() { return popupOpener; },
-    set opener(value: unknown) { popupOpener = value; },
-  };
-  (globalThis as any).window = {
-    electronAPI: undefined,
-    open: (targetUrl: string) => targetUrl ? null : popup,
-  };
-  try {
-    const browserShareOpened = await shareBillViaWhatsApp(
-      mockBill as any,
-      null,
-      mockArgentinaTenant,
-      {},
-      'en-US',
+    console.log(
+      `  ✓ Generated receipt artifact for ${label}: ${path.basename(htmlPath)} & ${path.basename(pngPath)}`,
     );
-    assert.equal(browserShareOpened, true, 'browser WhatsApp share reports a successfully navigated popup');
-    assert.equal(popupOpener, null, 'browser WhatsApp share clears the popup opener');
-    assert.ok(popup.location.href.startsWith('https://wa.me/?text='), 'browser WhatsApp share navigates the popup to wa.me');
-  } finally {
-    (globalThis as any).window = originalWindow;
   }
-
-  // Connected Flo sends must use the same active UI locale as browser shares.
-  const originalPost = whatsappApi.post;
-  let sentBody: Record<string, unknown> | undefined;
-  whatsappApi.post = async (_url: string, body: Record<string, unknown>) => {
-    sentBody = body;
-    return { data: { ok: false } };
-  };
-  try {
-    await sendBillViaFlo(
-      mockBill as any,
-      '+541155551234',
-      mockArgentinaTenant,
-      (key: string) => key,
-      {},
-      'en-US',
-    );
-  } finally {
-    whatsappApi.post = originalPost;
-  }
-  assert.ok(typeof sentBody?.body === 'string', 'Expected connected Flo request body');
-  assert.ok(String(sentBody?.body).includes('Aug'), `Expected English date in connected Flo message, got: ${sentBody?.body}`);
-
-  // Build WhatsApp preview artifact
-  const whatsappPreviewHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>WhatsApp Share Message - Decoupled UI Locale</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0b141a;
-      color: #e9edef;
-      padding: 32px;
-      margin: 0;
-    }
-    .header-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #25d366;
-      margin-bottom: 8px;
-    }
-    .subtitle {
-      font-size: 14px;
-      color: #8696a0;
-      margin-bottom: 24px;
-    }
-    .chat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      max-width: 900px;
-    }
-    .chat-col {
-      background: #111b21;
-      border-radius: 12px;
-      border: 1px solid #222e35;
-      padding: 16px;
-    }
-    .col-title {
-      font-size: 13px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #00a884;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .wa-bubble {
-      background: #005c4b;
-      color: #e9edef;
-      border-radius: 8px 8px 0px 8px;
-      padding: 14px 16px;
-      font-size: 14px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-    .meta-tag {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: #202c33;
-      color: #8696a0;
-    }
-  </style>
-</head>
-<body>
-  <div class="header-title">FloCafe - WhatsApp Share Receipt Localization</div>
-  <div class="subtitle">Demonstrates date and currency formatting decoupled from tenant country (Argentina Store with ARS) across UI Locales</div>
-
-  <div class="chat-grid">
-    <div class="chat-col">
-      <div class="col-title">
-        <span>English UI (en-US)</span>
-        <span class="meta-tag">Locale: en-US</span>
-      </div>
-      <div class="wa-bubble">${enWaMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-    </div>
-
-    <div class="chat-col">
-      <div class="col-title">
-        <span>Spanish UI (es-AR)</span>
-        <span class="meta-tag">Locale: es-AR</span>
-      </div>
-      <div class="wa-bubble">${esWaMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-    </div>
-  </div>
-</body>
-</html>`;
-
-  const waHtmlPath = path.join(EVIDENCE_DIR, 'whatsapp-message-decoupled-locale.html');
-  const waPngPath = path.join(EVIDENCE_DIR, 'whatsapp-message-decoupled-locale.png');
-  fs.writeFileSync(waHtmlPath, whatsappPreviewHtml, 'utf8');
-  await captureScreenshot(whatsappPreviewHtml, waPngPath, 850, 520);
-  console.log(`  ✓ Generated WhatsApp artifact: ${path.basename(waHtmlPath)} & ${path.basename(waPngPath)}`);
 
   // -------------------------------------------------------------------------
   // 4. Testing React Component & useFormatDate Hook
@@ -583,30 +475,114 @@ async function runTests() {
         {
           ui: 'English (en-US)',
           locale: 'en-US',
-          shortDate: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric' }, 'en-US'),
-          dateTime: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }, 'en-US'),
-          timeOnly: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { hour: '2-digit', minute: '2-digit' }, 'en-US'),
+          shortDate: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric' },
+            'en-US',
+          ),
+          dateTime: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+            'en-US',
+          ),
+          timeOnly: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { hour: '2-digit', minute: '2-digit' },
+            'en-US',
+          ),
         },
         {
           ui: 'Spanish (es-AR)',
           locale: 'es-AR',
-          shortDate: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric' }, 'es-AR'),
-          dateTime: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }, 'es-AR'),
-          timeOnly: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { hour: '2-digit', minute: '2-digit' }, 'es-AR'),
+          shortDate: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric' },
+            'es-AR',
+          ),
+          dateTime: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+            'es-AR',
+          ),
+          timeOnly: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { hour: '2-digit', minute: '2-digit' },
+            'es-AR',
+          ),
         },
         {
           ui: 'Portuguese (pt-BR)',
           locale: 'pt-BR',
-          shortDate: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric' }, 'pt-BR'),
-          dateTime: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }, 'pt-BR'),
-          timeOnly: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { hour: '2-digit', minute: '2-digit' }, 'pt-BR'),
+          shortDate: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric' },
+            'pt-BR',
+          ),
+          dateTime: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+            'pt-BR',
+          ),
+          timeOnly: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { hour: '2-digit', minute: '2-digit' },
+            'pt-BR',
+          ),
         },
         {
           ui: 'Persian (fa-IR)',
           locale: 'fa-IR',
-          shortDate: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric' }, 'fa-IR'),
-          dateTime: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }, 'fa-IR'),
-          timeOnly: formatDateForTenant(testDateUtc, 'AR', argentinaTimezone, {}, { hour: '2-digit', minute: '2-digit' }, 'fa-IR'),
+          shortDate: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric' },
+            'fa-IR',
+          ),
+          dateTime: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+            'fa-IR',
+          ),
+          timeOnly: formatDateForTenant(
+            testDateUtc,
+            'AR',
+            argentinaTimezone,
+            {},
+            { hour: '2-digit', minute: '2-digit' },
+            'fa-IR',
+          ),
         },
       ],
     },
@@ -839,7 +815,9 @@ async function runTests() {
         </tr>
       </thead>
       <tbody>
-        ${comparisonData[0].formats.map(f => `
+        ${comparisonData[0].formats
+          .map(
+            (f) => `
           <tr>
             <td><strong>${f.ui}</strong></td>
             <td><code>${f.locale}</code></td>
@@ -848,7 +826,9 @@ async function runTests() {
             <td>${f.timeOnly}</td>
             <td><span class="status-badge" style="font-size: 11px; padding: 2px 8px;">✓ Decoupled</span></td>
           </tr>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </tbody>
     </table>
 
@@ -866,7 +846,9 @@ async function runTests() {
   const compPngPath = path.join(EVIDENCE_DIR, 'decoupled-locale-visual-comparison.png');
   fs.writeFileSync(compHtmlPath, comparisonHtml, 'utf8');
   await captureScreenshot(comparisonHtml, compPngPath, 950, 700);
-  console.log(`  ✓ Generated master comparison dashboard: ${path.basename(compHtmlPath)} & ${path.basename(compPngPath)}`);
+  console.log(
+    `  ✓ Generated master comparison dashboard: ${path.basename(compHtmlPath)} & ${path.basename(compPngPath)}`,
+  );
 
   console.log('\n' + '='.repeat(70));
   console.log('✅ All decouple-ui-locale tests and evidence artifacts generated successfully!');

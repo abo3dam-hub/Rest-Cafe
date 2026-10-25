@@ -1856,6 +1856,7 @@
     "createBackup": "Sicherung jetzt erstellen",
     "createBackupHint": "Erstellt eine vollständige .db-Sicherung mit Benutzern, PINs, Einstellungen, Bestellungen, Produkten und Verlauf. Verwenden Sie diese, um FloCafe auf einen anderen Computer zu übertragen.",
     "currency": "Währung",
+    "currencyUnit": "Währungseinheit",
     "currencyAutoFilled": "Währung (automatisch ausgefüllt)",
     "currencyRecommended": "Empfohlen",
     "currencyPopular": "Beliebte Währungen",

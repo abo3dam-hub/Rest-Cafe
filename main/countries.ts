@@ -42,52 +42,155 @@ interface Row {
 }
 
 const SUPPORTED: Record<string, Row> = {
-  IN: { locale: 'en-IN', currency: 'INR', tz: 'Asia/Kolkata',                    taxIdLabel: 'GSTIN', taxName: 'GST',
+  IN: {
+    locale: 'en-IN',
+    currency: 'INR',
+    tz: 'Asia/Kolkata',
+    taxIdLabel: 'GSTIN',
+    taxName: 'GST',
     taxIdFormat: {
       pattern: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
-      description: '15 characters: 2-digit state code + 10-character PAN + entity code + "Z" + checksum (e.g. 29ABCDE1234F1Z5)',
-    } },
-  AR: { locale: 'es-AR', currency: 'ARS', tz: 'America/Argentina/Buenos_Aires',  taxIdLabel: 'CUIT',  taxName: 'IVA' },
-  US: { locale: 'en-US', currency: 'USD', tz: 'America/New_York',                taxIdLabel: 'EIN',   taxName: 'Sales Tax' },
-  CA: { locale: 'en-CA', currency: 'CAD', tz: 'America/Toronto',                 taxIdLabel: 'BN',    taxName: 'GST/HST' },
-  GB: { locale: 'en-GB', currency: 'GBP', tz: 'Europe/London',                   taxIdLabel: 'VAT',   taxName: 'VAT' },
-  TH: { locale: 'th-TH', currency: 'THB', tz: 'Asia/Bangkok',                    taxIdLabel: 'Tax ID',taxName: 'VAT' },
-  SG: { locale: 'en-SG', currency: 'SGD', tz: 'Asia/Singapore',                  taxIdLabel: 'UEN',   taxName: 'GST' },
-  MY: { locale: 'ms-MY', currency: 'MYR', tz: 'Asia/Kuala_Lumpur',                                                     taxName: 'SST' },
-  ID: { locale: 'id-ID', currency: 'IDR', tz: 'Asia/Jakarta',                    taxIdLabel: 'NPWP',  taxName: 'VAT' },
-  PH: { locale: 'en-PH', currency: 'PHP', tz: 'Asia/Manila',                     taxIdLabel: 'TIN',   taxName: 'VAT' },
-  VN: { locale: 'vi-VN', currency: 'VND', tz: 'Asia/Ho_Chi_Minh',                taxIdLabel: 'MST',   taxName: 'VAT' },
-  AU: { locale: 'en-AU', currency: 'AUD', tz: 'Australia/Sydney',                taxIdLabel: 'ABN',   taxName: 'GST' },
-  NZ: { locale: 'en-NZ', currency: 'NZD', tz: 'Pacific/Auckland',                taxIdLabel: 'IRD',   taxName: 'GST' },
-  AE: { locale: 'ar-AE', currency: 'AED', tz: 'Asia/Dubai',                      taxIdLabel: 'TRN',   taxName: 'VAT' },
-  SA: { locale: 'ar-SA', currency: 'SAR', tz: 'Asia/Riyadh',                     taxIdLabel: 'VAT',   taxName: 'VAT' },
-  ZA: { locale: 'en-ZA', currency: 'ZAR', tz: 'Africa/Johannesburg',             taxIdLabel: 'VAT',   taxName: 'VAT' },
-  MA: { locale: 'fr-MA', currency: 'MAD', tz: 'Africa/Casablanca',               taxIdLabel: 'Tax ID',taxName: 'VAT' },
-  KE: { locale: 'en-KE', currency: 'KES', tz: 'Africa/Nairobi',                  taxIdLabel: 'PIN',   taxName: 'VAT' },
-  NG: { locale: 'en-NG', currency: 'NGN', tz: 'Africa/Lagos',                    taxIdLabel: 'TIN',   taxName: 'VAT' },
-  BR: { locale: 'pt-BR', currency: 'BRL', tz: 'America/Sao_Paulo',               taxIdLabel: 'CNPJ',  taxName: 'ICMS' },
-  MX: { locale: 'es-MX', currency: 'MXN', tz: 'America/Mexico_City',             taxIdLabel: 'RFC',   taxName: 'IVA' },
-  CL: { locale: 'es-CL', currency: 'CLP', tz: 'America/Santiago',                taxIdLabel: 'RUT',   taxName: 'IVA' },
-  UY: { locale: 'es-UY', currency: 'UYU', tz: 'America/Montevideo',              taxIdLabel: 'RUT',   taxName: 'IVA' },
-  PY: { locale: 'es-PY', currency: 'PYG', tz: 'America/Asuncion',                taxIdLabel: 'RUC',   taxName: 'IVA' },
-  JP: { locale: 'ja-JP', currency: 'JPY', tz: 'Asia/Tokyo',                                                            taxName: 'VAT' },
-  KR: { locale: 'ko-KR', currency: 'KRW', tz: 'Asia/Seoul',                      taxIdLabel: 'BRN',   taxName: 'VAT' },
-  CN: { locale: 'zh-CN', currency: 'CNY', tz: 'Asia/Shanghai',                   taxIdLabel: 'USCC',  taxName: 'VAT' },
+      description:
+        '15 characters: 2-digit state code + 10-character PAN + entity code + "Z" + checksum (e.g. 29ABCDE1234F1Z5)',
+    },
+  },
+  AR: {
+    locale: 'es-AR',
+    currency: 'ARS',
+    tz: 'America/Argentina/Buenos_Aires',
+    taxIdLabel: 'CUIT',
+    taxName: 'IVA',
+  },
+  US: {
+    locale: 'en-US',
+    currency: 'USD',
+    tz: 'America/New_York',
+    taxIdLabel: 'EIN',
+    taxName: 'Sales Tax',
+  },
+  CA: {
+    locale: 'en-CA',
+    currency: 'CAD',
+    tz: 'America/Toronto',
+    taxIdLabel: 'BN',
+    taxName: 'GST/HST',
+  },
+  GB: { locale: 'en-GB', currency: 'GBP', tz: 'Europe/London', taxIdLabel: 'VAT', taxName: 'VAT' },
+  TH: {
+    locale: 'th-TH',
+    currency: 'THB',
+    tz: 'Asia/Bangkok',
+    taxIdLabel: 'Tax ID',
+    taxName: 'VAT',
+  },
+  SG: { locale: 'en-SG', currency: 'SGD', tz: 'Asia/Singapore', taxIdLabel: 'UEN', taxName: 'GST' },
+  MY: { locale: 'ms-MY', currency: 'MYR', tz: 'Asia/Kuala_Lumpur', taxName: 'SST' },
+  ID: { locale: 'id-ID', currency: 'IDR', tz: 'Asia/Jakarta', taxIdLabel: 'NPWP', taxName: 'VAT' },
+  PH: { locale: 'en-PH', currency: 'PHP', tz: 'Asia/Manila', taxIdLabel: 'TIN', taxName: 'VAT' },
+  VN: {
+    locale: 'vi-VN',
+    currency: 'VND',
+    tz: 'Asia/Ho_Chi_Minh',
+    taxIdLabel: 'MST',
+    taxName: 'VAT',
+  },
+  AU: {
+    locale: 'en-AU',
+    currency: 'AUD',
+    tz: 'Australia/Sydney',
+    taxIdLabel: 'ABN',
+    taxName: 'GST',
+  },
+  NZ: {
+    locale: 'en-NZ',
+    currency: 'NZD',
+    tz: 'Pacific/Auckland',
+    taxIdLabel: 'IRD',
+    taxName: 'GST',
+  },
+  AE: { locale: 'ar-AE', currency: 'AED', tz: 'Asia/Dubai', taxIdLabel: 'TRN', taxName: 'VAT' },
+  SA: { locale: 'ar-SA', currency: 'SAR', tz: 'Asia/Riyadh', taxIdLabel: 'VAT', taxName: 'VAT' },
+  ZA: {
+    locale: 'en-ZA',
+    currency: 'ZAR',
+    tz: 'Africa/Johannesburg',
+    taxIdLabel: 'VAT',
+    taxName: 'VAT',
+  },
+  MA: {
+    locale: 'fr-MA',
+    currency: 'MAD',
+    tz: 'Africa/Casablanca',
+    taxIdLabel: 'Tax ID',
+    taxName: 'VAT',
+  },
+  KE: { locale: 'en-KE', currency: 'KES', tz: 'Africa/Nairobi', taxIdLabel: 'PIN', taxName: 'VAT' },
+  NG: { locale: 'en-NG', currency: 'NGN', tz: 'Africa/Lagos', taxIdLabel: 'TIN', taxName: 'VAT' },
+  BR: {
+    locale: 'pt-BR',
+    currency: 'BRL',
+    tz: 'America/Sao_Paulo',
+    taxIdLabel: 'CNPJ',
+    taxName: 'ICMS',
+  },
+  MX: {
+    locale: 'es-MX',
+    currency: 'MXN',
+    tz: 'America/Mexico_City',
+    taxIdLabel: 'RFC',
+    taxName: 'IVA',
+  },
+  CL: {
+    locale: 'es-CL',
+    currency: 'CLP',
+    tz: 'America/Santiago',
+    taxIdLabel: 'RUT',
+    taxName: 'IVA',
+  },
+  UY: {
+    locale: 'es-UY',
+    currency: 'UYU',
+    tz: 'America/Montevideo',
+    taxIdLabel: 'RUT',
+    taxName: 'IVA',
+  },
+  PY: {
+    locale: 'es-PY',
+    currency: 'PYG',
+    tz: 'America/Asuncion',
+    taxIdLabel: 'RUC',
+    taxName: 'IVA',
+  },
+  JP: { locale: 'ja-JP', currency: 'JPY', tz: 'Asia/Tokyo', taxName: 'VAT' },
+  KR: { locale: 'ko-KR', currency: 'KRW', tz: 'Asia/Seoul', taxIdLabel: 'BRN', taxName: 'VAT' },
+  CN: { locale: 'zh-CN', currency: 'CNY', tz: 'Asia/Shanghai', taxIdLabel: 'USCC', taxName: 'VAT' },
   HK: { locale: 'zh-HK', currency: 'HKD', tz: 'Asia/Hong_Kong' },
-  TW: { locale: 'zh-TW', currency: 'TWD', tz: 'Asia/Taipei',                     taxIdLabel: 'UBN',   taxName: 'VAT' },
-  PK: { locale: 'en-PK', currency: 'PKR', tz: 'Asia/Karachi',                    taxIdLabel: 'NTN',   taxName: 'GST' },
-  BD: { locale: 'bn-BD', currency: 'BDT', tz: 'Asia/Dhaka',                      taxIdLabel: 'TIN',   taxName: 'VAT' },
-  LK: { locale: 'en-LK', currency: 'LKR', tz: 'Asia/Colombo',                    taxIdLabel: 'TIN',   taxName: 'VAT' },
-  NP: { locale: 'ne-NP', currency: 'NPR', tz: 'Asia/Kathmandu',                  taxIdLabel: 'TIN',   taxName: 'VAT' },
-  EG: { locale: 'ar-EG', currency: 'EGP', tz: 'Africa/Cairo',                    taxIdLabel: 'TIN',   taxName: 'VAT' },
-  IL: { locale: 'he-IL', currency: 'ILS', tz: 'Asia/Jerusalem',                                                      taxName: 'VAT' },
-  TR: { locale: 'tr-TR', currency: 'TRY', tz: 'Europe/Istanbul',                 taxIdLabel: 'VKN',   taxName: 'KDV' },
-  IR: { locale: 'fa-IR', currency: 'IRR', tz: 'Asia/Tehran',                     taxIdLabel: 'Economic Code', taxName: 'VAT',
+  TW: { locale: 'zh-TW', currency: 'TWD', tz: 'Asia/Taipei', taxIdLabel: 'UBN', taxName: 'VAT' },
+  PK: { locale: 'en-PK', currency: 'PKR', tz: 'Asia/Karachi', taxIdLabel: 'NTN', taxName: 'GST' },
+  BD: { locale: 'bn-BD', currency: 'BDT', tz: 'Asia/Dhaka', taxIdLabel: 'TIN', taxName: 'VAT' },
+  LK: { locale: 'en-LK', currency: 'LKR', tz: 'Asia/Colombo', taxIdLabel: 'TIN', taxName: 'VAT' },
+  NP: { locale: 'ne-NP', currency: 'NPR', tz: 'Asia/Kathmandu', taxIdLabel: 'TIN', taxName: 'VAT' },
+  EG: { locale: 'ar-EG', currency: 'EGP', tz: 'Africa/Cairo', taxIdLabel: 'TIN', taxName: 'VAT' },
+  IL: { locale: 'he-IL', currency: 'ILS', tz: 'Asia/Jerusalem', taxName: 'VAT' },
+  TR: {
+    locale: 'tr-TR',
+    currency: 'TRY',
+    tz: 'Europe/Istanbul',
+    taxIdLabel: 'VKN',
+    taxName: 'KDV',
+  },
+  IR: {
+    locale: 'fa-IR',
+    currency: 'IRR',
+    tz: 'Asia/Tehran',
+    taxIdLabel: 'Economic Code',
+    taxName: 'VAT',
     localeOptions: {
       currencyDisplay: ['rial', 'toman', 'toman_short'],
       digits: ['locale', 'latin'],
       calendar: ['locale', 'persian', 'gregorian'],
-    } },
+    },
+  },
 
   // Eurozone
   DE: { locale: 'de-DE', currency: 'EUR', tz: 'Europe/Berlin', taxIdLabel: 'Steuernummer' },
@@ -205,7 +308,13 @@ function build(code: string): Country {
     name: dn.of(code) ?? code,
     currency: r.currency,
     timezone: r.tz,
-    dialCode: (() => { try { return `+${getCountryCallingCode(code as CountryCode)}`; } catch { return '+1'; } })(),
+    dialCode: (() => {
+      try {
+        return `+${getCountryCallingCode(code as CountryCode)}`;
+      } catch {
+        return '+1';
+      }
+    })(),
     locale: r.locale,
     taxIdLabel: r.taxIdLabel,
     taxName: r.taxName,
@@ -234,12 +343,18 @@ export const getCountryByCode = (code: string): Country | undefined => {
 // already-configured store's settings/tenant, so RegionalNotConfiguredError
 // here indicates a real bug upstream, not a state to silently paper over.
 export function resolveTenantCurrency(currency: unknown, countryCode: string): string {
-  // The country must be real before an explicit currency is ever trusted —
-  // otherwise a syntactically-valid-but-bogus currency (e.g. 'ZZZ') masks an
-  // unresolvable country and this never throws, silently processing money
-  // under invalid regional settings.
+  // Rest&Cafe has no country profiles: a store without a country resolves
+  // its currency from its own explicit currency setting, defaulting to the
+  // Syrian pound. A configured country (legacy stores) keeps the original
+  // validation: the country must be real before a currency is trusted.
   const country = getCountryByCode(countryCode);
-  if (!country) throw new RegionalNotConfiguredError(countryCode);
+  if (!country) {
+    if (typeof currency === 'string') {
+      const normalized = currency.trim().toUpperCase();
+      if (isSyntacticallyValidCurrencyCode(normalized)) return normalized;
+    }
+    return 'SYP';
+  }
   if (typeof currency === 'string') {
     const normalized = currency.trim().toUpperCase();
     if (isSyntacticallyValidCurrencyCode(normalized)) return normalized;
@@ -247,10 +362,11 @@ export function resolveTenantCurrency(currency: unknown, countryCode: string): s
   return country.currency;
 }
 
-// Neutral fallback preferences for locales without country-specific options.
+// Neutral fallback preferences. Rest&Cafe always renders Latin digits, so
+// 'latin' is the neutral digit mode (and is supported for every store).
 const NEUTRAL_LOCALE_PREFERENCES = {
   currency_display: 'rial',
-  number_digits: 'locale',
+  number_digits: 'latin',
   calendar: 'locale',
 } as const;
 
@@ -266,13 +382,24 @@ export function isLocalePreferenceKey(key: string): key is LocalePreferenceKey {
   return key === 'currency_display' || key === 'number_digits' || key === 'calendar';
 }
 
-export function isLocalePreferenceSupported(key: LocalePreferenceKey, value: string, countryCode: string): boolean {
+export function isLocalePreferenceSupported(
+  key: LocalePreferenceKey,
+  value: string,
+  countryCode: string,
+): boolean {
   if (value === NEUTRAL_LOCALE_PREFERENCES[key]) return true;
+  // Latin digits are a product-wide constant in Rest&Cafe, not a
+  // country-profile option.
+  if (key === 'number_digits' && value === 'latin') return true;
   const options = getCountryByCode(countryCode)?.localeOptions?.[LOCALE_OPTION_FIELDS[key]];
   return Array.isArray(options) && (options as readonly string[]).includes(value);
 }
 
-export function resolveStoredLocalePreference(key: LocalePreferenceKey, stored: string | undefined, countryCode: string): string {
+export function resolveStoredLocalePreference(
+  key: LocalePreferenceKey,
+  stored: string | undefined,
+  countryCode: string,
+): string {
   if (stored && isLocalePreferenceSupported(key, stored, countryCode)) return stored;
   return NEUTRAL_LOCALE_PREFERENCES[key];
 }
@@ -280,7 +407,11 @@ export function resolveStoredLocalePreference(key: LocalePreferenceKey, stored: 
 export const getCurrencySymbol = (currency: string, locale = 'en-US'): string => {
   if (!currency) return currency;
   try {
-    const symbol = new Intl.NumberFormat(locale, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+    const symbol = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    })
       .formatToParts(0)
       .find((p) => p.type === 'currency')?.value;
     return symbol && symbol !== '¤' ? symbol : currency;
@@ -312,7 +443,11 @@ const normalizePreferences = (prefs?: LocalePreferences): Required<LocalePrefere
 export const formatCurrency = (amount: number, currency: string, locale = 'en-US'): string => {
   if (!currency) return amount.toFixed(2);
   try {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).format(amount);
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).format(amount);
   } catch {
     return `${currency} ${amount.toFixed(2)}`;
   }
@@ -401,9 +536,7 @@ export const getCurrencyUnitAdapter = (
 ): CurrencyUnitAdapter => {
   const { currencyDisplay, digits } = normalizePreferences(prefs);
   if (currency === IRAN_CURRENCY && currencyDisplay !== 'rial') {
-    const label = currencyDisplay === 'toman_short'
-      ? (digits === 'latin' ? 'T' : 'ت')
-      : 'تومان';
+    const label = currencyDisplay === 'toman_short' ? (digits === 'latin' ? 'T' : 'ت') : 'تومان';
     return {
       scale: 0.1,
       label,
@@ -451,7 +584,9 @@ export const formatCurrencyForTenant = (
 // Formats a plain number using the given locale's digits and grouping.
 export const formatNumber = (value: number, locale = 'en-US', numberingSystem?: string): string => {
   try {
-    return new Intl.NumberFormat(locale, numberingSystem ? { numberingSystem } : undefined).format(value);
+    return new Intl.NumberFormat(locale, numberingSystem ? { numberingSystem } : undefined).format(
+      value,
+    );
   } catch {
     return String(value);
   }
@@ -545,14 +680,13 @@ export const DEFAULT_COUNTRY_PROFILE = {
 
 // ── Regional snapshot (docs/architecture/regional-settings.md) ───────────────────────────
 //
-// The country chosen at signup, and the ISO 4217 currency that follows from
-// it, are the only source of a store's regional identity. Everything else
-// here is derived from that pair via Intl/ISO/IANA conventions — there is no
-// default country, and no per-store override of symbol, position, or
-// separators. Timezone is the one exception: country.timezone is only the
-// fallback, and a valid stored settings.timezone overrides it, for stores in
-// multi-zone countries. See docs/reference/product-invariants.md, "Regional settings
-// come from signup, never from a fallback".
+// Rest&Cafe model: there are no country profiles. A store's regional
+// identity is its own settings — currency, an optional currency-symbol
+// override (the "currency unit", e.g. SP), and timezone — resolved by
+// resolveGenericSnapshot with product defaults (SYP, Asia/Damascus,
+// Latin digits). The SUPPORTED table above remains only as reference
+// data (dial codes, tax-id labels) and for legacy stores that still
+// carry a country code from the upstream product.
 
 /** Thrown when a store has no resolvable country or, via the optional `field`,
  * another required regional setting (e.g. timezone). Callers should surface
@@ -583,9 +717,13 @@ export interface RegionalSnapshot {
 // Whether the currency symbol renders before or after the amount for this locale/currency pair.
 function regionalCurrencyPosition(locale: string, currency: string): 'prefix' | 'suffix' {
   try {
-    const parts = new Intl.NumberFormat(locale, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
-      .formatToParts(1);
-    return parts.findIndex((part) => part.type === 'currency') < parts.findIndex((part) => part.type === 'integer')
+    const parts = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(1);
+    return parts.findIndex((part) => part.type === 'currency') <
+      parts.findIndex((part) => part.type === 'integer')
       ? 'prefix'
       : 'suffix';
   } catch {
@@ -594,7 +732,10 @@ function regionalCurrencyPosition(locale: string, currency: string): 'prefix' | 
 }
 
 // Decimal and thousands-group separators for this locale, per CLDR via Intl.
-function regionalNumberSeparators(locale: string): { decimalSeparator: string; groupSeparator: string } {
+function regionalNumberSeparators(locale: string): {
+  decimalSeparator: string;
+  groupSeparator: string;
+} {
   try {
     const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
     return {
@@ -607,17 +748,70 @@ function regionalNumberSeparators(locale: string): { decimalSeparator: string; g
 }
 
 /**
- * Resolves a store's regional identity from its settings. Pure: same
- * settings in, same snapshot out, no I/O. Throws RegionalNotConfiguredError
- * when the store has no resolvable country — callers must not substitute a
- * default rather than handling that.
+ * The generic Rest&Cafe regional snapshot for stores without a country
+ * profile: everything derives from the store's own settings with the
+ * product defaults (SYP, Asia/Damascus, Latin digits). The currency
+ * symbol is the one snapshot value a store may override directly (the
+ * Settings "currency unit" field, e.g. "SP").
  */
-export function resolveRegionalSnapshot(settings: Record<string, string | undefined>): RegionalSnapshot {
+export function resolveGenericSnapshot(
+  settings: Record<string, string | undefined>,
+): RegionalSnapshot {
+  const locale = 'en-US';
+  const currency = resolveTenantCurrency(settings.currency, '');
+  const timezone = isValidTimeZone(settings.timezone)
+    ? (settings.timezone as string)
+    : 'Asia/Damascus';
+  const storedSymbol =
+    typeof settings.currency_symbol === 'string' ? settings.currency_symbol.trim() : '';
+  const { decimalSeparator, groupSeparator } = regionalNumberSeparators(locale);
+
+  return {
+    country: '',
+    locale,
+    currency,
+    currencySymbol: storedSymbol || getCurrencySymbol(currency, locale),
+    currencyPosition: currency === 'SYP' ? 'suffix' : regionalCurrencyPosition(locale, currency),
+    currencyFractionDigits: getCurrencyFractionDigits(currency),
+    decimalSeparator,
+    groupSeparator,
+    timezone,
+    preferences: {
+      currencyDisplay: resolveStoredLocalePreference(
+        'currency_display',
+        settings.currency_display,
+        '',
+      ) as CurrencyDisplay,
+      digits: resolveStoredLocalePreference(
+        'number_digits',
+        settings.number_digits,
+        '',
+      ) as DigitMode,
+      calendar: resolveStoredLocalePreference('calendar', settings.calendar, '') as CalendarMode,
+    },
+  };
+}
+
+/**
+ * Resolves a store's regional identity from its settings. Pure: same
+ * settings in, same snapshot out, no I/O.
+ *
+ * Rest&Cafe ships no country profiles: a store's regional identity is its
+ * own plain settings (currency, currency symbol, timezone) with generic
+ * defaults — Syrian pound ("SP"), Asia/Damascus, Latin digits, whole-pound
+ * amounts. A legacy store that still carries a supported country code
+ * keeps resolving through that country's data.
+ */
+export function resolveRegionalSnapshot(
+  settings: Record<string, string | undefined>,
+): RegionalSnapshot {
   const country = getCountryByCode(settings.country ?? '');
-  if (!country) throw new RegionalNotConfiguredError(settings.country);
+  if (!country) return resolveGenericSnapshot(settings);
 
   const currency = resolveTenantCurrency(settings.currency, country.code);
-  const timezone = isValidTimeZone(settings.timezone) ? (settings.timezone as string) : country.timezone;
+  const timezone = isValidTimeZone(settings.timezone)
+    ? (settings.timezone as string)
+    : country.timezone;
   const { decimalSeparator, groupSeparator } = regionalNumberSeparators(country.locale);
 
   return {
@@ -631,26 +825,47 @@ export function resolveRegionalSnapshot(settings: Record<string, string | undefi
     groupSeparator,
     timezone,
     preferences: {
-      currencyDisplay: resolveStoredLocalePreference('currency_display', settings.currency_display, country.code) as CurrencyDisplay,
-      digits: resolveStoredLocalePreference('number_digits', settings.number_digits, country.code) as DigitMode,
-      calendar: resolveStoredLocalePreference('calendar', settings.calendar, country.code) as CalendarMode,
+      currencyDisplay: resolveStoredLocalePreference(
+        'currency_display',
+        settings.currency_display,
+        country.code,
+      ) as CurrencyDisplay,
+      digits: resolveStoredLocalePreference(
+        'number_digits',
+        settings.number_digits,
+        country.code,
+      ) as DigitMode,
+      calendar: resolveStoredLocalePreference(
+        'calendar',
+        settings.calendar,
+        country.code,
+      ) as CalendarMode,
     },
   };
 }
 
-type AmountFormat = Pick<RegionalSnapshot, 'decimalSeparator' | 'groupSeparator' | 'currencySymbol' | 'locale'>;
+type AmountFormat = Pick<
+  RegionalSnapshot,
+  'decimalSeparator' | 'groupSeparator' | 'currencySymbol' | 'locale'
+>;
 
 // True if `digits` either has no grouping at all, or its grouping exactly
 // matches what Intl would produce for this locale — catching malformed
 // grouping (e.g. "1,00" for en-US, a 2-digit trailing group) instead of
 // silently stripping it into a wrong value. Locale-correct by construction
 // (en-IN's 2-3-3 groups, not just Western 3s), not a hardcoded pattern.
-function hasValidLocaleGrouping(digits: string, format: Pick<AmountFormat, 'groupSeparator' | 'locale'>): boolean {
+function hasValidLocaleGrouping(
+  digits: string,
+  format: Pick<AmountFormat, 'groupSeparator' | 'locale'>,
+): boolean {
   if (!format.groupSeparator || !digits.includes(format.groupSeparator)) return true;
   const rawDigits = digits.split(format.groupSeparator).join('');
   if (!/^\d+$/.test(rawDigits)) return false;
   try {
-    const regrouped = new Intl.NumberFormat(format.locale, { useGrouping: true, numberingSystem: 'latn' }).format(BigInt(rawDigits));
+    const regrouped = new Intl.NumberFormat(format.locale, {
+      useGrouping: true,
+      numberingSystem: 'latn',
+    }).format(BigInt(rawDigits));
     return regrouped === digits;
   } catch {
     return false;
@@ -675,7 +890,8 @@ export function canonicalizeLocalizedAmount(raw: string, format: AmountFormat): 
     const symbolCount = cleaned.split(format.currencySymbol).length - 1;
     if (symbolCount > 1) return null;
     if (symbolCount === 1) {
-      if (!cleaned.startsWith(format.currencySymbol) && !cleaned.endsWith(format.currencySymbol)) return null;
+      if (!cleaned.startsWith(format.currencySymbol) && !cleaned.endsWith(format.currencySymbol))
+        return null;
       cleaned = cleaned.split(format.currencySymbol).join('').trim();
     }
   }
@@ -688,8 +904,11 @@ export function canonicalizeLocalizedAmount(raw: string, format: AmountFormat): 
   const [integerPart, fractionPart] = decimalParts;
 
   if (!hasValidLocaleGrouping(integerPart, format)) return null;
-  const normalizedInteger = format.groupSeparator ? integerPart.split(format.groupSeparator).join('') : integerPart;
-  const normalized = fractionPart !== undefined ? `${normalizedInteger}.${fractionPart}` : normalizedInteger;
+  const normalizedInteger = format.groupSeparator
+    ? integerPart.split(format.groupSeparator).join('')
+    : integerPart;
+  const normalized =
+    fractionPart !== undefined ? `${normalizedInteger}.${fractionPart}` : normalizedInteger;
 
   if (!normalized || !/^\d*\.?\d*$/.test(normalized)) return null;
   return sign + normalized;
@@ -704,7 +923,10 @@ export function canonicalizeLocalizedAmount(raw: string, format: AmountFormat): 
  * fraction digits (nothing currently enforces that at write time), and
  * rounding on export would silently change the stored value on re-import.
  */
-export function formatAmountForCsv(value: number, snapshot: Pick<RegionalSnapshot, 'decimalSeparator'>): string {
+export function formatAmountForCsv(
+  value: number,
+  snapshot: Pick<RegionalSnapshot, 'decimalSeparator'>,
+): string {
   const plain = String(value);
   return snapshot.decimalSeparator === '.' ? plain : plain.replace('.', snapshot.decimalSeparator);
 }

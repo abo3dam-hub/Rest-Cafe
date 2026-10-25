@@ -8,17 +8,65 @@
   "currency": "ZZZ",
   "effectiveFrom": "2026-01-01",
   "publishedAt": "2026-01-01",
-  "minFloVersion": "2.4.0",
+  "minFloVersion": "1.0.0",
   "taxPoint": "finalized_at",
   "inclusivePricingDefault": false,
   "registrationNumberLabel": "Tax ID",
   "categories": [
-    { "id": "standard", "label": "Standard", "ruleIds": ["rate-a", "rate-b", "rate-c"] },
-    { "id": "packaging", "label": "Packaging", "ruleIds": ["rate-a", "rate-b", "rate-c"] },
-    { "id": "delivery", "label": "Delivery", "ruleIds": ["rate-a", "rate-b", "rate-c"] },
-    { "id": "service_charge", "label": "Service charge", "ruleIds": ["rate-a", "rate-b", "rate-c"] },
-    { "id": "addon", "label": "Add-on", "ruleIds": ["rate-a", "rate-b", "rate-c"] },
-    { "id": "unclassified", "label": "Unclassified", "ruleIds": ["rate-a", "rate-b", "rate-c"] }
+    {
+      "id": "standard",
+      "label": "Standard",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    },
+    {
+      "id": "packaging",
+      "label": "Packaging",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    },
+    {
+      "id": "delivery",
+      "label": "Delivery",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    },
+    {
+      "id": "service_charge",
+      "label": "Service charge",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    },
+    {
+      "id": "addon",
+      "label": "Add-on",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    },
+    {
+      "id": "unclassified",
+      "label": "Unclassified",
+      "ruleIds": [
+        "rate-a",
+        "rate-b",
+        "rate-c"
+      ]
+    }
   ],
   "defaultCategories": {
     "product": "standard",
@@ -33,10 +81,20 @@
       "id": "rate-a",
       "label": "Tax A",
       "type": "percent",
-      "categoryIds": ["standard", "packaging", "delivery", "service_charge", "addon", "unclassified"],
+      "categoryIds": [
+        "standard",
+        "packaging",
+        "delivery",
+        "service_charge",
+        "addon",
+        "unclassified"
+      ],
       "rate": "2.5",
       "conditions": {
-        "businessTypes": ["restaurant", "salon"],
+        "businessTypes": [
+          "restaurant",
+          "salon"
+        ],
         "customerStateRelation": "intra_or_unspecified"
       }
     },
@@ -44,10 +102,20 @@
       "id": "rate-b",
       "label": "Tax B",
       "type": "percent",
-      "categoryIds": ["standard", "packaging", "delivery", "service_charge", "addon", "unclassified"],
+      "categoryIds": [
+        "standard",
+        "packaging",
+        "delivery",
+        "service_charge",
+        "addon",
+        "unclassified"
+      ],
       "rate": "2.5",
       "conditions": {
-        "businessTypes": ["restaurant", "salon"],
+        "businessTypes": [
+          "restaurant",
+          "salon"
+        ],
         "customerStateRelation": "intra_or_unspecified"
       }
     },
@@ -55,10 +123,20 @@
       "id": "rate-c",
       "label": "Tax C",
       "type": "percent",
-      "categoryIds": ["standard", "packaging", "delivery", "service_charge", "addon", "unclassified"],
+      "categoryIds": [
+        "standard",
+        "packaging",
+        "delivery",
+        "service_charge",
+        "addon",
+        "unclassified"
+      ],
       "rate": "5",
       "conditions": {
-        "businessTypes": ["restaurant", "salon"],
+        "businessTypes": [
+          "restaurant",
+          "salon"
+        ],
         "customerStateRelation": "interstate"
       }
     }

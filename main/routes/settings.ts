@@ -53,7 +53,6 @@ import {
   resolveStoredLocalePreference,
   type LocalePreferenceKey,
 } from '../countries';
-import { countryConfirmationPatch } from '../services/country-provenance';
 import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
 import { asyncHandler } from '../middleware/async-handler';
 import { normalizeOptionalPhone } from '../lib/phone';
@@ -133,9 +132,14 @@ function upsertSettings(db: ReturnType<typeof getDatabase>, entries: Record<stri
 }
 
 function validBusinessLocation(timezone: unknown, currency: unknown, country: unknown): boolean {
+  // Rest&Cafe: country is optional (no country profiles); '' means unset.
   if (timezone !== undefined && !isValidTimeZone(timezone)) return false;
   if (currency !== undefined && !isSyntacticallyValidCurrencyCode(currency)) return false;
-  if (country !== undefined && (typeof country !== 'string' || !/^[A-Z]{2}$/.test(country)))
+  if (
+    country !== undefined &&
+    country !== '' &&
+    (typeof country !== 'string' || !/^[A-Z]{2}$/.test(country))
+  )
     return false;
   return true;
 }
@@ -233,6 +237,8 @@ function businessShape(s: Record<string, string>) {
     timezone: s.timezone || '',
     business_day_start_time: s.business_day_start_time || '00:00',
     currency: s.currency || '',
+    // The owner's currency unit (symbol override, e.g. "SP"); '' = CLDR default.
+    currency_symbol: s.currency_symbol || '',
     country: s.country || '',
     language: s.language || 'en',
     tax_registration_number: s.tax_registration_number || '',
@@ -348,6 +354,7 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       currency_display,
       number_digits,
       calendar,
+      currency_symbol,
     } = req.body;
     const normalizedCurrency =
       typeof currency === 'string' ? currency.trim().toUpperCase() : currency;
@@ -414,6 +421,14 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
     }
     const effectiveCountry = country || currentSettings.country || '';
     const effectiveCurrency = normalizedCurrency || currentSettings.currency || '';
+    // The currency unit (symbol) is the owner's own setting in Rest&Cafe —
+    // never derived from a country. '' clears it back to the CLDR symbol.
+    const normalizedCurrencySymbol =
+      currency_symbol !== undefined
+        ? String(currency_symbol || '')
+            .trim()
+            .slice(0, 12)
+        : undefined;
 
     // Validate locale preferences against country options, normalizing unsupported legacy values.
     const localeUpdates: Record<string, string> = {};
@@ -454,7 +469,7 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
 
     let normalizedPhone: string | undefined = undefined;
     if (business_phone !== undefined) {
-      const phoneRes = normalizeOptionalPhone(business_phone, effectiveCountry);
+      const phoneRes = normalizeOptionalPhone(business_phone, effectiveCountry || 'SY');
       if (!phoneRes.valid) {
         return res.status(400).json({ error: phoneRes.error || 'Invalid business phone number' });
       }
@@ -469,10 +484,7 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       currency: normalizedCurrency,
       country,
       language,
-      currency_symbol:
-        normalizedCurrency !== undefined || country !== undefined
-          ? deriveCurrencySymbol(effectiveCurrency, effectiveCountry)
-          : undefined,
+      currency_symbol: normalizedCurrencySymbol,
       tax_registration_number,
       state_code,
       business_address,
@@ -494,8 +506,6 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       receipt_logo: normalizedReceiptLogo,
       receipt_logo_raster: normalizedReceiptLogoRaster,
       ...localeUpdates,
-      // Only mark country as user-confirmed if it actually changed in this submission.
-      ...countryConfirmationPatch(country, currentSettings.country, req.body.country_selected),
     });
     cloudSync.refreshRegistrationProfile();
     syncPostHogIdentity();

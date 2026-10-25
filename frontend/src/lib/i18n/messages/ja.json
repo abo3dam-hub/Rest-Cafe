@@ -1856,6 +1856,7 @@
     "createBackup": "バックアップを作成",
     "createBackupHint": "ユーザー、PIN、設定、注文、商品、履歴を保持する完全な.dbバックアップを作成します。FloCafeを別のコンピューターへ移す場合に使用してください。",
     "currency": "通貨",
+    "currencyUnit": "通貨単位",
     "currencyAutoFilled": "通貨（自動入力）",
     "currencyRecommended": "おすすめ",
     "currencyPopular": "よく使われる通貨",

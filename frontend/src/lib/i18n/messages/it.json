@@ -1856,6 +1856,7 @@
     "createBackup": "Crea backup",
     "createBackupHint": "Crea un backup .db completo che preserva utenti, PIN, impostazioni, ordini, prodotti e cronologia. Usalo per spostare FloCafe su un altro computer.",
     "currency": "Valuta",
+    "currencyUnit": "Unità di valuta",
     "currencyAutoFilled": "Valuta (compilata automaticamente)",
     "currencyRecommended": "Consigliata",
     "currencyPopular": "Valute popolari",

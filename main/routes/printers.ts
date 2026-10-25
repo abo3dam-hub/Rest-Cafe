@@ -1056,9 +1056,12 @@ router.post(
         phone: settings.business_phone || '',
         taxRegistrationNumber: settings.tax_registration_number || '',
         currency,
-        // CLDR-derived only — a stored currency_symbol setting is not an input
-        // (docs/reference/product-invariants.md: no per-store override of a snapshot value).
-        currency_symbol: getCurrencySymbol(currency, getCountryByCode(country)?.locale) || currency,
+        // Rest&Cafe: the currency unit is the owner's own setting (e.g. SP);
+        // CLDR is only the fallback when no unit is stored.
+        currency_symbol:
+          settings.currency_symbol ||
+          getCurrencySymbol(currency, getCountryByCode(country)?.locale) ||
+          currency,
         country,
         instagram_handle: settings.instagram_handle || '',
         customer_name: customer?.name || '',

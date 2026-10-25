@@ -1856,6 +1856,7 @@
     "createBackup": "สร้างข้อมูลสำรอง",
     "createBackupHint": "สร้างข้อมูลสำรอง .db ฉบับเต็มที่เก็บผู้ใช้ PIN การตั้งค่า คำสั่งซื้อ สินค้า และประวัติ ใช้เมื่อย้าย FloCafe ไปเครื่องอื่น",
     "currency": "สกุลเงิน",
+    "currencyUnit": "หน่วยสกุลเงิน",
     "currencyAutoFilled": "สกุลเงิน (กรอกอัตโนมัติ)",
     "currencyRecommended": "แนะนำ",
     "currencyPopular": "สกุลเงินยอดนิยม",

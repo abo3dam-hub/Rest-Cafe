@@ -1856,6 +1856,7 @@
     "createBackup": "建立備份",
     "createBackupHint": "建立完整的 .db 備份，保留使用者、PIN、設定、訂單、商品和歷史。用於將 FloCafe 遷移到另一臺電腦。",
     "currency": "貨幣",
+    "currencyUnit": "貨幣單位",
     "currencyAutoFilled": "貨幣（自動填充）",
     "currencyRecommended": "推薦",
     "currencyPopular": "常用貨幣",

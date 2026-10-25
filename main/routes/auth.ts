@@ -26,7 +26,6 @@ import {
   resolveRegionalSnapshot,
   type RegionalSnapshot,
 } from '../countries';
-import { countryConfirmationPatch } from '../services/country-provenance';
 import {
   cloudSync,
   CloudRequestError,
@@ -918,12 +917,9 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     // setup wizard's analytics choice says.
     const telemetryChoice = 'false';
     const email = normalizeEmail(req.body.email);
-    // Regional settings come from signup, never from a fallback — see
-    // docs/reference/product-invariants.md. There is no default country.
-    const resolvedCountry = typeof country === 'string' ? getCountryByCode(country) : undefined;
-    if (!resolvedCountry) {
-      return res.status(400).json({ error: 'A valid country is required' });
-    }
+    // Rest&Cafe has no country profiles: regional settings are plain
+    // settings with generic defaults (SYP / Asia/Damascus), all editable
+    // later in Settings. A country in the payload is ignored.
     const displayName = String(name || '').trim();
     const normalizedBusinessType = String(business_type || 'restaurant').trim();
     const normalizedSetupProfile = String(setup_profile || 'express')
@@ -932,19 +928,18 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     const normalizedServiceModel = String(service_model || 'qsr')
       .trim()
       .toLowerCase();
-    // Omitted currency derives from the country profile; an explicitly-invalid
-    // one is rejected rather than silently replaced (resolveTenantCurrency's
-    // read-time leniency is the wrong tool for validating a write).
+    // Omitted currency/timezone take the product defaults; an explicitly
+    // invalid one is rejected rather than silently replaced.
     const normalizedCurrency =
       currency === undefined
-        ? resolvedCountry.currency
+        ? 'SYP'
         : typeof currency === 'string'
           ? currency.trim().toUpperCase()
           : currency;
     if (!isSupportedCurrencyCode(normalizedCurrency)) {
       return res.status(400).json({ error: 'Invalid currency' });
     }
-    const resolvedTimezone = timezone === undefined ? resolvedCountry.timezone : timezone;
+    const resolvedTimezone = timezone === undefined ? 'Asia/Damascus' : timezone;
     if (!isValidTimeZone(resolvedTimezone)) {
       return res.status(400).json({ error: 'Invalid timezone' });
     }
@@ -954,7 +949,7 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     const rawOutletPhone = String(business_phone || phone || '').trim();
     let outletPhone = '';
     if (rawOutletPhone) {
-      const normPhone = normalizeOptionalPhone(rawOutletPhone, resolvedCountry.code);
+      const normPhone = normalizeOptionalPhone(rawOutletPhone, 'SY');
       if (!normPhone.valid) {
         return res.status(400).json({ error: normPhone.error || 'Invalid business phone number' });
       }
@@ -1061,11 +1056,13 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       upsertSettings(db, {
         business_name: resolvedStoreName,
         business_type: normalizedBusinessType,
-        country: resolvedCountry.code,
+        country: '',
         currency: normalizedCurrency,
         currency_symbol:
-          currency_symbol || getCurrencySymbol(normalizedCurrency, resolvedCountry.locale),
+          currency_symbol ||
+          (normalizedCurrency === 'SYP' ? 'SP' : getCurrencySymbol(normalizedCurrency, 'en-US')),
         timezone: resolvedTimezone,
+        number_digits: 'latin',
         language,
         business_address: outletAddress,
         business_phone: outletPhone,
@@ -1083,12 +1080,6 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
         service_model: normalizedServiceModel,
         setup_profile: pendingCurrencyReset ? 'empty' : normalizedSetupProfile,
         onboarding_completed: 'true',
-        // Confirm country if user explicitly selected it or differed from default.
-        ...countryConfirmationPatch(
-          resolvedCountry.code,
-          getSettingValue('country'),
-          req.body.country_selected,
-        ),
         anonymous_data_consent: telemetryChoice,
         telemetry_enabled: telemetryChoice,
         ...(analyticsLevel ? { [PRODUCT_ANALYTICS_LEVEL_SETTING]: analyticsLevel } : {}),
@@ -1105,13 +1096,7 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       });
 
       if (!pendingCurrencyReset) {
-        seedSetupProfile(
-          db,
-          normalizedSetupProfile,
-          normalizedServiceModel,
-          language,
-          resolvedCountry.code,
-        );
+        seedSetupProfile(db, normalizedSetupProfile, normalizedServiceModel, language, '');
       }
       if (pendingCurrencyReset) {
         db.prepare("DELETE FROM _flo_meta WHERE key = 'currency_reset_pending'").run();

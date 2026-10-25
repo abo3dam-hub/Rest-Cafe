@@ -234,9 +234,13 @@ export function buildBillPrintContext(opts: {
     baseDirection: detectPrintLanguageDirection(lang),
     locale,
     currency,
-    // CLDR-derived only — a stored currency_symbol setting is not an input
-    // (docs/reference/product-invariants.md: no per-store override of a snapshot value).
-    currencySymbol: String(getCurrencySymbol(currency, locale) || currency),
+    // Rest&Cafe: honor the owner's stored currency unit when the business
+    // profile carries one; CLDR symbol otherwise.
+    currencySymbol: String(
+      (opts.business as { currency_symbol?: string } | undefined)?.currency_symbol ||
+        getCurrencySymbol(currency, locale) ||
+        currency,
+    ),
     trimDecimals: opts.business?.trim_decimals === true,
     ...(opts.business?.timezone ? { timezone: String(opts.business.timezone) } : {}),
     resolveLabel: (conceptId, language) => printLabel(language, conceptId as PrintConceptId),

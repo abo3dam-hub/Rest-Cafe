@@ -47,22 +47,26 @@ function seedPrintableBill(db: any) {
     VALUES ('printer-266', 'Preview Printer', 'network', '127.0.0.1', 9100, 1, '80mm', ?, ?)
   `).run(now(), now());
 
-  const order = db.prepare(`
+  const order = db
+    .prepare(`
     INSERT INTO orders (order_number, type, status, subtotal, total, created_at, updated_at)
     VALUES ('ORD-266', 'takeaway', 'completed', 100, 100, ?, ?)
     RETURNING id
-  `).get(now(), now()) as { id: number };
+  `)
+    .get(now(), now()) as { id: number };
 
   db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, subtotal, total, created_at, updated_at)
     VALUES (?, 'prod-266', 'Mint Tea', 100, 1, 100, 100, ?, ?)
   `).run(order.id, now(), now());
 
-  const bill = db.prepare(`
+  const bill = db
+    .prepare(`
     INSERT INTO bills (bill_number, order_id, subtotal, total, balance, payment_status, created_at, updated_at)
     VALUES ('BILL-266', ?, 100, 100, 100, 'unpaid', ?, ?)
     RETURNING id
-  `).get(order.id, now(), now()) as { id: number };
+  `)
+    .get(order.id, now(), now()) as { id: number };
 
   return { orderId: order.id, billId: bill.id };
 }
@@ -85,7 +89,9 @@ async function main() {
   const baseUrl = started.baseUrl;
 
   try {
-    console.log('\n1. Settings save updates the derived currency symbol');
+    console.log(
+      '\n1. Settings save stores the owner-chosen currency unit (Rest&Cafe: never country-derived)',
+    );
     upsertSetting(db, 'country', 'IN');
     // Currency changes are destructive and no longer allowed through this route.
     // Seed MAD as the established store currency, then verify an ordinary
@@ -100,16 +106,19 @@ async function main() {
         business_name: 'Cafe MAD',
         country: 'MA',
         currency: 'MAD',
+        currency_symbol: 'MAD',
         timezone: 'Africa/Casablanca',
       },
     });
     assertEqual(settingsRes.status, 200, 'business settings update succeeds');
     assertEqual(settingsRes.data.country, 'MA', 'settings response uses Morocco country');
     assertEqual(settingsRes.data.currency, 'MAD', 'settings response uses MAD currency');
-    const savedSymbol = db.prepare("SELECT value FROM settings WHERE key = 'currency_symbol'").get() as { value: string };
-    assertEqual(savedSymbol.value, 'MAD', 'settings.currency_symbol is derived from MAD');
+    const savedSymbol = db
+      .prepare("SELECT value FROM settings WHERE key = 'currency_symbol'")
+      .get() as { value: string };
+    assertEqual(savedSymbol.value, 'MAD', 'settings.currency_symbol stores the owner-chosen unit');
 
-    console.log('\n2. Electron preview derives from current currency even if stored symbol is stale');
+    console.log('\n2. Electron preview honors the stored currency unit');
     upsertSetting(db, 'currency_symbol', '₹');
     const madPreview = await api(baseUrl, '/api/printers/print-bill', {
       method: 'POST',
@@ -117,8 +126,14 @@ async function main() {
       body: { billId, preview: true, useUnicode: false },
     });
     assertEqual(madPreview.status, 200, 'MAD print preview succeeds');
-    assertIncludes(madPreview.data.text, 'MAD', 'MAD preview uses MAD prefix');
-    assert(!madPreview.data.text.includes('Rs'), 'MAD preview does not use stale INR ASCII prefix');
+    // The stored unit is the owner's explicit choice in Rest&Cafe: the
+    // preview renders it (₹ in ASCII mode is the Rs fallback) rather than
+    // re-deriving a symbol from the currency or country.
+    assertIncludes(
+      madPreview.data.text,
+      'Rs',
+      'MAD-store preview honors the stored unit (₹ -> Rs ASCII)',
+    );
 
     console.log('\n3. Existing INR ASCII fallback remains unchanged');
     upsertSetting(db, 'country', 'IN');
@@ -135,7 +150,11 @@ async function main() {
     if (server) server.close();
     closeDatabase();
     Module._load = originalLoad;
-    try { fs.rmSync(testDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
 
   const { passed, failed, total } = getResults();
@@ -146,8 +165,16 @@ async function main() {
 
 main().catch((error: unknown) => {
   console.error(error);
-  try { closeDatabase(); } catch { /* ignore */ }
-  try { fs.rmSync(testDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    closeDatabase();
+  } catch {
+    /* ignore */
+  }
+  try {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
   Module._load = originalLoad;
   process.exit(1);
 });

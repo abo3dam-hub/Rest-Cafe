@@ -1856,6 +1856,7 @@
     "createBackup": "백업 만들기",
     "createBackupHint": "사용자, PIN, 설정, 주문, 상품, 기록을 보존하는 전체 .db 백업을 만듭니다. FloCafe를 다른 컴퓨터로 옮길 때 사용하세요.",
     "currency": "통화",
+    "currencyUnit": "통화 단위",
     "currencyAutoFilled": "통화 (자동 입력)",
     "currencyRecommended": "권장",
     "currencyPopular": "자주 사용되는 통화",

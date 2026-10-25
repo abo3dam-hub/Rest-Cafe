@@ -1856,6 +1856,7 @@
     "createBackup": "Criar Backup",
     "createBackupHint": "Criar um backup completo do seu arquivo de banco de dados SQLite.",
     "currency": "Moeda",
+    "currencyUnit": "Unidade monetária",
     "currencyAutoFilled": "Moeda (preenchida automaticamente)",
     "currencyRecommended": "Recomendada",
     "currencyPopular": "Moedas populares",

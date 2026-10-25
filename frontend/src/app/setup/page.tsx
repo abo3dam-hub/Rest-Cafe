@@ -24,14 +24,6 @@ import {
   EyeOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import {
-  COUNTRIES,
-  getCountryByCode,
-  getLocalizedCountryName,
-  countryMatchesQuery,
-  sortCountriesByLocalizedName,
-  type Country,
-} from '@/lib/countries';
 import { TimeZoneSelect } from '@/components/TimeZoneSelect';
 import type { ProductAnalyticsLevel } from '@/components/analytics/ProductAnalyticsDialog';
 import { CurrencySelect } from '@/components/CurrencySelect';
@@ -102,15 +94,10 @@ export default function SetupPage() {
   const language = usePosSettingsStore((s) => s.language);
   const setStoreLanguage = usePosSettingsStore((s) => s.setLanguage);
   const [browserLanguage, setBrowserLanguage] = useState<Language>('en');
-  // No default country: regional settings come only from what the owner
-  // selects here (docs/reference/product-invariants.md, "Regional settings come from
-  // signup, never from a fallback").
-  const [country, setCountry] = useState<string>('');
-  const [currency, setCurrency] = useState<string>('');
-  const [countryQuery, setCountryQuery] = useState<string>('');
-  // The country profile timezone is only a suggested default, set once a
-  // country is chosen below; the owner can override it for multi-timezone countries.
-  const [timezone, setTimezone] = useState<string>('');
+  // Rest&Cafe has no country profiles: the wizard starts from the product
+  // defaults (Syrian pound, Damascus time); both stay editable in Settings.
+  const [currency, setCurrency] = useState<string>('SYP');
+  const [timezone, setTimezone] = useState<string>('Asia/Damascus');
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -153,9 +140,6 @@ export default function SetupPage() {
 
   // Country labels are generated from CLDR data, which can differ between the server
   // and the browser even within the same locale. Keep the first paint deterministic
-  // and only switch to the locale-specific names after hydration.
-  const resolvedCountryLocale = mounted ? locale : 'en';
-
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setMounted(true);
@@ -168,9 +152,8 @@ export default function SetupPage() {
         if (!mountedFlag) return;
         setMasterPinAvailable(!!data.masterPinAvailable);
         if (data.currencyReset) {
-          setCountry(String(data.currencyReset.country || ''));
-          setCurrency(String(data.currencyReset.currency || ''));
-          setTimezone(String(data.currencyReset.timezone || ''));
+          setCurrency(String(data.currencyReset.currency || 'SYP'));
+          setTimezone(String(data.currencyReset.timezone || 'Asia/Damascus'));
           setProfile('empty');
         }
         // Redirect to login if setup was already completed.
@@ -192,13 +175,9 @@ export default function SetupPage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedCountry: Country | undefined = getCountryByCode(country);
   const languageOptions: Language[] = SELECTABLE_LANGUAGES.includes(browserLanguage)
     ? [browserLanguage, ...SELECTABLE_LANGUAGES.filter((l) => l !== browserLanguage)]
     : SELECTABLE_LANGUAGES;
-  const filteredCountries = sortCountriesByLocalizedName(COUNTRIES, resolvedCountryLocale).filter(
-    (c) => countryMatchesQuery(c, countryQuery, resolvedCountryLocale),
-  );
 
   const completeSetup = () => {
     usePosSettingsStore.getState().setLanguage(language);
@@ -246,11 +225,6 @@ export default function SetupPage() {
 
   const handleCompleteSetup = async () => {
     if (loading) return;
-    if (!country) {
-      toast.error(t('chooseCountryRequired'));
-      setStep(1);
-      return;
-    }
     if (!validateOwner()) {
       setStep(3);
       return;
@@ -286,12 +260,9 @@ export default function SetupPage() {
 
     setLoading(true);
     try {
-      const countryProfile = selectedCountry;
-      const countryCode = countryProfile?.code || country;
-      const countryPayload = {
-        country: countryCode,
-        currency: currency || countryProfile?.currency,
-        timezone,
+      const regionalPayload = {
+        currency: currency || 'SYP',
+        timezone: timezone || 'Asia/Damascus',
         language,
       };
 
@@ -313,7 +284,7 @@ export default function SetupPage() {
         email_product_updates: productUpdates,
         email_marketing: marketing,
         product_analytics_level: analyticsLevel ?? undefined,
-        ...countryPayload,
+        ...regionalPayload,
       });
       completeSetup();
     } catch {
@@ -380,87 +351,23 @@ export default function SetupPage() {
                   })}
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-medium">{t('chooseCountry')}</h3>
-                    <p className="text-muted-foreground text-sm mt-1">{t('chooseCountryHint')}</p>
-                  </div>
-
-                  <div className="relative">
-                    <Search
-                      size={16}
-                      className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                    />
-                    <Input
-                      value={countryQuery}
-                      onChange={(e) => setCountryQuery(e.target.value)}
-                      placeholder={t('searchPlaceholder')}
-                      className="ps-9"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="setup-currency">{tSettings('currency')}</Label>
+                  <CurrencySelect
+                    id="setup-currency"
+                    value={currency}
+                    recommendedCurrency="SYP"
+                    locale={locale}
+                    onChange={setCurrency}
+                    recommendedLabel={tSettings('currencyRecommended')}
+                    popularLabel={tSettings('currencyPopular')}
+                    allLabel={tSettings('currencyAll')}
+                    className="h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tSettings('currencySelectionHint')}
+                  </p>
                 </div>
-
-                <div className="grid gap-2 max-h-72 overflow-y-auto">
-                  {filteredCountries.map((c) => {
-                    const selected = country === c.code;
-                    return (
-                      <button
-                        key={c.code}
-                        onClick={() => {
-                          const previousCountry = getCountryByCode(country);
-                          setCountry(c.code);
-                          if (!currency || currency === previousCountry?.currency) {
-                            setCurrency(c.currency);
-                          }
-                          // Update default timezone when switching countries unless user has manually customized it.
-                          if (!previousCountry || timezone === previousCountry.timezone) {
-                            setTimezone(c.timezone || timezone);
-                          }
-                        }}
-                        className={`p-3 rounded-xl border-2 text-start transition-all flex items-center justify-between ${
-                          selected
-                            ? 'border-primary bg-primary/5'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-semibold">
-                            {getLocalizedCountryName(c.code, resolvedCountryLocale)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {c.currency} · {c.taxIdLabel || t('noTaxId')} · {c.locale}
-                          </div>
-                        </div>
-                        {selected && <Check className="w-5 h-5 text-primary" />}
-                      </button>
-                    );
-                  })}
-                  {countryQuery.trim() && filteredCountries.length === 0 && (
-                    <p className="text-center text-gray-500 py-6 text-sm">
-                      {t('noMatches', { query: countryQuery })}
-                    </p>
-                  )}
-                </div>
-
-                {selectedCountry ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="setup-currency">{tSettings('currency')}</Label>
-                    <CurrencySelect
-                      id="setup-currency"
-                      value={currency}
-                      recommendedCurrency={selectedCountry.currency}
-                      locale={locale}
-                      onChange={setCurrency}
-                      recommendedLabel={tSettings('currencyRecommended')}
-                      popularLabel={tSettings('currencyPopular')}
-                      allLabel={tSettings('currencyAll')}
-                      className="h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {tSettings('currencySelectionHint')}
-                    </p>
-                  </div>
-                ) : null}
 
                 <div className="space-y-2">
                   <Label htmlFor="setup-timezone">{t('timezoneLabel')}</Label>
@@ -473,17 +380,7 @@ export default function SetupPage() {
                   <p className="text-xs text-muted-foreground">{t('timezoneHint')}</p>
                 </div>
 
-                <Button
-                  onClick={() => {
-                    if (!country) {
-                      toast.error(t('chooseCountryRequired'));
-                      return;
-                    }
-                    setStep(2);
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
+                <Button onClick={() => setStep(2)} className="w-full" size="lg">
                   {t('continue')} <ArrowRight className="w-4 h-4 ms-2 rtl-flip" />
                 </Button>
               </div>
