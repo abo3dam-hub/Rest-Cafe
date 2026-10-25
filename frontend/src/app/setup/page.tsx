@@ -87,7 +87,7 @@ export default function SetupPage() {
   // Wizard language follows shared store to update translations immediately.
   const language = usePosSettingsStore((s) => s.language);
   const setStoreLanguage = usePosSettingsStore((s) => s.setLanguage);
-  const [browserLanguage, setBrowserLanguage] = useState<Language>('en');
+  const [browserLanguage, setBrowserLanguage] = useState<Language>('ar');
   // Rest&Cafe has no country profiles: the wizard starts from the product
   // defaults (Syrian pound, Damascus time); both stay editable in Settings.
   const [currency, setCurrency] = useState<string>('SYP');

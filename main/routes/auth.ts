@@ -101,7 +101,7 @@ function buildLocalTenant(db: ReturnType<typeof getDatabase>, userId: string, us
     group_separator: snapshot?.groupSeparator ?? ',',
     timezone: snapshot?.timezone || s.timezone || '',
     business_day_start_time: s.business_day_start_time || '00:00',
-    language: s.language || 'en',
+    language: s.language || 'ar',
     // Include print policies in tenant snapshot so renderer bootstraps them before first print.
     bill_language_policy: s.bill_language_policy || null,
     kot_language_policy: s.kot_language_policy || null,

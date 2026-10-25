@@ -29,7 +29,7 @@ language. Each entry carries:
 | `locale` | The canonical BCP-47 tag passed to `Intl`. It is the tag, not the key: `de` has locale `de-DE`, `pt` has `pt-BR`. |
 | `nativeName` | The endonym shown in the language picker. It is written in the language itself. |
 | `direction` | `ltr` or `rtl`. |
-| `selectable` | Whether the language may be chosen by an end user. |
+| `selectable` | Whether the language may be chosen by an end user. Rest&Cafe offers Arabic and English; the remaining catalogues stay registered for print labels and previously saved preferences. |
 | `load` | A lazy dynamic import returning that language's message catalogue. |
 
 Because the registry is the only place a language is declared, adding a language means adding an
@@ -78,15 +78,16 @@ catalogue the store no longer names. A partially loaded catalogue is never rende
 
 1. The persisted store value in `localStorage` under the `pos-settings` key, if it names a
    registered language.
-2. `getBrowserLanguage()`.
-3. `en`.
+2. `ar` — first-time installations start in Arabic.
 
-The result is written to the store, so browser detection runs only when there is nothing persisted.
+The result is written to the store, so the default applies only when there is nothing persisted.
+After login, the tenant language saved on the server is authoritative. `getBrowserLanguage()`
+only orders the language options in the setup wizard.
 
 ## Browser detection
 
 `frontend/src/lib/i18n/browser-language.ts` matches `navigator.languages` (plus
-`navigator.language`) against the registered `selectable` languages. Each registered locale is
+`navigator.language`) against the registered languages. Each registered locale is
 expanded with `Intl.Locale` and `maximize()`, which supplies the likely script for a bare language
 subtag.
 

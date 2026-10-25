@@ -221,7 +221,7 @@ function businessShape(s: Record<string, string>) {
     // The owner's currency unit (symbol override, e.g. "SP"); '' = CLDR default.
     currency_symbol: s.currency_symbol || '',
     country: s.country || '',
-    language: s.language || 'en',
+    language: s.language || 'ar',
     tax_registration_number: s.tax_registration_number || '',
     state_code: s.state_code || '',
     business_address: s.business_address || '',

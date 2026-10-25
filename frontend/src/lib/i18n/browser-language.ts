@@ -1,25 +1,28 @@
 import { isLanguage, LANGUAGES, type Language } from './languages';
 
-const SELECTABLE_LOCALES = (Object.keys(LANGUAGES) as Language[])
-  .filter((language) => LANGUAGES[language].selectable)
-  .map((language) => {
-    const locale = new Intl.Locale(LANGUAGES[language].locale);
-    const maximized = locale.maximize();
-    return {
-      language,
-      languageCode: locale.language,
-      baseName: locale.baseName,
-      maximizedBaseName: maximized.baseName,
-      script: maximized.script,
-    };
-  });
+// Detection covers every registered language, not only the selectable
+// ones: callers use it to recognise the user's preference (for example to
+// order the setup wizard's options), while pickers gate on `selectable`.
+const REGISTERED_LOCALES = (Object.keys(LANGUAGES) as Language[]).map((language) => {
+  const locale = new Intl.Locale(LANGUAGES[language].locale);
+  const maximized = locale.maximize();
+  return {
+    language,
+    languageCode: locale.language,
+    baseName: locale.baseName,
+    maximizedBaseName: maximized.baseName,
+    script: maximized.script,
+  };
+});
 
 function resolveRegisteredLocale(parsed: Intl.Locale): Language | null {
-  const exact = SELECTABLE_LOCALES.find((entry) => entry.baseName === parsed.baseName);
+  const exact = REGISTERED_LOCALES.find((entry) => entry.baseName === parsed.baseName);
   if (exact) return exact.language;
 
   const maximizedBaseName = parsed.maximize().baseName;
-  const maximized = SELECTABLE_LOCALES.find((entry) => entry.maximizedBaseName === maximizedBaseName);
+  const maximized = REGISTERED_LOCALES.find(
+    (entry) => entry.maximizedBaseName === maximizedBaseName,
+  );
   if (maximized) return maximized.language;
 
   // A region/script tag may still use a registered bundle with the same script
@@ -28,24 +31,28 @@ function resolveRegisteredLocale(parsed: Intl.Locale): Language | null {
   // regional/script variants continue to the next preference or English.
   if (parsed.script || parsed.region) {
     const script = parsed.maximize().script;
-    const sameScript = SELECTABLE_LOCALES.filter((entry) => entry.languageCode === parsed.language && entry.script === script);
+    const sameScript = REGISTERED_LOCALES.filter(
+      (entry) => entry.languageCode === parsed.language && entry.script === script,
+    );
     if (sameScript.length === 1) return sameScript[0].language;
     return null;
   }
 
   const lang = parsed.language?.toLowerCase();
-  return isLanguage(lang) && LANGUAGES[lang].selectable ? lang : null;
+  return isLanguage(lang) ? lang : null;
 }
 
 /** Detects user's preferred language from navigator.languages
- * using Intl.Locale, matching against registered selectable languages. */
+ * using Intl.Locale, matching against the registered languages. */
 export function getBrowserLanguage(): Language {
   if (typeof navigator === 'undefined') return 'en';
 
   const candidates = [
     ...(Array.isArray(navigator.languages) ? navigator.languages : []),
     navigator.language,
-  ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+  ].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  );
 
   for (const candidate of candidates) {
     try {

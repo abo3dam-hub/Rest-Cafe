@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IntlProvider } from 'use-intl';
 import { usePosSettingsStore } from '@/store/pos-settings';
-import { LANGUAGES, getBrowserLanguage, isLanguage, type Language } from '@/lib/i18n';
+import { LANGUAGES, isLanguage, type Language } from '@/lib/i18n';
 import { getCachedMessages, loadLocaleMessages } from '@/lib/i18n/loader';
 
 /** Wraps application in use-intl's IntlProvider with lazy-loaded messages,
@@ -20,12 +20,11 @@ function resolveInitialLanguage(): Language {
         }
       }
     } catch {
-      // Fall through to browser detection
+      // Fall through to the product default
     }
   }
-  const browser = getBrowserLanguage();
-  if (LANGUAGES[browser]) return browser;
-  return 'en';
+  // First-time installs start in Arabic; a saved preference always wins.
+  return 'ar';
 }
 
 /** Error handler for IntlProvider suppressing ENVIRONMENT_FALLBACK warnings. */
@@ -46,7 +45,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<Language>('en');
   const activeRef = useRef<Language>('en');
 
-  // Resolve deterministic initial language (persisted > browser > en)
+  // Resolve deterministic initial language (persisted > Arabic default)
   // and synchronize with posSettingsStore.
   useEffect(() => {
     const initial = resolveInitialLanguage();
@@ -70,7 +69,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       .catch((err: unknown) => {
         if (cancelled) return;
         if (usePosSettingsStore.getState().language !== language) return; // superseded
-        console.warn(`[i18n] Failed to load messages for "${language}" — staying on "${activeRef.current}".`, err);
+        console.warn(
+          `[i18n] Failed to load messages for "${language}" — staying on "${activeRef.current}".`,
+          err,
+        );
         usePosSettingsStore.setState({ language: activeRef.current });
       });
     return () => {

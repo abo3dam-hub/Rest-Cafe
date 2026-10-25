@@ -307,6 +307,8 @@ export function truncateShapedLine(
 }
 
 export function normalizePrintLanguage(language?: string): string {
+  // English is the print fallback of last resort; callers pass the tenant's
+  // configured language (Arabic by default) explicitly.
   return language && isGeneratedPrintLanguage(language) ? language : 'en';
 }
 
