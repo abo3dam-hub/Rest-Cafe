@@ -16,7 +16,7 @@
  */
 
 import { parseDbTimestamp } from '../../main/db';
-import { getCountryByCode } from '../../main/countries';
+import { formatBusinessDate, getCountryByCode } from '../../main/countries';
 import { resolveTaxComponents } from '../../main/services/tax-components';
 import type { PrinterCutMode } from '../../main/printers/profiles';
 import {
@@ -107,7 +107,7 @@ export function formatClassicReceiptLegacy(order: any, bill: any, biz: any, cols
 
   lines.push(dash);
   lines.push('{CENTER}' + printLabel(lang, 'print.invoiceNumber') + ' ' + (bill.bill_number || order.order_number) + '{/CENTER}');
-  lines.push('{CENTER}' + date.toLocaleDateString(locale + '-u-nu-latn', tzOptions) + ' ' + date.toLocaleTimeString(locale + '-u-nu-latn', tzOptions) + '{/CENTER}');
+  lines.push('{CENTER}' + formatBusinessDate(date, tzOptions?.timeZone) + ' ' + date.toLocaleTimeString(locale + '-u-nu-latn', tzOptions) + '{/CENTER}');
   if (biz.show_table_number !== false && order.table?.name) lines.push('{CENTER}' + truncateShapedLine(formatTableLabel(order.table.name, lang), cols, arabicShaping) + '{/CENTER}');
   lines.push(dash);
 
@@ -242,7 +242,7 @@ export function formatCompactReceiptLegacy(order: any, bill: any, biz: any, cols
   if (biz.show_name !== false && biz.name) lines.push('{STORE_NAME}{CENTER}{BOLD}' + truncateShapedLine(String(biz.name), cols, arabicShaping) + '{/BOLD}{/CENTER}');
   lines.push(bar);
   lines.push(printLabel(lang, 'receipt.billNumber') + ': ' + (bill.bill_number || order.order_number));
-  lines.push(printLabel(lang, 'receipt.date') + ': ' + date.toLocaleDateString(locale + '-u-nu-latn', tzOptions) + ' ' + date.toLocaleTimeString(locale + '-u-nu-latn', tzOptions));
+  lines.push(printLabel(lang, 'receipt.date') + ': ' + formatBusinessDate(date, tzOptions?.timeZone) + ' ' + date.toLocaleTimeString(locale + '-u-nu-latn', tzOptions));
   if (biz.show_table_number !== false && order.table?.name) lines.push(truncateShapedLine(formatTableLabel(order.table.name, lang), cols, arabicShaping));
   if (biz.show_customer_name !== false && biz.customer_name) lines.push(truncateShapedLine(printLabel(lang, 'pos.customer') + ': ' + biz.customer_name, cols, arabicShaping));
   if (biz.show_customer_phone !== false && biz.customer_phone) lines.push(printLabel(lang, 'print.numberShort') + ': ' + biz.customer_phone);

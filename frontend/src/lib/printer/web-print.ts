@@ -11,6 +11,7 @@ import {
   formatCurrencyForTenant,
   formatNumberForTenant,
   formatDateForTenant,
+  formatBusinessDate,
 } from '@/lib/countries';
 import { columnsForReceiptPaperSize } from '@print/width';
 import { parseDbTimestamp } from '@/lib/utils';
@@ -634,14 +635,16 @@ function formatReceiptDate(iso: string, tenant: ReceiptTenant, locale?: string):
   try {
     const d = parseDbTimestamp(iso);
     if (isNaN(d.getTime())) return iso;
-    return formatDateForTenant(
+    const timeZone = tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const time = formatDateForTenant(
       d,
       tenant.country,
-      tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone,
       { digits: tenant.number_digits, calendar: tenant.calendar },
-      { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
+      { hour: '2-digit', minute: '2-digit' },
       locale,
     );
+    return `${formatBusinessDate(d, timeZone)} ${time}`;
   } catch {
     return iso;
   }

@@ -123,7 +123,7 @@ function HistoryOrderCard({ order, currency, locale }: { order: HistoryOrder; cu
   const tOrders = useTranslations('orders');
   const tCommon = useTranslations('common');
   const tPrintTest = useTranslations('printTest');
-  const { formatDate } = useFormatDate();
+  const { formatDateTime } = useFormatDate();
   const items: OrderItem[] = order.items ?? [];
   const bill = order.bill;
   const fmt = (n: number) => formatCurrency(n, currency, locale);
@@ -134,7 +134,7 @@ function HistoryOrderCard({ order, currency, locale }: { order: HistoryOrder; cu
         <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="text-base font-bold">#<Ltr>{order.order_number}</Ltr></CardTitle>
-            <CardDescription>{formatDate(order.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</CardDescription>
+            <CardDescription>{formatDateTime(order.created_at, { hour: 'numeric', minute: '2-digit' })}</CardDescription>
           </div>
           <Badge className={STATUS_BADGE[order.status] ?? ''} variant="outline">
             {(() => { const key = STATUS_LABEL_KEY[order.status]; return key ? tOrders(key) : order.status; })()}

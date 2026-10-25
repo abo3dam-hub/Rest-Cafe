@@ -51,8 +51,8 @@ import {
 import { hasPermission, requirePermission, requireAnyPermission } from '../services/authorization';
 import { getOpenSession } from '../services/shift-session-gate';
 import {
+  formatBusinessDateTime,
   formatCurrencyForTenant,
-  formatDateForTenant,
   getCountryByCode,
   getCurrencySymbol,
   resolveRegionalSnapshot,
@@ -781,17 +781,8 @@ router.post(
         includeDescriptions: body.includeDescriptions,
         includeModifiers: body.includeModifiers,
         businessName: settings.business_name || 'Store',
-        printedAt: formatDateForTenant(
-          new Date(),
-          regional.country,
-          regional.timezone,
-          regional.preferences,
-          {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          },
-        ),
-        baseDirection: detectPrintLanguageDirection(settings.language || 'en'),
+        printedAt: formatBusinessDateTime(new Date(), regional.timezone),
+        baseDirection: detectPrintLanguageDirection(settings.language || 'ar'),
         formatPrice: (price) =>
           formatCurrencyForTenant(price, regional.country, regional.currency, regional.preferences),
       });
@@ -853,7 +844,7 @@ router.post(
         menu,
         getHttpRequestSignal(req),
         targetPrinter,
-        settings.language || 'en',
+        settings.language || 'ar',
       );
       if (!result.ok) {
         return res.status(502).json({
@@ -1506,15 +1497,15 @@ router.post(
 
 export const printerRoutes = router;
 
-/** Tenant-configured language for print labels, defaulting to 'en'. */
+/** Tenant-configured language for print labels, defaulting to 'ar'. */
 export function tenantLanguage(db: ReturnType<typeof getDatabase>): string {
   try {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'language'").get() as
       | { value?: string }
       | undefined;
-    return row?.value || 'en';
+    return row?.value || 'ar';
   } catch {
-    return 'en';
+    return 'ar';
   }
 }
 

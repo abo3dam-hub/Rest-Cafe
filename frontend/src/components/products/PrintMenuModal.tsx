@@ -18,7 +18,7 @@ import { useAuthStore } from '@/store/auth';
 import { usePrinterStore, type HardwarePrinter } from '@/hooks/usePrinter';
 import { printerService } from '@/lib/printer/PrinterService';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
-import { formatDateForTenant } from '@/lib/countries';
+import { formatBusinessDateTime } from '@/lib/countries';
 import type { Category, Product, ProductVariant } from '@/lib/types';
 import { activeVariants, isVariantSoldOut } from '@/lib/product-variants';
 import { buildMenuWebPrintHtml, MenuPopupBlockedError, printMenuInBrowser, reservePrintGesture, type MenuWebPrintSection } from '@/lib/printer/menu-web-print';
@@ -164,17 +164,7 @@ export default function PrintMenuModal({ open, onOpenChange }: Props) {
       return null;
     }
 
-    const printedAt = formatDateForTenant(
-      new Date(),
-      tenant?.country || '',
-      tenant?.timezone || 'UTC',
-      {
-        currencyDisplay: tenant?.currency_display,
-        digits: tenant?.number_digits,
-        calendar: tenant?.calendar,
-      },
-      { dateStyle: 'medium', timeStyle: 'short' },
-    );
+    const printedAt = formatBusinessDateTime(new Date(), tenant?.timezone || 'UTC');
     return buildMenuWebPrintHtml({
       businessName: tenant?.business_name || 'Store',
       printedAt,

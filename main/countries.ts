@@ -641,6 +641,43 @@ export const formatDateForTenant = (
   }
 };
 
+// Business dates always render as DD/MM/YYYY with Latin digits and the
+// Gregorian calendar, in Arabic and English alike.
+export const formatBusinessDate = (date: Date, timezone?: string): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB-u-ca-gregory-nu-latn', {
+      ...(timezone ? { timeZone: timezone } : {}),
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).formatToParts(date);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    return `${get('day')}/${get('month')}/${get('year')}`;
+  } catch {
+    return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
+  }
+};
+
+// Business date with a 24-hour Latin-digit time: "DD/MM/YYYY HH:MM".
+export const formatBusinessDateTime = (date: Date, timezone?: string): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  let time: string;
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB-u-ca-gregory-nu-latn', {
+      ...(timezone ? { timeZone: timezone } : {}),
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    time = `${get('hour')}:${get('minute')}`;
+  } catch {
+    time = `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  }
+  return `${formatBusinessDate(date, timezone)} ${time}`;
+};
+
 export const countryName = (code: string): string => {
   try {
     return dn.of(code.toUpperCase()) ?? code;

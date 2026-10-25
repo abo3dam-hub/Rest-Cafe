@@ -363,7 +363,7 @@ async function run(): Promise<void> {
     useUnicode: false,
     language: 'en',
   }, taxWarnings)).toString('utf8');
-  assert.match(taxBillText, /Date: Apr 21, 2026/, 'raw tax bill uses an explicit ASCII-safe fallback for Persian country data');
+  assert.match(taxBillText, /Date: 21\/04\/2026/, 'raw tax bill uses an explicit ASCII-safe fallback for Persian country data');
 
   const longTaxItemName = 'Extra Long Caramelized Vanilla Bean Creme Frappuccino';
   const longTaxBillText = Buffer.from(frontend.taxBillEncoder.buildTaxBillBytes({
@@ -383,7 +383,7 @@ async function run(): Promise<void> {
   } as any, { business_name: 'Cafe', country: 'DE', currency: 'EUR', timezone: 'UTC' } as any, {
     rawEscPos: true, useUnicode: false, language: 'de',
   }, germanTaxWarnings)).toString('utf8');
-  assert.match(germanTaxText, /Datum: .*Maer/, 'raw tax bill keeps a representable country locale date');
+  assert.match(germanTaxText, /Datum: 21\/03\/2026/, 'raw tax bill keeps the DD/MM/YYYY business date with the country label');
   assert.doesNotMatch(germanTaxWarnings.map((warning) => warning.text).join('\n'), /Datum:/, 'raw tax bill date fallback does not create a date omission warning');
 
   const taxHeaderWarnings: any[] = [];

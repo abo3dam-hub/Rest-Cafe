@@ -1,7 +1,7 @@
 /** PrintDocument v1 compact thermal receipt renderer; maps print blocks to ESC/POS token lines. */
 
 import { parseDbTimestamp } from '../db';
-import { getCurrencyFractionDigits } from '../countries';
+import { formatBusinessDate, getCurrencyFractionDigits } from '../countries';
 import type { PrinterCutMode } from './profiles';
 import { isThermalTextRepresentable, type ThermalPrinterCapabilities } from '../../shared/print/thermal-capabilities';
 import { receiptChargeLines } from '../../shared/charges';
@@ -199,7 +199,7 @@ export function renderBillDocumentToCompactLines(
     lines.push(normalize(labelOf(meta.billNumberLabel) + ': ' + meta.invoiceNumber.text));
     metaSourceLines.push(labelOf(meta.billNumberLabel) + ': ' + meta.invoiceNumber.text);
     const date = parseDbTimestamp(meta.timestamp.text);
-    const dateText = date.toLocaleDateString(options.locale + '-u-nu-latn', tzOptions) + ' ' + date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
+    const dateText = formatBusinessDate(date, tzOptions?.timeZone) + ' ' + date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
     lines.push(normalize(labelOf(meta.dateLabel) + ': ' + dateText));
     metaSourceLines.push(labelOf(meta.dateLabel) + ': ' + dateText);
     if (meta.table) {

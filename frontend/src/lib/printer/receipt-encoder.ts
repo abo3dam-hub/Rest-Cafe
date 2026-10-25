@@ -15,6 +15,7 @@ import {
   truncateToDisplayCells,
 } from '@print/width';
 import {
+  formatBusinessDate,
   getCountryByCode,
   getCurrencyFractionDigits,
   getCurrencySymbol,
@@ -318,13 +319,13 @@ function resolveEncoderCurrency(
   return padCurrencyPrefix(hasSymbol && useUnicode ? normalizedCurrency : fallbackCurrency);
 }
 
-/** Thermal-safe timestamp: numeric calendar fields on Latin digits. */
+/** Thermal-safe timestamp: DD/MM/YYYY date plus a Latin-digit time. */
 function formatThermalTimestamp(iso: string, locale: string, timezone?: string | null): string {
   const parsed = parseDbTimestamp(iso);
   if (Number.isNaN(parsed.getTime())) return iso;
   const safeLocale = getSafeLatnLocale(locale);
   const options = timezone ? { timeZone: timezone } : undefined;
-  return `${parsed.toLocaleDateString(safeLocale, options)} ${parsed.toLocaleTimeString(safeLocale, options)}`;
+  return `${formatBusinessDate(parsed, timezone ?? undefined)} ${parsed.toLocaleTimeString(safeLocale, options)}`;
 }
 
 function getSafeLatnLocale(locale: string | undefined): string {

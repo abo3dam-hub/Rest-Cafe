@@ -13,6 +13,8 @@ export {
   formatNumber,
   formatNumberForTenant,
   formatDateForTenant,
+  formatBusinessDate,
+  formatBusinessDateTime,
   getCurrencyFractionDigits,
   getCurrencyMinorUnitFactor,
   getCurrencyUnitAdapter,

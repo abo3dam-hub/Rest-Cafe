@@ -15,6 +15,8 @@ import {
   capabilitiesForPrinter,
 } from './profiles';
 import {
+  formatBusinessDate,
+  formatBusinessDateTime,
   getCountryByCode,
   getCurrencyFractionDigits,
   getCurrencySymbol,
@@ -2309,7 +2311,7 @@ function renderEscposLineTemplateV1(
   lines.push(
     normalize(printLabel(lang, 'receipt.date')) +
       ': ' +
-      date.toLocaleDateString(locale + '-u-nu-latn', tzOptions),
+      formatBusinessDate(date, tzOptions?.timeZone),
   );
   lines.push(
     normalize(printLabel(lang, 'print.time')) +
@@ -3030,7 +3032,7 @@ export function buildTestPage(
     ruler,
     edgeProbe,
     bar,
-    `${label('print.time')}: ${new Date().toLocaleString('en-US-u-nu-latn', timezone ? { timeZone: timezone } : undefined)}`,
+    `${label('print.time')}: ${formatBusinessDateTime(new Date(), timezone ?? undefined)}`,
     '',
     bar,
     '{CENTER}' + label('print.test.success') + '{/CENTER}',
@@ -3119,7 +3121,7 @@ export function buildZReportBody(
     try {
       const d = parseDbTimestamp(iso);
       if (isNaN(d.getTime())) return iso;
-      return d.toLocaleString('en-US-u-nu-latn', { timeZone: tz });
+      return `${formatBusinessDate(d, tz)} ${d.toLocaleTimeString('en-US-u-nu-latn', { timeZone: tz })}`;
     } catch {
       return iso;
     }

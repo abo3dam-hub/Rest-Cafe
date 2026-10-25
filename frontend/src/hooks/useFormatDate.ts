@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useLocale } from 'use-intl';
-import { formatDateForTenant } from '@/lib/countries';
+import { formatBusinessDate, formatDateForTenant } from '@/lib/countries';
 import { parseDbTimestamp } from '@/lib/utils';
 
 // String timestamps arrive in DB UTC format (YYYY-MM-DD HH:MM:SS);
@@ -9,6 +9,8 @@ import { parseDbTimestamp } from '@/lib/utils';
 function toDate(date: string | Date | number): Date {
   return typeof date === 'string' ? parseDbTimestamp(date) : new Date(date);
 }
+
+const TIME_OPTION_KEYS = ['hour', 'minute', 'second', 'hour12', 'hourCycle'] as const;
 
 export function useFormatDate() {
   const currentTenant = useAuthStore((s) => s.currentTenant);
@@ -30,17 +32,29 @@ export function useFormatDate() {
     }, options, locale);
   }, [country, timeZone, currentTenant?.calendar, currentTenant?.number_digits, locale]);
 
-  const formatDate = useCallback((date?: string | Date | number | null, options?: Intl.DateTimeFormatOptions) =>
-    format(date, { year: 'numeric', month: 'short', day: 'numeric', ...options }),
-  [format]);
+  // Business dates render as DD/MM/YYYY with Latin digits in every UI
+  // language; only the time part keeps locale formatting.
+  const formatDate = useCallback((date?: string | Date | number | null): string => {
+    if (!date) return '';
+    const d = toDate(date);
+    if (isNaN(d.getTime())) return String(date);
+    return formatBusinessDate(d, timeZone);
+  }, [timeZone]);
 
   const formatTime = useCallback((date?: string | Date | number | null, options?: Intl.DateTimeFormatOptions) =>
     format(date, { hour: '2-digit', minute: '2-digit', ...options }),
   [format]);
 
-  const formatDateTime = useCallback((date?: string | Date | number | null, options?: Intl.DateTimeFormatOptions) =>
-    format(date, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', ...options }),
-  [format]);
+  const formatDateTime = useCallback((date?: string | Date | number | null, options?: Intl.DateTimeFormatOptions): string => {
+    if (!date) return '';
+    const d = toDate(date);
+    if (isNaN(d.getTime())) return String(date);
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+    for (const key of TIME_OPTION_KEYS) {
+      if (options?.[key] !== undefined) Object.assign(timeOptions, { [key]: options[key] });
+    }
+    return `${formatBusinessDate(d, timeZone)} ${format(d, timeOptions)}`;
+  }, [format, timeZone]);
 
   return { formatDate, formatTime, formatDateTime };
 }

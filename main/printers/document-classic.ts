@@ -2,6 +2,7 @@
 
 import { parseDbTimestamp } from '../db';
 import {
+  formatBusinessDate,
   getCountryByCode,
   getCurrencyFractionDigits,
   getCurrencySymbol,
@@ -681,13 +682,13 @@ export function renderBillDocumentToClassicLines(
         const date = parseDbTimestamp(block.timestamp.text);
         segment.main.push(
           '{CENTER}' +
-            date.toLocaleDateString(options.locale + '-u-nu-latn', tzOptions) +
+            formatBusinessDate(date, tzOptions?.timeZone) +
             ' ' +
             date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions) +
             '{/CENTER}',
         );
         segment.sourceLines.main.push(
-          date.toLocaleDateString(options.locale + '-u-nu-latn', tzOptions) +
+          formatBusinessDate(date, tzOptions?.timeZone) +
             ' ' +
             date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions),
         );
