@@ -94,12 +94,12 @@ const HOUR = 60 * 60_000;
 
 async function main(): Promise<void> {
   const backupDir = getLocalBackupDir();
-  assert.equal(backupDir, path.join(documentsDir, 'FloCafe', 'Backups'));
+  assert.equal(backupDir, path.join(documentsDir, 'RestCafe', 'Backups'));
   documentsThrows = true;
   try {
     assert.equal(
       getLocalBackupDir(),
-      path.join(userDataDir, 'FloCafe', 'Backups'),
+      path.join(userDataDir, 'RestCafe', 'Backups'),
       'falls back to userData when documents path is unavailable',
     );
   } finally {
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   }
 
   const stamp = new Date('2026-10-22T13:05:09.456Z');
-  assert.equal(localBackupFileName(stamp), 'flo-backup-2026-10-22T13-05-09-456Z.db');
+  assert.equal(localBackupFileName(stamp), 'rest-cafe-backup-2026-10-22T13-05-09-456Z.db');
   assert.equal(
     parseLocalBackupTime(localBackupFileName(stamp)),
     Date.UTC(2026, 9, 22, 13, 5, 9, 456),

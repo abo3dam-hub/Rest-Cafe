@@ -272,7 +272,7 @@ export function registerIpcHandlers(
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const result = await dialog.showSaveDialog({
-        defaultPath: path.join(app.getPath('documents'), `flo-backup-${timestamp}.db`),
+        defaultPath: path.join(app.getPath('documents'), `rest-cafe-backup-${timestamp}.db`),
         filters: [{ name: 'SQLite Database', extensions: ['db'] }],
       });
 
@@ -329,7 +329,7 @@ export function registerIpcHandlers(
         return {
           success: false,
           error:
-            'Invalid backup file: missing schema version metadata. This backup may have been created with an older version of FloDesktop.',
+            'Invalid backup file: missing schema version metadata. This backup may have been created with an older version of Rest&Cafe.',
         };
       }
 

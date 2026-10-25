@@ -545,7 +545,7 @@ export default function POSPage() {
     const clientTicketId = createOperationReference() || '';
     setSupportError({
       title: entry.title,
-      subject: 'FloCafe order problem',
+      subject: 'Rest&Cafe order problem',
       code: entry.code,
       message: entry.message,
       nextStep: entry.nextStep,

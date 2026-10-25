@@ -97,7 +97,7 @@ async function runTests() {
 
       fs.unlinkSync = function (targetFile: fs.PathLike) {
         const filePath = String(targetFile);
-        if (filePath.includes('flo-backup-')) {
+        if (filePath.includes('rest-cafe-backup-')) {
           unlinkAttempted = true;
           const err: any = new Error('resource busy or locked');
           err.code = 'EBUSY';
@@ -108,14 +108,22 @@ async function runTests() {
 
       const result = await createBackup(customTarget);
       check(unlinkAttempted, 'fs.unlinkSync was called for the temp backup file');
-      check(result.path === customTarget, `createBackup returned the custom target path (got ${result.path})`);
+      check(
+        result.path === customTarget,
+        `createBackup returned the custom target path (got ${result.path})`,
+      );
       check(fs.existsSync(customTarget), 'final backup file exists on disk');
       check(warnLogged, 'warning log was emitted explaining the Windows file lock');
 
       // Verify the backup is a valid SQLite DB with the schema version intact
       const backupDb = new Database(customTarget);
-      const metaVersion = backupDb.prepare("SELECT value FROM _flo_meta WHERE key = 'schema_version'").get() as { value: string };
-      check(Number(metaVersion.value) === getCurrentSchemaVersion(), `backup DB contains correct schema_version (got ${metaVersion.value})`);
+      const metaVersion = backupDb
+        .prepare("SELECT value FROM _flo_meta WHERE key = 'schema_version'")
+        .get() as { value: string };
+      check(
+        Number(metaVersion.value) === getCurrentSchemaVersion(),
+        `backup DB contains correct schema_version (got ${metaVersion.value})`,
+      );
       backupDb.close();
     }
 
@@ -137,7 +145,7 @@ async function runTests() {
 
       fs.unlinkSync = function (targetFile: fs.PathLike) {
         const filePath = String(targetFile);
-        if (filePath.includes('flo-backup-')) {
+        if (filePath.includes('rest-cafe-backup-')) {
           unlinkAttempted = true;
           const err: any = new Error('operation not permitted');
           err.code = 'EPERM';
@@ -148,13 +156,21 @@ async function runTests() {
 
       const result = await createBackup(customTarget);
       check(unlinkAttempted, 'fs.unlinkSync was called for the temp backup file');
-      check(result.path === customTarget, `createBackup returned the custom target path (got ${result.path})`);
+      check(
+        result.path === customTarget,
+        `createBackup returned the custom target path (got ${result.path})`,
+      );
       check(fs.existsSync(customTarget), 'final backup file exists on disk');
       check(warnLogged, 'warning log was emitted for EPERM');
 
       const backupDb = new Database(customTarget);
-      const metaVersion = backupDb.prepare("SELECT value FROM _flo_meta WHERE key = 'schema_version'").get() as { value: string };
-      check(Number(metaVersion.value) === getCurrentSchemaVersion(), `backup DB contains correct schema_version (got ${metaVersion.value})`);
+      const metaVersion = backupDb
+        .prepare("SELECT value FROM _flo_meta WHERE key = 'schema_version'")
+        .get() as { value: string };
+      check(
+        Number(metaVersion.value) === getCurrentSchemaVersion(),
+        `backup DB contains correct schema_version (got ${metaVersion.value})`,
+      );
       backupDb.close();
     }
 
@@ -177,13 +193,20 @@ async function runTests() {
       fs.writeFileSync(directoryFdStandIn, '');
       fs.openSync = function (targetFile: fs.PathLike, flags: string, mode?: any) {
         let isDirectory = false;
-        try { isDirectory = fs.statSync(String(targetFile)).isDirectory(); } catch { }
-        return originalOpenSync.call(fs, isDirectory ? directoryFdStandIn : targetFile, isDirectory ? 'r+' : flags, mode);
+        try {
+          isDirectory = fs.statSync(String(targetFile)).isDirectory();
+        } catch {}
+        return originalOpenSync.call(
+          fs,
+          isDirectory ? directoryFdStandIn : targetFile,
+          isDirectory ? 'r+' : flags,
+          mode,
+        );
       };
 
       fs.unlinkSync = function (targetFile: fs.PathLike) {
         const filePath = String(targetFile);
-        if (filePath.includes('flo-backup-')) {
+        if (filePath.includes('rest-cafe-backup-')) {
           const err: any = new Error('resource busy or locked');
           err.code = 'EBUSY';
           throw err;
@@ -196,7 +219,10 @@ async function runTests() {
         await createBackup(customTarget);
       } catch (err: any) {
         threw = true;
-        check(err?.code === 'EBUSY', `re-threw EBUSY on non-Windows platform (got code: ${err?.code}, message: ${err?.message})`);
+        check(
+          err?.code === 'EBUSY',
+          `re-threw EBUSY on non-Windows platform (got code: ${err?.code}, message: ${err?.message})`,
+        );
       } finally {
         fs.openSync = originalOpenSync;
       }
@@ -211,7 +237,7 @@ async function runTests() {
 
       fs.unlinkSync = function (targetFile: fs.PathLike) {
         const filePath = String(targetFile);
-        if (filePath.includes('flo-backup-')) {
+        if (filePath.includes('rest-cafe-backup-')) {
           const err: any = new Error('I/O error');
           err.code = 'EIO';
           throw err;
@@ -226,16 +252,21 @@ async function runTests() {
         threw = true;
         check(err?.code === 'EIO', `re-threw EIO on Windows (got code: ${err?.code})`);
       }
-      check(threw, 'createBackup threw on Windows when tempPath unlink threw non-EBUSY/EPERM error');
+      check(
+        threw,
+        'createBackup threw on Windows when tempPath unlink threw non-EBUSY/EPERM error',
+      );
     }
 
     // ── Test 5: End-to-end HTTP API with simulated Windows EBUSY ─────────
-    console.log('\nTest 5: POST /api/db/backup and POST /api/db/import succeed on Windows under EBUSY');
+    console.log(
+      '\nTest 5: POST /api/db/backup and POST /api/db/import succeed on Windows under EBUSY',
+    );
     {
       setPlatform('win32');
       fs.unlinkSync = function (targetFile: fs.PathLike) {
         const filePath = String(targetFile);
-        if (filePath.includes('flo-backup-') && !filePath.endsWith('.tmp')) {
+        if (filePath.includes('rest-cafe-backup-') && !filePath.endsWith('.tmp')) {
           const err: any = new Error('resource busy or locked');
           err.code = 'EBUSY';
           throw err;
@@ -247,11 +278,17 @@ async function runTests() {
       app.use(express.json());
       // requirePermission() resolves effective permissions from a real users row
       // keyed by the JWT's userId — the token alone is not authoritative.
-      getDatabase().prepare(
-        `INSERT OR IGNORE INTO users (id, name, email, password, role, is_active, created_at, updated_at)
-         VALUES ('owner-1', 'Owner', 'owner@flo.local', 'unused', 'owner', 1, ?, ?)`
-      ).run(now(), now());
-      const ownerToken = jwt.sign({ userId: 'owner-1', email: 'owner@flo.local', role: 'owner' }, getJWTSecret(), { expiresIn: '1h' });
+      getDatabase()
+        .prepare(
+          `INSERT OR IGNORE INTO users (id, name, email, password, role, is_active, created_at, updated_at)
+         VALUES ('owner-1', 'Owner', 'owner@flo.local', 'unused', 'owner', 1, ?, ?)`,
+        )
+        .run(now(), now());
+      const ownerToken = jwt.sign(
+        { userId: 'owner-1', email: 'owner@flo.local', role: 'owner' },
+        getJWTSecret(),
+        { expiresIn: '1h' },
+      );
       app.use((req: any, res: any, next: any) => {
         const auth = req.headers.authorization;
         if (auth?.startsWith('Bearer ')) {
@@ -280,12 +317,22 @@ async function runTests() {
           overwrite: false,
           data: {
             schema_version: String(getCurrentSchemaVersion() + 1), // mismatch triggers safety backup
-            data: { settings: [], categories: [{ id: 'win-import-cat', name: 'Win Category' }], products: [], users: [] },
+            data: {
+              settings: [],
+              categories: [{ id: 'win-import-cat', name: 'Win Category' }],
+              products: [],
+              users: [],
+            },
           },
         });
 
-      check(importRes.status === 200, `POST /api/db/import with schema mismatch succeeded under EBUSY (got ${importRes.status})`);
-      const imported = db.prepare("SELECT COUNT(*) AS count FROM categories WHERE id = 'win-import-cat'").get() as { count: number };
+      check(
+        importRes.status === 200,
+        `POST /api/db/import with schema mismatch succeeded under EBUSY (got ${importRes.status})`,
+      );
+      const imported = db
+        .prepare("SELECT COUNT(*) AS count FROM categories WHERE id = 'win-import-cat'")
+        .get() as { count: number };
       check(imported.count === 1, 'imported data was committed to database');
     }
   } finally {

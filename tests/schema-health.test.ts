@@ -53,7 +53,7 @@ function isNativeAbiMismatch(error: any): boolean {
 }
 
 function main() {
-  console.log('🧪 FloDesktop Schema Health Check Tests');
+  console.log('🧪 Rest&Cafe Schema Health Check Tests');
   console.log('='.repeat(60));
 
   try {

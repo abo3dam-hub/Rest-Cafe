@@ -12,14 +12,16 @@ export const LOCAL_BACKUP_RETENTION = 5;
 const DAY_MS = 24 * 60 * 60_000;
 const CHECK_INTERVAL_MS = 60 * 60_000;
 const STARTUP_DELAY_MS = 2 * 60_000;
+// Both prefixes are recognized forever: backups written before the rename
+// (flo-backup-*) stay listed, prunable, and restorable.
 const BACKUP_FILE_PATTERN =
-  /^flo-backup-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d{3}))?Z\.db$/;
+  /^(?:flo-backup|rest-cafe-backup)-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d{3}))?Z\.db$/;
 
 export function getLocalBackupDir(): string {
   try {
-    return path.join(app.getPath('documents'), 'FloCafe', 'Backups');
+    return path.join(app.getPath('documents'), 'RestCafe', 'Backups');
   } catch {
-    return path.join(app.getPath('userData'), 'FloCafe', 'Backups');
+    return path.join(app.getPath('userData'), 'RestCafe', 'Backups');
   }
 }
 
@@ -32,7 +34,7 @@ export function setLocalBackupEnabled(enabled: boolean): void {
 }
 
 export function localBackupFileName(at: Date): string {
-  return `flo-backup-${at.toISOString().replace(/[:.]/g, '-')}.db`;
+  return `rest-cafe-backup-${at.toISOString().replace(/[:.]/g, '-')}.db`;
 }
 
 export function parseLocalBackupTime(fileName: string): number | null {
@@ -129,7 +131,7 @@ function removeQuietly(filePath: string): void {
 }
 
 function stagingPath(dir: string): string {
-  return path.join(dir, `.flo-backup-${randomUUID()}.tmp`);
+  return path.join(dir, `.rest-cafe-backup-${randomUUID()}.tmp`);
 }
 
 /** Links a staged file in under the first free backup name; never replaces an existing file. */

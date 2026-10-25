@@ -1116,10 +1116,17 @@ export function isHealthyDatabaseFile(
 
 export const MAX_RETAINED_RESTORE_SAFETY_COPIES = 3;
 
+const MANAGED_BACKUP_PREFIXES = ['rest-cafe-backup-', 'flo-backup-'] as const;
+
+/** Managed backup names carry either prefix; flo-backup-* is the legacy spelling. */
+export function hasManagedBackupPrefix(fileName: string): boolean {
+  return MANAGED_BACKUP_PREFIXES.some((prefix) => fileName.startsWith(prefix));
+}
+
 /** True for the retained copies a successful restore leaves behind as an undo. */
 export function isRestoreSafetyCopyName(fileName: string): boolean {
   return (
-    fileName.startsWith('flo-backup-') &&
+    hasManagedBackupPrefix(fileName) &&
     fileName.includes('-pre-restore-') &&
     fileName.endsWith('.db')
   );
@@ -1143,7 +1150,7 @@ export function retainRestoreSafetyCopy(
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const retainedPath = path.join(
     getBackupDir(),
-    `flo-backup-${timestamp}-pre-restore-v${schemaVersion}.db`,
+    `rest-cafe-backup-${timestamp}-pre-restore-v${schemaVersion}.db`,
   );
   try {
     if (!pathEntryExists(recoveryPath)) return null;
@@ -1834,7 +1841,7 @@ export async function createBackupUnlocked(
   const uniqueSuffix = crypto.randomBytes(4).toString('hex');
   const backupDir = getBackupDir();
   const stagingDir = options?.stagingDirectory ? path.resolve(options.stagingDirectory) : backupDir;
-  const tempPath = path.join(stagingDir, `flo-backup-${timestamp}-${uniqueSuffix}.db`);
+  const tempPath = path.join(stagingDir, `rest-cafe-backup-${timestamp}-${uniqueSuffix}.db`);
   const finalPath = targetPath ? path.resolve(targetPath) : tempPath;
   const stagedTargetPath =
     finalPath !== tempPath
@@ -2463,7 +2470,7 @@ export function listBackupsPage(options: BackupPaginationOptions = {}): BackupPa
 
   let candidates = fs
     .readdirSync(backupDir)
-    .filter((fileName) => fileName.startsWith('flo-backup-') && fileName.endsWith('.db'))
+    .filter((fileName) => hasManagedBackupPrefix(fileName) && fileName.endsWith('.db'))
     .map((fileName) => ({ fileName, fullPath: resolveContainedPath(backupDir, fileName) }))
     .filter((entry): entry is { fileName: string; fullPath: string } => {
       if (!entry.fullPath) return false;
@@ -2531,7 +2538,7 @@ export function deleteBackup(fileName: string): void {
     error.code = 'ERR_INVALID_BACKUP_NAME';
     return error;
   };
-  if (!/^flo-backup-[\w.-]+\.db$/.test(fileName)) {
+  if (!/^(?:flo-backup|rest-cafe-backup)-[\w.-]+\.db$/.test(fileName)) {
     throw invalidName();
   }
   const backupDir = getBackupDir();
@@ -2560,7 +2567,7 @@ export function isManagedBackupFile(candidatePath: string): boolean {
   }
   if (!resolved.startsWith(backupDir + path.sep)) return false;
   const fileName = path.basename(resolved);
-  if (!fileName.startsWith('flo-backup-') || !fileName.endsWith('.db')) return false;
+  if (!hasManagedBackupPrefix(fileName) || !fileName.endsWith('.db')) return false;
   try {
     return fs.statSync(resolved).isFile();
   } catch {
@@ -7708,7 +7715,7 @@ function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     targetPath = path.join(
       backupDir,
-      `flo-backup-${timestamp}-pre-v${fromVersion}-to-v${toVersion}.db`,
+      `rest-cafe-backup-${timestamp}-pre-v${fromVersion}-to-v${toVersion}.db`,
     );
 
     if (fs.existsSync(dbPath)) {

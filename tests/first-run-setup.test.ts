@@ -77,7 +77,7 @@ function isNativeAbiMismatch(error: any): boolean {
 }
 
 async function main() {
-  console.log('🧪 FloDesktop First-Run Setup Tests');
+  console.log('🧪 Rest&Cafe First-Run Setup Tests');
   console.log('='.repeat(60));
 
   try {
