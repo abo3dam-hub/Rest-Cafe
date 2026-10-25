@@ -131,15 +131,6 @@ function installConcurrentOrderBoundaryMutation(
   };
 }
 
-async function waitForOutboxCount(db: any, expected: number): Promise<number> {
-  for (let attempt = 0; attempt < 50; attempt++) {
-    const row = db.prepare('SELECT COUNT(*) AS count FROM cloud_sync_outbox').get();
-    if (row.count >= expected) return row.count;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  return db.prepare('SELECT COUNT(*) AS count FROM cloud_sync_outbox').get().count;
-}
-
 async function main() {
   console.log('Regression Test: Issue #252 Order Lifecycle & Inventory Safety');
   console.log('='.repeat(65));
@@ -643,9 +634,6 @@ async function main() {
     assertEqual(itemAStatusRes.status, 200, 'Item A moved to preparing via order-items API');
 
     // Void Item A (in progress void requires PIN)
-    db.prepare(
-      "UPDATE settings SET value = '1', updated_at = ? WHERE key = 'cloud_orders_enabled'",
-    ).run(new Date().toISOString());
     db.prepare('DELETE FROM cloud_sync_outbox').run();
     const voidRes = await api(baseUrl, `/api/orders/${order3Id}/items/${itemA.id}/cancel`, {
       method: 'PATCH',
@@ -653,13 +641,10 @@ async function main() {
       body: { override_pin: '1234' },
     });
     assertEqual(voidRes.status, 200, 'Void item A status code');
-    const voidOutboxCount = await waitForOutboxCount(db, 1);
-    assertEqual(voidOutboxCount, 1, 'First void cancellation creates one cloud event');
     assertEqual(
-      db.prepare('SELECT event_type FROM cloud_sync_outbox ORDER BY created_at LIMIT 1').get()
-        .event_type,
-      'order.item_voided',
-      'First void cancellation is classified as a void event',
+      db.prepare('SELECT COUNT(*) AS count FROM cloud_sync_outbox').get().count,
+      0,
+      'void cancellation creates no cloud event (local-only build)',
     );
 
     const itemARow = db.prepare('SELECT status FROM order_items WHERE id = ?').get(itemA.id);
@@ -702,8 +687,8 @@ async function main() {
       'Repeated void cancellation does not restore stock',
     );
     assertEqual(
-      await waitForOutboxCount(db, 1),
-      1,
+      db.prepare('SELECT COUNT(*) AS count FROM cloud_sync_outbox').get().count,
+      0,
       'Repeated void cancellation creates no cloud event',
     );
     assertEqual(

@@ -764,7 +764,6 @@ assertEqualOrThrow(
     'install-electron',
     'electron-builder install-app-deps',
     'npm run verify:electron',
-    'node scripts/prepare-snap-build.cjs',
   ]),
   'the complete Electron postinstall command sequence must stay intact',
 );

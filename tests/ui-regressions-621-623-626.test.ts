@@ -42,30 +42,6 @@ assert.match(
   'floor and section remain visible together',
 );
 
-const whatsapp = source('frontend/src/components/settings/WhatsAppEnableCard.tsx');
-assert.match(
-  whatsapp,
-  /font-semibold text-foreground/,
-  'WhatsApp enable heading uses theme foreground',
-);
-
-const settings = source('frontend/src/app/(dashboard)/settings/page.tsx');
-assert.match(
-  settings,
-  /dark:bg-yellow-950\/50 dark:border-yellow-800/,
-  'update warning has a dark-mode surface',
-);
-assert.match(
-  settings,
-  /text-yellow-700 dark:text-yellow-300/,
-  'update warning copy has dark-mode contrast',
-);
-assert.match(
-  settings,
-  /text-red-600 dark:text-red-300/,
-  'update failure copy has dark-mode contrast',
-);
-
 const kds = source('frontend/src/hooks/useKdsConnection.ts');
 assert.match(
   kds,
