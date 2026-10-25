@@ -24,8 +24,6 @@ import {
   ChevronRight,
   CreditCard,
   RotateCcw,
-  Send,
-  AlertCircle,
   MapPin,
   Info,
   FileText,

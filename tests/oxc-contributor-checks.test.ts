@@ -1272,219 +1272,33 @@ assertIncludesOrThrow(
   'an empty change set must be reported explicitly',
 );
 
-// ── Workflow wiring and cross-platform invocation ───────────────────────────
+// ── Workflow wiring ────────────────────────────────────────────────────────
+// The fork's CI is a single lean validate job (the upstream sharded lint
+// matrix and path-filter jobs were removed with the release automation).
+// What must stay true: CI runs the same lint command contributors run.
 
-console.log('Testing the CI workflow wiring and Windows-safe invocation...');
+console.log('Testing the CI workflow wiring...');
 
 const YAML = require('js-yaml') as { load: (text: string) => any };
 const workflow = YAML.load(
   fs.readFileSync(path.join(rootDir, '.github', 'workflows', 'ci.yml'), 'utf8'),
 );
-const lintJobSteps = workflow.jobs['linux-baseline'].steps as Array<Record<string, string>>;
-
-const exactStepIndex = (command: string, workingDirectory?: string) =>
-  lintJobSteps.findIndex(
-    (step) =>
-      step.run === command &&
-      (workingDirectory === undefined
-        ? step['working-directory'] === undefined
-        : step['working-directory'] === workingDirectory),
-  );
-
-const stepRunsCommand = (
-  step: Record<string, string>,
-  command: string,
-  workingDirectory?: string,
-) => {
-  if (!step?.run) return false;
-  if (
-    workingDirectory !== undefined &&
-    step['working-directory'] !== undefined &&
-    step['working-directory'] !== workingDirectory
-  ) {
-    return false;
-  }
-  const lines = step.run.split('\n');
-  return lines.some((line) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) return false;
-    if (workingDirectory !== undefined && !step['working-directory']) {
-      return (
-        (line.includes(`cd ${workingDirectory}`) || line.includes(workingDirectory)) &&
-        line.includes(command)
-      );
-    }
-    return line.includes(command);
-  });
-};
-
-const findStepIndex = (command: string, workingDirectory?: string) =>
-  lintJobSteps.findIndex((step) => stepRunsCommand(step, command, workingDirectory));
-
-const gateIndex = findStepIndex('node scripts/ci/check-changed-format.cjs');
-assertOrThrow(gateIndex >= 0, 'CI must run the changed-file formatting gate');
+const validateSteps = workflow.jobs?.validate?.steps as Array<Record<string, string>> | undefined;
+assertOrThrow(Array.isArray(validateSteps), 'ci.yml must define the validate job steps');
+const validateRuns = (validateSteps || [])
+  .map((step) => (typeof step.run === 'string' ? step.run : ''))
+  .join('\n');
 assertOrThrow(
-  exactStepIndex('npm ci') >= 0 && exactStepIndex('npm ci') < gateIndex,
-  'the gate must run after the root dependency install',
+  validateRuns.includes('npm ci'),
+  'the validate job must install dependencies with npm ci',
 );
 assertOrThrow(
-  exactStepIndex('npm ci', 'frontend') >= 0 && exactStepIndex('npm ci', 'frontend') < gateIndex,
-  'the gate must run after the frontend dependency install it formats against',
-);
-for (const [required, workingDirectory] of [
-  ['npm run lint:backend', undefined],
-  ['npm run lint', 'frontend'],
-  ['npm run lint:budget', undefined],
-] as const) {
-  assertOrThrow(
-    findStepIndex(required, workingDirectory) >= 0,
-    `the ${required} gate must stay in the lint job`,
-  );
-}
-
-// Verify that parallelized lint steps propagate any sub-command failure
-const backendLintStepIndex = findStepIndex('npm run lint:backend');
-assertOrThrow(backendLintStepIndex >= 0, 'backend lint step must exist');
-const backendLintStep = lintJobSteps[backendLintStepIndex];
-const frontendLintStep = lintJobSteps[gateIndex];
-
-const fakeBinDir = tempDir('fake-bin');
-const npmScript = `#!/bin/sh
-if [ "\${FAIL_NPM_BACKEND:-}" = "1" ] && [ "$1" = "run" ] && [ "$2" = "lint:backend" ]; then
-  exit 1
-fi
-if [ "\${FAIL_NPM_FRONTEND:-}" = "1" ] && [ "$1" = "run" ] && [ "$2" = "lint" ]; then
-  exit 1
-fi
-if [ "\${FAIL_NPM_BUDGET:-}" = "1" ] && [ "$1" = "run" ] && [ "$2" = "lint:budget" ]; then
-  exit 1
-fi
-exit 0
-`;
-const npxScript = `#!/bin/sh
-if [ "\${FAIL_NPX_TSC:-}" = "1" ]; then
-  exit 1
-fi
-exit 0
-`;
-const nodeScript = `#!/bin/sh
-if [ "\${FAIL_NODE_FORMAT:-}" = "1" ] && echo "$*" | grep -q "check-changed-format.cjs"; then
-  exit 1
-fi
-exit 0
-`;
-
-for (const [name, script] of [
-  ['npm', npmScript],
-  ['npx', npxScript],
-  ['node', nodeScript],
-] as const) {
-  const p = path.join(fakeBinDir, name);
-  fs.writeFileSync(p, script);
-  fs.chmodSync(p, 0o755);
-  if (process.platform === 'win32') {
-    fs.writeFileSync(path.join(fakeBinDir, `${name}.cmd`), `@sh "%~dp0\\\\${name}" %*\n`);
-  }
-}
-
-const runLintStepScript = (script: string, env: Record<string, string> = {}) => {
-  const bashExecutable = process.platform === 'win32' ? 'bash' : '/bin/bash';
-  return spawnSync(bashExecutable, ['-e', '-u', '-o', 'pipefail', '-c', script], {
-    cwd: rootDir,
-    env: {
-      ...process.env,
-      PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
-      ...env,
-    },
-    encoding: 'utf8',
-  });
-};
-
-assertEqualOrThrow(
-  runLintStepScript(backendLintStep.run).status,
-  0,
-  'backend lint step must pass when both lint and typecheck succeed',
+  (validateSteps || []).some((step) => step.run?.trim() === 'npm run lint'),
+  'the validate job must run the contributor lint command (npm run lint) as its own step',
 );
 assertOrThrow(
-  runLintStepScript(backendLintStep.run, { FAIL_NPM_BACKEND: '1' }).status !== 0,
-  'backend lint step must fail when npm run lint:backend fails',
-);
-assertOrThrow(
-  runLintStepScript(backendLintStep.run, { FAIL_NPX_TSC: '1' }).status !== 0,
-  'backend lint step must fail when npx tsc fails',
-);
-
-assertEqualOrThrow(
-  runLintStepScript(frontendLintStep.run).status,
-  0,
-  'frontend lint/format/budget step must pass when all sub-commands succeed',
-);
-assertOrThrow(
-  runLintStepScript(frontendLintStep.run, { FAIL_NPM_FRONTEND: '1' }).status !== 0,
-  'frontend lint step must fail when frontend lint fails',
-);
-assertOrThrow(
-  runLintStepScript(frontendLintStep.run, { FAIL_NODE_FORMAT: '1' }).status !== 0,
-  'frontend lint step must fail when format check fails',
-);
-assertOrThrow(
-  runLintStepScript(frontendLintStep.run, { FAIL_NPM_BUDGET: '1' }).status !== 0,
-  'frontend lint step must fail when lint budget fails',
-);
-
-const filterStep = workflow.jobs.changes.steps.find(
-  (step: { id?: string }) => step.id === 'filter',
-);
-const normalizedFilters = YAML.load(String(filterStep.with.filters)) as Record<string, string[]>;
-const backendFilter = normalizedFilters.backend;
-for (const pattern of [
-  'main/**',
-  'shared/**',
-  'scripts/**',
-  'dev-server.js',
-  'kill-ports.js',
-  'tests/**',
-  'package.json',
-  'package-lock.json',
-  'tsconfig.json',
-  '.oxlintrc.json',
-  '.oxfmtrc.json',
-  'scripts/ci/check-lint-budget.cjs',
-  'lint-staged.config.mjs',
-  '.husky/**',
-  '.github/workflows/ci.yml',
-]) {
-  assertOrThrow(
-    backendFilter.includes(pattern),
-    `the backend workflow filter must retain ${pattern}`,
-  );
-}
-const matchesBackendFilter = (file: string) =>
-  backendFilter.some((pattern) => {
-    if (!pattern.endsWith('/**')) return pattern === file;
-    const prefix = pattern.slice(0, -3);
-    return file.startsWith(`${prefix}/`);
-  });
-for (const file of [
-  'shared/print/kernel.ts',
-  'scripts/oxc/scope.cjs',
-  'scripts/ci/check-lint-budget.cjs',
-  'scripts/ci/check-changed-format.cjs',
-  'dev-server.js',
-  'kill-ports.js',
-  '.husky/pre-commit',
-  'lint-staged.config.mjs',
-]) {
-  assertOrThrow(
-    matchesBackendFilter(file),
-    `a change to ${file} must activate the backend workflow output`,
-  );
-}
-
-assertIncludesOrThrow(
-  lintJobSteps[gateIndex].run,
-  rootScripts.scripts['format:check:changed'],
-  'the contributor command and the CI step must run the same gate',
+  validateRuns.includes('npm run build') && validateRuns.includes('npm run build:frontend'),
+  'the validate job must build the backend and the frontend',
 );
 
 for (const pkg of [rootPackage, frontendPackage]) {

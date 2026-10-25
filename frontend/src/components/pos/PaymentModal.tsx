@@ -9,7 +9,6 @@ import {
   Sparkles,
   User,
   Percent,
-  Send,
   ChevronDown,
   Users,
 } from 'lucide-react';
@@ -30,7 +29,7 @@ import {
 import { resolveTaxComponents } from '@/lib/printer/tax-components';
 import { useCartStore } from '@/store/cart';
 import { useConfirm } from '@/hooks/use-confirm';
-import { useTranslations, useLocale, type AppConfig } from 'use-intl';
+import { useTranslations, type AppConfig } from 'use-intl';
 import { PAYMENT_METHODS, type CustomPaymentMethod } from '@/lib/payment-methods';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useFormatNumber } from '@/hooks/useFormatNumber';
@@ -140,9 +139,7 @@ export default function PaymentModal({
   const { confirm, ConfirmDialog } = useConfirm();
   const t = useTranslations('pos');
   const tExpenses = useTranslations('expenses');
-  const locale = useLocale();
   const tCommon = useTranslations('common');
-  const tOrders = useTranslations('orders');
   const tReceipt = useTranslations('receipt');
   const { currentTenant } = useAuthStore();
   const unitAdapter = useCurrencyUnitAdapter();
@@ -161,7 +158,7 @@ export default function PaymentModal({
   const toMinorUnits = (amount: number) => Math.round(amount * minorFactor);
 
   const [justPaid, setJustPaid] = useState(false);
-  const [pointsEarned, setPointsEarned] = useState(0);
+  const [, setPointsEarned] = useState(0);
   const [payments, setPayments] = useState<Payment[]>(
     PAYMENT_METHODS.map((method) => ({ method: method.key, amount: '' })),
   );

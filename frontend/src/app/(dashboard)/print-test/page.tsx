@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Printer, FileText, MessageCircle, Download, Usb, Globe } from 'lucide-react';
+import { Printer, FileText, Download, Usb, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isPrintCancelledOnTenantChangeError, usePrinterStore } from '@/hooks/usePrinter';
 import {

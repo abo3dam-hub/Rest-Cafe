@@ -40,7 +40,7 @@ How the system is put together and why its boundaries sit where they do.
 | [regional-settings.md](architecture/regional-settings.md) | How country and currency become a regional snapshot, and who consumes it. |
 | [taxation.md](architecture/taxation.md) | The single tax calculation path, category resolution, rounding, and pack activation. |
 | [order-lifecycle.md](architecture/order-lifecycle.md) | Held carts, order pricing, discounts, bill generation, payments, settlement, and refunds. |
-| [cloud-integrations.md](architecture/cloud-integrations.md) | The optional network features, what each talks to, and how each degrades offline. |
+| [cloud-integrations.md](architecture/cloud-integrations.md) | The fork's network surface: the one optional outbound integration, and what was removed. |
 
 ## Reference
 
@@ -51,7 +51,7 @@ Contracts a caller must satisfy. Looked up, not read through.
 | [api.md](reference/api.md) | Endpoint reference for the three servers, and the KDS WebSocket contract. |
 | [product-invariants.md](reference/product-invariants.md) | The deliberate product rules, each with where it is enforced and how to verify it. |
 | [roles-and-permissions.md](reference/roles-and-permissions.md) | The in-app UI capability matrix. Not the authorization reference; see the architecture page. |
-| [tax-packs.md](reference/tax-packs.md) | The `CountryPack` schema, the trust model, and the install path. |
+| [tax-packs.md](reference/tax-packs.md) | The internal tax-pack data format and the manual tax configuration. |
 | [merchant-print-templates.md](reference/merchant-print-templates.md) | The merchant receipt-template wire contract, validation, and trust model. |
 | [print-templates-compliance.md](reference/print-templates-compliance.md) | The `escpos-line-template-v1` authoring contract used by signed tax packs. |
 | [daily-sales-export.md](reference/daily-sales-export.md) | The owner-only accounting export, its reconciliation identities, and file formats. |
@@ -64,7 +64,6 @@ Recurring procedures with an outcome.
 | Page | Subject |
 | --- | --- |
 | [adding-a-language.md](guides/adding-a-language.md) | Adding a locale, from scaffolding to the verification commands. |
-| [adding-a-tax-pack.md](guides/adding-a-tax-pack.md) | Authoring and shipping a country tax pack. |
 | [showcase-recording.md](guides/showcase-recording.md) | Capturing and transcoding automated visual feature showcase assets. |
 | [testing-printers.md](guides/testing-printers.md) | Validating a physical printer against the print pipeline. |
 
@@ -75,8 +74,7 @@ Procedures for people with release credentials.
 | Page | Subject |
 | --- | --- |
 | [releases.md](maintainers/releases.md) | Channels, promotion, artifact naming, and the manual pre-release checks. |
-| [mac-app-store.md](maintainers/mac-app-store.md) | The Mac App Store workflow, its secrets, and its release notes. |
-| [upgrade-testing.md](maintainers/upgrade-testing.md) | What an upgrade test proves, and the platforms CI cannot cover. |
+| [upgrade-testing.md](maintainers/upgrade-testing.md) | How upgrade safety is proven for manual installer updates: backups and migration suites. |
 
 ## Architecture decisions
 

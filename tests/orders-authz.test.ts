@@ -643,7 +643,9 @@ async function main() {
       'split-check order completes without PIN once all payable checks are settled',
     );
 
-    // Missing regional currency/country settings must fail with 409 RegionalNotConfiguredError
+    // Rest&Cafe has no regional gate: with currency/country settings deleted
+    // the generic snapshot applies, so completion reaches the ordinary
+    // unpaid-order rule instead of failing with a regional 409.
     const unconfiguredCurrencyOrder = seedOrderWithItem(db, 'NO-CURRENCY', 'cashier-authz');
     const savedSettings = db
       .prepare(`SELECT key, value FROM settings WHERE key IN ('currency', 'country')`)
@@ -661,8 +663,13 @@ async function main() {
       );
       assertEqual(
         missingRegionalRes.status,
-        409,
-        'missing regional settings return 409 instead of guessing currency decimals',
+        400,
+        'missing regional settings fall back to the generic snapshot (no regional 409)',
+      );
+      assertEqual(
+        String(missingRegionalRes.data?.error || '').includes('Manager PIN required'),
+        true,
+        'completion is governed by the unpaid-order rule, not regional configuration',
       );
     } finally {
       for (const row of savedSettings) {

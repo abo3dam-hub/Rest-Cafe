@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 import api from '@/lib/api';
-import { useLocale, useTranslations } from 'use-intl';
+import { useTranslations } from 'use-intl';
 import toast from 'react-hot-toast';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useCurrencyUnitAdapter } from '@/hooks/useCurrencyUnitAdapter';
@@ -114,9 +114,6 @@ export function useCashClose() {
   const { currentTenant } = useAuthStore();
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
-  const tPrint = useTranslations('print');
-  const tSettings = useTranslations('settings');
-  const locale = useLocale();
   const fmt = useFormatCurrency();
   const timeZone = currentTenant?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dayStartTime = currentTenant?.business_day_start_time || '00:00';

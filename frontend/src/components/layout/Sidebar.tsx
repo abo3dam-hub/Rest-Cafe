@@ -15,7 +15,6 @@ import {
   LogOut,
   ChefHat,
   UserCircle,
-  MessageCircle,
   LifeBuoy,
   ChevronUp,
   Sun,

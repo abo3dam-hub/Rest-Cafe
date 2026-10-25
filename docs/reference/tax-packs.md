@@ -1,9 +1,8 @@
 # Tax pack reference
 
-Schema, trust model, and install mechanics for country tax packs. How the engine applies a pack is
-in [taxation](../architecture/taxation.md); why packs are data rather than plugins is in
-[0004: data-only tax packs](../decisions/0004-data-only-tax-packs.md). The authoring procedure is
-in [adding a tax pack](../guides/adding-a-tax-pack.md).
+The pack schema — an internal data format in this fork. How the engine applies a pack is in
+[taxation](../architecture/taxation.md); why packs are data rather than plugins is in
+[0004: data-only tax packs](../decisions/0004-data-only-tax-packs.md).
 
 The types below are declared in [`main/tax-packs/types.ts`](../../main/tax-packs/types.ts).
 `main/tax-packs/generic.json` is the reference instance and the only bundled pack.
@@ -15,8 +14,8 @@ A pack is a data object conforming to `schemaVersion: 1`.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `schemaVersion` | `1` | Only `1` is accepted at activation. |
-| `id` | `string` | Catalog ids match `^[a-z0-9][a-z0-9-]*$`. |
-| `publisher` | `string` | `local` is reserved; see below. |
+| `id` | `string` | Ids match `^[a-z0-9][a-z0-9-]*$`. |
+| `publisher` | `string` | `local` is reserved for packs the owner builds in Settings. |
 | `sourceType` | `'official' \| 'community'` | Optional; defaults to `official`. |
 | `version` | `string` | Must match `^\d+\.\d+\.\d+$`. |
 | `country` | `string` | Two-letter code, or `*` for a multi-country pack. |
@@ -25,7 +24,7 @@ A pack is a data object conforming to `schemaVersion: 1`.
 | `effectiveFrom` | `string` | A parseable date. |
 | `effectiveTo` | `string` | Optional; must be at or after `effectiveFrom`. |
 | `publishedAt` | `string` | |
-| `minFloVersion` | `string` | Minimum FloCafe version that may activate it. |
+| `minFloVersion` | `string` | Minimum app version that may activate it. |
 | `taxPoint` | `'order_created' \| 'finalized_at'` | Declared, but nothing reads it. |
 | `inclusivePricingDefault` | `boolean` | |
 | `registrationNumberLabel` | `string` | Merchant-facing label. |
@@ -71,121 +70,30 @@ conditions? }`.
 Amounts are strings, not numbers. A rate or amount that is not finite, or is negative, fails
 activation.
 
-## Artifact form
+## How packs exist in this fork
 
-A catalog artifact may be either a bare `CountryPack` or a `CountryTaxPackPluginArtifact`:
+Rest&Cafe ships exactly one bundled pack, `main/tax-packs/generic.json` — an empty framework
+with no rates. There is no catalog, no download, and no signing or trust chain: the routes that
+fetched, installed, or updated packs from a remote catalog do not exist, and no community or
+country packs are bundled.
 
-```ts
-interface CountryTaxPackPluginArtifact {
-  schemaVersion: 1;
-  artifactType: 'country-tax-pack-plugin';
-  id: string;
-  displayName: string;
-  publisher: string;
-  version: string;
-  country: string;
-  jurisdiction: string;
-  publishedAt: string;
-  minFloVersion: string;
-  taxPack: CountryPack;
-  printTemplates?: PluginPrintTemplate[];
-}
-```
-
-Despite the name, the artifact carries no plugin code. `printTemplates` is a list of declarative
-`escpos-line-template-v1` templates rendered by FloCafe code; see
-[print templates compliance](print-templates-compliance.md). The templates are data, validated on
-install by `validateTemplateChargeRows()` and `validateTemplateLabelsMap()` in
-[`main/tax-packs/catalog.ts`](../../main/tax-packs/catalog.ts), and persisted to
-`installed_print_templates` keyed by the installed pack version.
-
-The plugin artifact is what is signed and digested, so a pack and its print templates are
-distributed and verified as one unit.
-
-## Install path
-
-`installCatalogEntry()` in [`main/routes/tax-packs.ts`](../../main/routes/tax-packs.ts) runs
-`downloadAndVerifyTaxPack()` in [`main/tax-packs/catalog.ts`](../../main/tax-packs/catalog.ts)
-first. The steps run in this order; each is a hard gate.
-
-1. **Catalog fetch.** `fetchRemoteTaxPackCatalog()` pages the GitHub Releases API for
-   `FreeOpenSourcePOS/FloCafe-Plugins`, 100 per page, at most `MAX_RELEASE_PAGES` (10) pages. A
-   request that exceeds `MAX_CATALOG_BYTES` (1,000,000) is rejected.
-2. **Release filter.** Draft releases are skipped, and a release is considered only when its tag
-   matches `^tax-pack-[a-z0-9][a-z0-9-]*-v\d+\.\d+\.\d+$`. A `catalog.json` asset is then located
-   on that release.
-3. **Download URL guard.** `trustedReleaseDownloadUrl()` accepts a URL only when the protocol is
-   `https`, the host is exactly `github.com`, there are no embedded credentials, and the path
-   starts with `/FreeOpenSourcePOS/FloCafe-Plugins/releases/download/`.
-4. **Size caps.** The pack artifact is capped at `MAX_PACK_BYTES` (2,000,000) and the detached
-   signature at `MAX_SIGNATURE_BYTES` (4,096).
-5. **Digest.** The SHA-256 of the pack JSON must equal the catalog entry's `digest`.
-6. **Signature.** The detached signature must verify as Ed25519 against
-   `TRUSTED_TAX_PACK_SIGNING_PUBLIC_KEY`.
-7. **Identity cross-check.** If a pack with that id is already installed, its `publisher`,
-   `country`, and `jurisdiction` must match the downloaded artifact, or install fails with HTTP
-   409. Installing the same id and version twice also fails with HTTP 409.
-8. **Local publisher rejection.** A downloaded artifact claiming `publisher: 'local'` is refused.
-9. **Staging.** The pack, its rules, and its print templates are written to the version, its rules,
-   and `installed_print_templates` tables, with a `status` of `installed` rather than `active`.
-10. **Activation.** Activation runs the 26 checks in
-    [taxation](../architecture/taxation.md#activation-checks) and then switches the pack's
-    `active_version_id`, flipping the version and its template rows to `active`.
-
-A catalog request uses a 15 second timeout and honours an abort signal.
-
-## Trust
-
-`publisher: 'local'` is reserved for packs the app synthesizes, which today means only manual tax
-configuration. A local pack must carry no signature. The catalog path refuses a downloaded artifact
-that claims to be local, so local status cannot be used to skip signing.
-
-`sourceType: 'community'` marks a pack as built from public information rather than an official
-source. It requires merchant acknowledgement of a disclaimer, and a local or manual pack may never
-declare it.
-
-The Singapore community profile in
-[`main/tax-packs/community-singapore.json`](../../main/tax-packs/community-singapore.json) applies
-9% GST from 2024-01-01 to standard-rated restaurant products, packaging, delivery, service charges,
-add-ons, and unclassified lines. Its default pricing behavior is GST-inclusive. Activation does not
-verify GST registration with IRAS; only GST-registered businesses charge GST. The registration field
-accepts UENs and IRAS-issued GST registration numbers, which may be separate from a UEN. Its format
-check validates syntax only, not registration status.
-
-Hotels and food-and-beverage establishments that impose a genuine service charge may display
-GST-exclusive prices for goods and services subject to that charge, with a prominent notice. The
-service charge remains part of the amount on which GST is calculated. The community profile does
-not model the price-display concession, rate-change transition rules, or exempt and zero-rated
-supplies. It rounds document GST to cents using half-up rounding. See IRAS guidance on the
-[prevailing 9% rate](https://www.iras.gov.sg/taxes/goods-services-tax-%28gst%29/charging-gst-%28output-tax%29/when-to-charge-goods-and-services-tax-%28gst%29/prevailing-rate-of-9),
-[hotel and F&B treatment](https://www.iras.gov.sg/taxes/goods-services-tax-%28gst%29/specific-business-sectors/hotel-and-food-beverage),
-and [GST registration numbers on invoices](https://www.iras.gov.sg/taxes/goods-services-tax-%28gst%29/basics-of-gst/invoicing-price-display-and-record-keeping/invoicing-customers).
-
-A JSON source file in FloCafe does not make a pack bundled or available in the public catalog. The
-catalog contains only signed releases that have been published in FloCafe-Plugins.
-
-There is one trusted signing public key, in
-[`main/tax-packs/trusted-signing-key.ts`](../../main/tax-packs/trusted-signing-key.ts).
-
-`LEGACY_TRUSTED_PACK_DIGESTS` in `main/routes/tax-packs.ts` pins four SHA-256 digests of
-pre-signing artifacts, for `official-india`, `official-thailand`, `official-in`, and
-`official-th`. An unsigned artifact matching one of them is accepted. This is a compatibility
-exception pinned by `tests/legacy-tax-pack-digest.test.ts`, not a way to publish a new unsigned
-pack.
+The only other packs are the ones the owner creates in Settings through the manual tax
+configuration (below). A locally built pack still passes the same activation validation
+(`validationChecklist` in `main/routes/tax-packs.ts`) before it can become active, and the
+engine calculates from it exactly like any other pack.
 
 ## Manual tax configuration
 
-`buildManualPack()` in `main/routes/tax-packs.ts` turns settings-entered tax configuration into a
-`CountryPack` with `publisher: 'local'`, id `manual-<country>`, and jurisdiction `*`. It installs
-through the same path and is calculated by the same `TaxEngine.calculate()`, so there is no second
-calculation path. `POST /manual-config` is owner-only.
+`buildManualPack()` in `main/routes/tax-packs.ts` turns settings-entered tax configuration into
+a `CountryPack` with `publisher: 'local'`, id `manual-<key>`, and jurisdiction `*`. It is
+validated and activated locally and is calculated by the same `TaxEngine.calculate()`, so there
+is no second calculation path. `POST /manual-config` requires the `tax-packs.manage`
+permission.
 
 ## Verification
 
 ```sh
 npm run test:tax-pack-catalog
-npm run test:tax-pack-management
 npm run test:manual-tax-config
-npm run test:legacy-tax-pack-digest
-npm run test:community-tax-packs
+npm run test:tax-engine
 ```

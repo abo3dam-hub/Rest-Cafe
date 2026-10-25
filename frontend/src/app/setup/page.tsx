@@ -17,7 +17,6 @@ import {
   Cloud,
   Database,
   KeyRound,
-  Search,
   Sparkles,
   UtensilsCrossed,
   Eye,
@@ -136,7 +135,7 @@ export default function SetupPage() {
   const tAnalytics = useTranslations('productAnalytics');
   const tSettings = useTranslations('settings');
   const locale = useLocale();
-  const [mounted, setMounted] = useState(false);
+  const [, setMounted] = useState(false);
 
   // Country labels are generated from CLDR data, which can differ between the server
   // and the browser even within the same locale. Keep the first paint deterministic

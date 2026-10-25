@@ -29,7 +29,7 @@ import { useHeldOrdersStore } from '@/store/held-orders';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/store/cart';
 import { usePosSettingsStore } from '@/store/pos-settings';
-import { useTranslations, useLocale, type AppConfig } from 'use-intl';
+import { useTranslations, type AppConfig } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatDate } from '@/hooks/useFormatDate';
 import {
@@ -163,7 +163,6 @@ export default function OrdersPage() {
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
   const { formatTime } = useFormatDate();
-  const locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewingBillId, setPreviewingBillId] = useState<number | null>(null);

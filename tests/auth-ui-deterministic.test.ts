@@ -89,9 +89,9 @@ async function run() {
     'tables-only staff land on Tables',
   );
   assert.equal(
-    getLandingPage(tenantWith('whatsapp.use')),
-    '/whatsapp',
-    'WhatsApp-only staff land on WhatsApp',
+    getLandingPage(tenantWith('support.use')),
+    '/support',
+    'support-only staff land on Support',
   );
   assert.equal(
     getLandingPage(tenantWith('unknown.permission')),

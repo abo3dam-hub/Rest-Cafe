@@ -84,6 +84,7 @@ Four things do not use it, and a new screen has to notice which kind it is:
 | --- | --- |
 | [`kds-standalone/page.tsx`](../../frontend/src/app/kds-standalone/page.tsx) | builds its own axios instance on its own origin, because it runs on the `:3002` base port rather than the POS window's `:3001`, and on a `401` clears the token and reloads instead of redirecting |
 | [`server-standalone/page.tsx`](../../frontend/src/app/server-standalone/page.tsx) | the same, against the filtered `:3003` proxy |
+| [`self-order/page.tsx`](../../frontend/src/app/self-order/page.tsx) | bare `fetch` on its own `:3003` origin with the per-table token as a query parameter, because the customer device has no session |
 | [`i18n/server-language.ts`](../../frontend/src/lib/i18n/server-language.ts) | bare `fetch`, because it reads the tenant's language before a session exists |
 | the KDS live feed | a WebSocket, described below |
 
@@ -309,9 +310,11 @@ Route gating lives in `AuthGuard`:
   aggregates several permissions. Adding a route means adding it to one of those three; a route in
   none of them is behind authentication and nothing else.
 - `PUBLIC_PATHS` holds the unauthenticated surfaces: `/kds`, `/kds-standalone`,
-  `/server-standalone`, `/customer-display`, `/auth/login`, `/auth/register`, `/auth/recover`, and
-  `/setup`. The standalone KDS, Server App, and paired customer display pages run their own session
-  and skip the shared auth store, so loading it there would clear their token.
+  `/server-standalone`, `/customer-display`, `/self-order`, `/auth/login`, `/auth/register`,
+  `/auth/recover`, and `/setup`. The standalone KDS, Server App, and paired customer display pages
+  run their own session and skip the shared auth store, so loading it there would clear their
+  token. The customer self-order page has no session at all: it authenticates per request with
+  the per-table token in its URL and talks only to the Server App's `/api/self-order/*` routes.
 - Once a user and tenant are resolved, the guard refreshes the auth context on window focus, every
   30 seconds, and on `flo:authorization-denied`.
 

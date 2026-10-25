@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, LifeBuoy, MessageCircle, Ticket } from 'lucide-react';
+import { Eye, EyeOff, LifeBuoy, Ticket } from 'lucide-react';
 import { ROLE_LABEL_KEYS } from '@/lib/i18n-enums';
 import {
   SupportTicketForm,

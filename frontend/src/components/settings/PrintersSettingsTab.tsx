@@ -15,7 +15,6 @@ import {
   Settings,
   Trash2,
   AlertTriangle,
-  Share2,
   FileText,
 } from 'lucide-react';
 import { useTranslations, type AppConfig } from 'use-intl';

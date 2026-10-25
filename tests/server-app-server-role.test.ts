@@ -116,12 +116,17 @@ async function main() {
   try {
     setSetting('country', '');
     const unconfiguredInfo = await getJson(baseUrl, '/api/server-app/info');
+    // Rest&Cafe has no country profiles: a store without a country gets the
+    // generic snapshot (SYP, whole amounts, Latin digits) instead of a 409.
     assert.equal(
       unconfiguredInfo.status,
-      409,
-      'Server App refuses to format regional values before a country is configured',
+      200,
+      'Server App serves the generic regional snapshot when no country is configured',
     );
-    assert.equal(unconfiguredInfo.body.error, 'regional_not_configured');
+    assert.equal(unconfiguredInfo.body.country, '');
+    assert.equal(unconfiguredInfo.body.currency, 'SYP');
+    assert.equal(unconfiguredInfo.body.currency_position, 'suffix');
+    assert.equal(unconfiguredInfo.body.currency_fraction_digits, 0);
 
     setSetting('country', 'CO');
     setSetting('currency', 'COP');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Building2, Hash, CreditCard, Lock, Upload, Trash2 } from 'lucide-react';
 import { useTranslations, useLocale } from 'use-intl';
 import { processReceiptLogoFile } from '@/lib/printer/logo-processor';

@@ -150,16 +150,6 @@ Module._load = function (request: string, parent: unknown, isMain: boolean) {
       applySafeFixes: () => ({ applied: ['fix1'], skipped: [], errors: [] }),
     };
   }
-  if (request === './services/whatsapp') {
-    return {
-      getStatus: () => ({ connected: false, qrCode: null }),
-      sanitizeLogText: (error: unknown) =>
-        (error instanceof Error ? error.message : String(error)).replace(
-          /https?:\/\/\S+/gi,
-          '[redacted-url]',
-        ),
-    };
-  }
   return originalLoad.apply(this, arguments as any);
 };
 
@@ -271,8 +261,6 @@ async function run(): Promise<void> {
     { channel: 'master-pin-status', args: [] },
     { channel: 'get-settings', args: [] },
     { channel: 'set-setting', args: ['theme_mode', 'dark'] },
-    { channel: 'whatsapp-get-status', args: [] },
-    { channel: 'whatsapp-open-share', args: ['https://wa.me/15555550100?text=test'] },
     { channel: 'get-kds-info', args: [] },
     { channel: 'open-kds-window', args: [] },
     { channel: 'get-app-info', args: [] },
@@ -368,30 +356,6 @@ async function run(): Promise<void> {
 
     log(`  ✓ ${channel}: successfully blocks untrusted senders and admits trusted origins`);
   }
-
-  const openShareListener = registered.get('whatsapp-open-share')!;
-  const invalidShareRes = await openShareListener(trustedLocalhost, 'https://example.com/');
-  assert.deepEqual(
-    invalidShareRes,
-    { success: false, error: 'Invalid WhatsApp share URL' },
-    'WhatsApp opener rejects non-wa.me URLs',
-  );
-  failExternalOpen = true;
-  const failedShareRes = await openShareListener(
-    trustedLocalhost,
-    'https://wa.me/15555550100?text=test',
-  );
-  assert.deepEqual(
-    failedShareRes,
-    { success: false, error: 'Failed to open WhatsApp' },
-    'WhatsApp opener reports shell failure',
-  );
-  failExternalOpen = false;
-  const successfulShareRes = await openShareListener(
-    trustedLocalhost,
-    'https://wa.me/15555550100?text=test',
-  );
-  assert.deepEqual(successfulShareRes, { success: true }, 'WhatsApp opener reports shell success');
 
   // 2. PIN-gated handlers enforce master PIN
   log('\n[Phase 2] Verifying PIN-gated handlers require authorization...');

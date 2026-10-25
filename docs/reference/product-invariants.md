@@ -199,7 +199,7 @@ rule is minor units, not cents.
 
 The tenant's business currency is chosen at setup and governs store-wide order, billing, and
 settlement records. It is not changed on an active store; see
-[regional settings](#regional-settings-come-from-signup-never-from-a-fallback).
+[regional settings](#regional-settings-are-the-stores-own-plain-settings-restcafe).
 
 **Reason:** A controlled way to reverse completed sales without reopening the order-editing
 surface, while keeping the two things most exposed to misuse deliberately tight: how far back a
@@ -258,15 +258,18 @@ actual currency change with `currency_change_requires_reset`.
  country tax packs, and any flow that requires a country before the store
  can operate.
 
-
-**Enforced by:** `resolveRegionalSnapshot()` in `main/countries.ts`, the first-run wizard requiring
-a country, setup rejecting a missing country, `seedInstallDefaults()` in `main/db.ts` not writing
-regional keys, and `POST /api/db-tools/currency-reset` as the only post-setup currency-change path.
+**Enforced by:** `resolveRegionalSnapshot()` / `resolveGenericSnapshot()` in `main/countries.ts`;
+the first-run wizard collects currency and timezone only (there is no country field, and
+`POST /api/auth/setup` ignores any country in the payload, seeding the `SYP` / `SP` /
+`Asia/Damascus` defaults); Settings stores `currency_symbol` verbatim as the owner's unit; and
+`POST /api/db-tools/currency-reset` as the only post-setup currency-change path.
 
 **How to verify:**
 
 ```sh
 npm run test:currency
+npm run test:manual-tax-config
+npm run test:first-run
 ```
 
 The compliance grep must return nothing except two annotated one-time migration exceptions:
@@ -284,6 +287,37 @@ other match is a reintroduced fallback and should be treated as a bug.
 **Change policy:** the no-default-country rule and the derived-value model are structural. Adding a
 per-store override or a fallback path requires a product decision, because it reintroduces the
 silent disagreement the rule exists to prevent.
+
+---
+
+## Customer self-ordering stays inside the staff order pipeline (Rest&Cafe)
+
+**Rule:** Customers order from a per-table QR code served by the Server App
+(`/self-order?t=<token>`). The token is an HMAC of the table id and a per-table salt under a
+store secret, all kept in settings; the owner enables the feature and regenerates codes under
+Settings → Server App. A self-order is an ordinary dine-in order on that table, created through
+the staff orders API — audit-attributed to the owner account by a short-lived JWT the Server App
+mints per request — marked `online_platform = 'self_order'`, and it fires the same KDS
+notification and kitchen-ticket print as a waiter order.
+
+**The customer's payload is never trusted for money.** The Server App rebuilds the cart from the
+database before forwarding: products, variants and add-ons must exist and be active, add-on names
+and prices are re-read from the database (payload-priced add-ons are a staff-client contract, not
+a customer one), the table and order type are forced from the token, and price overrides,
+discounts and charges cannot be expressed. While the feature is disabled the routes return 404.
+
+**What this rules out:** a parallel customer order store or totals path, customer-chosen prices,
+and sharing a staff login with customers.
+
+**Enforced by:** `main/services/self-order.ts` (`resolveSelfOrderTable`,
+`sanitizeSelfOrderItems`, `mintSelfOrderActorToken`), the `/api/self-order/*` routes in
+`main/server-app.ts`, and the owner controls in `main/routes/self-order-admin.ts`.
+
+**How to verify:**
+
+```sh
+npm run test:self-order
+```
 
 ---
 

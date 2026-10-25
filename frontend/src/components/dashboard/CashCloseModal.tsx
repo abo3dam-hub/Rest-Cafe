@@ -27,7 +27,6 @@ import {
   ChevronDown,
   FileSpreadsheet,
   FileText,
-  MessageCircle,
 } from 'lucide-react';
 import type { CashCloseModel } from '@/hooks/useCashClose';
 import {
@@ -79,7 +78,6 @@ export function CashCloseModal({ model }: { model: CashCloseModel }) {
     todayLocal,
     submitClose,
     printZ,
-    canViewSettings,
   } = model;
   const tPos = useTranslations('pos');
   const blockingOpenShift = xReport?.blockingOpenShift ?? null;

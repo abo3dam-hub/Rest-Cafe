@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
-  Download,
   History,
   Lock,
   Plus,
@@ -106,18 +105,6 @@ type PackDetail = {
   rules: TaxRule[];
   overrides: TaxOverride[];
   targets: { products: OverrideTarget[]; addons: OverrideTarget[] };
-};
-
-type TaxPackUpdate = {
-  // The catalog's current id — pass this to catalog/install.
-  packId: string;
-  // The id actually installed for this store (may predate a catalog rename).
-  installedPackId: string;
-  country: string;
-  publisher: string;
-  currentVersion: string;
-  latestVersion: string;
-  entry: { version: string; publishedAt: string; minFloVersion: string };
 };
 
 type AuditRow = {

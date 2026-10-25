@@ -5,9 +5,7 @@ jurisdiction's categories and rules; the engine decides what a transaction owes.
 per-jurisdiction code path, and the host never executes pack content. The reasoning behind that
 split is in [0004: data-only tax packs](../decisions/0004-data-only-tax-packs.md).
 
-The pack schema, the trust model, and the install mechanics are in the
-[tax pack reference](../reference/tax-packs.md). How to author one is in
-[adding a tax pack](../guides/adding-a-tax-pack.md).
+The pack schema is in the [tax pack reference](../reference/tax-packs.md).
 
 ## One calculation path
 
