@@ -250,7 +250,7 @@ rule=32 maxFontA=32 max=36
 029 00A ||
 030 00A ||
 031 28A |   Thank you for your visit!|
-032 36  |      Powered by FloPOS (flopos.com)|
+032 36  |      Powered by Ali.J|
 033 00A ||
 034 00A ||
 035 00A ||
@@ -286,7 +286,7 @@ rule=42 maxFontA=42 max=43
 027 00A ||
 028 00A ||
 029 33A |        Thank you for your visit!|
-030 43  |             Powered by FloPOS (flopos.com)|
+030 43  |             Powered by Ali.j|
 031 00A ||
 032 00A ||
 033 00A ||
@@ -317,7 +317,7 @@ rule=32 maxFontA=32 max=42
 022 32A |Card                    Rs517.00|
 023 00A ||
 024 21A |           Thank you!|
-025 36  |      Powered by FloPOS (flopos.com)|
+025 36  |      Powered by Ali.j|
 026 00A ||
 027 00A ||
 028 00A ||
@@ -348,7 +348,7 @@ rule=42 maxFontA=42 max=56
 022 42A |Card                              Rs517.00|
 023 00A ||
 024 26A |                Thank you!|
-025 43  |             Powered by FloPOS (flopos.com)|
+025 43  |             Powered by Ali.J|
 026 00A ||
 027 00A ||
 028 00A ||
