@@ -38,6 +38,7 @@ const PUBLIC_PATHS = [
   '/kds-standalone',
   '/server-standalone',
   '/customer-display',
+  '/self-order',
   '/auth/login',
   '/auth/register',
   '/auth/recover',
@@ -75,6 +76,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const isStandalonePath =
     pathname?.startsWith('/kds') ||
     pathname?.startsWith('/server-standalone') ||
+    pathname?.startsWith('/self-order') ||
     pathname === '/customer-display' ||
     pathname?.startsWith('/customer-display/');
 

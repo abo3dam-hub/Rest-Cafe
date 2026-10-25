@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { usePosSettingsStore, type BillTemplate } from '@/store/pos-settings';
@@ -10,6 +9,7 @@ import { useOrdersLayoutPreference } from '@/hooks/useOrdersLayout';
 import { usePosSortPreference } from '@/hooks/usePosSort';
 import { POS_CATEGORY_SORTS, POS_ITEM_SORTS } from '@/lib/pos-sort';
 import { CustomerDisplayCard } from '@/components/settings/CustomerDisplayCard';
+import SelfOrderSettingsCard from '@/components/settings/SelfOrderSettingsCard';
 import type {
   KotLanguagePolicy,
   PrimaryLanguageSelection,
@@ -5177,6 +5177,8 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
+
+              <SelfOrderSettingsCard />
             </SettingsTabShell>
           </TabsContent>
 

@@ -18,9 +18,19 @@ import {
   createDatabaseMaintenanceHandoff,
   databaseMaintenanceMiddleware,
   getDatabase,
+  getSettingValue,
   isServerAppEnabled,
   revokeDatabaseMaintenanceHandoff,
 } from './db';
+import { resolveBrandLogo } from './branding';
+import {
+  SELF_ORDER_PLATFORM,
+  isSelfOrderEnabled,
+  mintSelfOrderActorToken,
+  resolveSelfOrderTable,
+  sanitizeSelfOrderItems,
+  type SelfOrderTable,
+} from './services/self-order';
 import { getJWTSecret } from './security/jwt-secret';
 import {
   authRateLimit,
@@ -434,6 +444,200 @@ export function startServerApp(): Promise<void> {
     );
     app.post('/api/printers/print-bill', printForwardRateLimit, requireServerAppAuth, (req, res) =>
       forwardToMainApi(req, res, '/printers/print-bill'),
+    );
+
+    // ── Customer self-ordering ─────────────────────────────────────────────
+    // Token-authenticated (per-table QR code), no staff login. Reads and the
+    // order itself are forwarded to the main API under a minted owner token;
+    // the customer's device only ever sees these four routes.
+    const selfOrderReadRateLimit = expressRateLimit({
+      windowMs: 60 * 1000,
+      limit: 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    const selfOrderSubmitRateLimit = expressRateLimit({
+      windowMs: 60 * 1000,
+      limit: 20,
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+
+    const selfOrderTable = (req: Request, res: Response): SelfOrderTable | null => {
+      if (!isServerAppEnabled() || !isSelfOrderEnabled()) {
+        res.status(404).json({ error: 'Not found' });
+        return null;
+      }
+      const headerToken = req.get('x-self-order-token');
+      const token = (typeof req.query.t === 'string' ? req.query.t : '') || headerToken || '';
+      const table = resolveSelfOrderTable(token);
+      if (!table) {
+        res
+          .status(401)
+          .json({ error: 'This QR code is no longer valid. Please ask a member of staff.' });
+        return null;
+      }
+      return table;
+    };
+
+    const forwardJson = async (
+      req: Request,
+      targetPath: string,
+      options: { actor: string; method?: string; body?: unknown; idempotencyKey?: string },
+    ): Promise<{ status: number; data: unknown }> => {
+      const [pathname, search = ''] = targetPath.split('?');
+      const target = new URL(`/api${pathname}`, `http://127.0.0.1:${getServerPort()}`);
+      for (const [key, value] of new URLSearchParams(search)) target.searchParams.set(key, value);
+      const reservation = (req as any).databaseAdmissionReservation as
+        | DatabaseAdmissionReservation
+        | undefined;
+      const handoffToken = reservation ? createDatabaseMaintenanceHandoff(reservation) : undefined;
+      try {
+        const upstream = await fetch(target, {
+          method: options.method || 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${options.actor}`,
+            ...(options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : {}),
+            ...(handoffToken ? { 'x-flo-maintenance-handoff': handoffToken } : {}),
+          },
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          signal: getHttpRequestSignal(req),
+        });
+        const text = await upstream.text();
+        let data: unknown = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { error: 'Unexpected response from the local POS API' };
+        }
+        return { status: upstream.status, data };
+      } catch (error: any) {
+        if (getHttpRequestSignal(req)?.aborted)
+          return { status: 503, data: { error: 'Request cancelled' } };
+        console.error('[Server App] Self-order forward failed:', error);
+        return { status: 502, data: { error: 'Could not reach the local POS API' } };
+      } finally {
+        if (handoffToken) revokeDatabaseMaintenanceHandoff(handoffToken);
+      }
+    };
+
+    const selfOrderActor = (res: Response): string | null => {
+      const actor = mintSelfOrderActorToken();
+      if (!actor) {
+        res.status(503).json({ error: 'Self-ordering is not available right now' });
+        return null;
+      }
+      return actor;
+    };
+
+    app.get('/api/self-order/info', selfOrderReadRateLimit, (req: Request, res: Response) => {
+      const table = selfOrderTable(req, res);
+      if (!table) return;
+      const rows = getDatabase().prepare('SELECT key, value FROM settings').all() as {
+        key: string;
+        value: string;
+      }[];
+      const settings: Record<string, string> = {};
+      for (const row of rows) settings[row.key] = row.value;
+      let snapshot;
+      try {
+        snapshot = resolveRegionalSnapshot(settings);
+      } catch (error) {
+        if (error instanceof RegionalNotConfiguredError)
+          return res.status(409).json({ error: 'regional_not_configured' });
+        throw error;
+      }
+      res.json({
+        business_name: settings.business_name || 'Rest&Cafe',
+        logo: resolveBrandLogo(settings.receipt_logo),
+        language: settings.language || null,
+        table: { id: table.id, number: table.number },
+        currency: snapshot.currency,
+        currency_symbol: snapshot.currencySymbol,
+        currency_position: snapshot.currencyPosition,
+        currency_fraction_digits: snapshot.currencyFractionDigits,
+      });
+    });
+
+    app.get(
+      '/api/self-order/categories',
+      selfOrderReadRateLimit,
+      async (req: Request, res: Response) => {
+        if (!selfOrderTable(req, res)) return;
+        const actor = selfOrderActor(res);
+        if (!actor) return;
+        const result = await forwardJson(req, '/categories?active=true', { actor });
+        res.status(result.status).json(result.data);
+      },
+    );
+
+    app.get(
+      '/api/self-order/products',
+      selfOrderReadRateLimit,
+      async (req: Request, res: Response) => {
+        if (!selfOrderTable(req, res)) return;
+        const actor = selfOrderActor(res);
+        if (!actor) return;
+        const result = await forwardJson(req, '/products?active=true', { actor });
+        res.status(result.status).json(result.data);
+      },
+    );
+
+    app.post(
+      '/api/self-order/orders',
+      selfOrderSubmitRateLimit,
+      async (req: Request, res: Response) => {
+        const table = selfOrderTable(req, res);
+        if (!table) return;
+        const actor = selfOrderActor(res);
+        if (!actor) return;
+
+        const sanitized = sanitizeSelfOrderItems(getDatabase(), req.body?.items);
+        if ('error' in sanitized) return res.status(400).json({ error: sanitized.error });
+
+        const customerName =
+          typeof req.body?.customer_name === 'string'
+            ? req.body.customer_name.trim().slice(0, 60)
+            : '';
+        const notes =
+          typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 300) : '';
+        const specialInstructions =
+          [customerName ? `Customer: ${customerName}` : '', notes].filter(Boolean).join(' — ') ||
+          undefined;
+        const clientKey = req.get('Idempotency-Key');
+        const idempotencyKey =
+          clientKey && /^[A-Za-z0-9-]{8,80}$/.test(clientKey)
+            ? clientKey
+            : `self-order-${randomUUID()}`;
+
+        const created = await forwardJson(req, '/orders', {
+          actor,
+          method: 'POST',
+          idempotencyKey,
+          body: {
+            table_id: table.id,
+            type: 'dine_in',
+            online_platform: SELF_ORDER_PLATFORM,
+            ...(specialInstructions ? { special_instructions: specialInstructions } : {}),
+            items: sanitized.items,
+          },
+        });
+
+        if (created.status >= 200 && created.status < 300) {
+          const orderId = (created.data as any)?.order?.id;
+          if (orderId) {
+            // Kitchen ticket, mirroring the waiter app. Best-effort: the order
+            // already stands if printing is off or no printer is configured.
+            void forwardJson(req, '/printers/print-kot', {
+              actor,
+              method: 'POST',
+              body: { orderId },
+            }).catch(() => undefined);
+          }
+        }
+        res.status(created.status).json(created.data);
+      },
     );
 
     const staticDir = getStaticDir();
