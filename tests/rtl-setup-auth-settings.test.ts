@@ -506,7 +506,7 @@ async function run(): Promise<void> {
   const tUr = createTranslator({ locale: 'ur-PK', messages: i18nModule.getCachedMessages('ur') });
   const tEn = createTranslator({ locale: 'en', messages: i18nModule.getCachedMessages('en') });
   assert(
-    tUr('setup.welcome') === 'FloCafe میں خوش آمدید',
+    tUr('setup.welcome') === 'Rest&Cafe میں خوش آمدید',
     'Urdu setup welcome message is localized',
   );
   assert(tFa('setup.languagePersian') === 'فارسی', 'setup.languagePersian in fa must be فارسی');

@@ -42,7 +42,7 @@ rule=32 maxFontA=32 max=32
 031 18A |GSTIN: GSTIN123456|
 032 00A ||
 033 00A ||
-034 30  |Powered by FloPOS (flopos.com)|
+034 20  |Powered by Rest&Cafe|
 === backend classic 42 columns ===
 rule=42 maxFontA=42 max=42
 001 30  |Flo Parity Cafe|
@@ -76,7 +76,7 @@ rule=42 maxFontA=42 max=42
 029 18A |GSTIN: GSTIN123456|
 030 00A ||
 031 00A ||
-032 30  |Powered by FloPOS (flopos.com)|
+032 20  |Powered by Rest&Cafe|
 === backend classic 48 columns ===
 rule=48 maxFontA=48 max=48
 001 30  |Flo Parity Cafe|
@@ -108,7 +108,7 @@ rule=48 maxFontA=48 max=48
 027 18A |GSTIN: GSTIN123456|
 028 00A ||
 029 00A ||
-030 30  |Powered by FloPOS (flopos.com)|
+030 20  |Powered by Rest&Cafe|
 === backend compact 32 columns ===
 rule=32 maxFontA=32 max=32
 001 15A |Flo Parity Cafe|
@@ -146,7 +146,7 @@ rule=32 maxFontA=32 max=32
 033 10A |Thank you!|
 034 00A ||
 035 00A ||
-036 30  |Powered by FloPOS (flopos.com)|
+036 20  |Powered by Rest&Cafe|
 === backend compact 42 columns ===
 rule=42 maxFontA=42 max=42
 001 15A |Flo Parity Cafe|
@@ -182,7 +182,7 @@ rule=42 maxFontA=42 max=42
 031 10A |Thank you!|
 032 00A ||
 033 00A ||
-034 30  |Powered by FloPOS (flopos.com)|
+034 20  |Powered by Rest&Cafe|
 === backend compact 48 columns ===
 rule=48 maxFontA=48 max=48
 001 15A |Flo Parity Cafe|
@@ -216,7 +216,7 @@ rule=48 maxFontA=48 max=48
 029 10A |Thank you!|
 030 00A ||
 031 00A ||
-032 30  |Powered by FloPOS (flopos.com)|
+032 20  |Powered by Rest&Cafe|
 === frontend classic 58mm ===
 rule=32 maxFontA=32 max=36
 001 31  | Flo Parity Cafe|
