@@ -1,0 +1,68 @@
+name: Build Windows Installer
+
+# Rest&Cafe phase 1 distribution is fully manual: a maintainer runs this
+# workflow, downloads the installer artifact, tests it, and ships it.
+# There is no auto-update channel and nothing is published automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Optional build note (for the run summary)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Windows NSIS installer (x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend and backend
+        run: |
+          npm run build:frontend
+          npm run build
+
+      - name: Package Windows installer (unsigned, phase 1)
+        run: npx electron-builder --win nsis --x64 --publish never --config.npmRebuild=false
+
+      - name: Verify installer artifact
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path release -Filter *.exe | Where-Object { $_.Name -notlike '*__uninstaller*' } | Select-Object -First 1
+          if (-not $exe) { Write-Error 'No installer .exe produced in release/'; exit 1 }
+          Write-Host "Installer: $($exe.Name) ($([math]::Round($exe.Length / 1MB, 1)) MB)"
+          "INSTALLER_NAME=$($exe.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rest-cafe-windows-installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Run summary
+        if: always()
+        run: |
+          echo "## Rest&Cafe Windows build" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Installer: ${env:INSTALLER_NAME}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Note: ${{ inputs.note }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Unsigned phase-1 build: Windows SmartScreen will warn on first run (More info -> Run anyway)." >> $env:GITHUB_STEP_SUMMARY
