@@ -357,10 +357,9 @@ does not establish **who is signed in**, and the single POS window serves every 
 owner. Everything else in this section follows from that gap.
 
 Registering a privileged channel with a bare `ipcMain.handle` skips the check. All privileged
-channels in [`main/ipc.ts`](../../main/ipc.ts) go through the `handle` wrapper, and direct update
-and status handlers in [`main/update-ipc.ts`](../../main/update-ipc.ts) go through
-`registerDirectUpdateIpcHandlers`, both using `isTrustedMainWindowSender`; any new channel must
-enforce sender validation.
+channels in [`main/ipc.ts`](../../main/ipc.ts) go through the `handle` wrapper, and the status
+and theme handlers registered directly in [`main/index.ts`](../../main/index.ts) check
+`isTrustedMainWindowSender` inline; any new channel must enforce sender validation.
 
 ### What the settings channel may write
 

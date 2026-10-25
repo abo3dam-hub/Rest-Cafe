@@ -98,7 +98,6 @@ metadata. Do not move them without a coordinated change to those references.
 | Page | Audience |
 | --- | --- |
 | [printers.md](printers.md) | Merchants and support: connecting a printer and diagnosing the queue. |
-| [google-drive-setup.md](google-drive-setup.md) | Maintainers: provisioning the optional Drive backup OAuth client. |
 
 ## Other repository assets
 

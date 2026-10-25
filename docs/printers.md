@@ -180,19 +180,11 @@ processors or reject raw byte streams. If prints fail or come out garbled:
 3. Re-select the printer in FloCafe's printer settings, because renaming or reinstalling changes
    the stored queue identifier.
 
-### macOS and Linux CUPS printers
-
-- If a printer was unplugged, the CUPS print queue may be in a disabled or paused state. Re-enable
-  the queue in your operating system printer settings; FloCafe resumes sending print jobs once the
-  queue is active.
-- For Linux USB permissions, ensure your user account is in the `lp` group. See
-  [Linux installation and support](linux.md#printing).
-
 ### Bluetooth and OS-paired printers
 
 FloCafe does not manage standalone Bluetooth RFCOMM transport or discovery. To use a Bluetooth
 receipt printer, pair the device in your operating system so it registers as an active printer queue
-through CUPS on macOS and Linux, or the Windows Print Spooler. FloCafe detects and dispatches print
+through the Windows Print Spooler. Rest&Cafe detects and dispatches print
 jobs through that OS-managed queue.
 
 ### WebUSB printers
