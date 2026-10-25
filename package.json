@@ -1,7 +1,7 @@
 {
   "name": "rest-cafe-desktop",
   "version": "1.0.0",
-  "description": "Rest&Cafe - offline-first restaurant POS by Ali Coding. Based on FloCafe (MIT).",
+  "description": "Rest&Cafe - offline-first restaurant POS by Ali Coding.",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -302,13 +302,13 @@
   "author": {
     "name": "Ali Coding"
   },
-  "homepage": "https://flopos.com",
+  "homepage": "https://Ali-coding.pages.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FreeOpenSourcePOS/FloCafe.git"
+    "url": "https://Ali-coding.pages.dev"
   },
   "bugs": {
-    "url": "https://github.com/FreeOpenSourcePOS/FloCafe/issues"
+    "url": "https://Ali-coding.pages.dev"
   },
   "license": "MIT",
   "overrides": {
