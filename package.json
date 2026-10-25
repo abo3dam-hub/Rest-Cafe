@@ -31,7 +31,7 @@
     "showcase:record": "node scripts/demo/record-showcase.cjs",
     "showcase:verify": "node scripts/demo/verify-showcase.cjs",
     "build:all-platforms": "npm run build:frontend && npm run build && electron-builder --win --mac --linux",
-    "postinstall": "install-electron && electron-builder install-app-deps && npm run verify:electron && node scripts/prepare-snap-build.cjs",
+    "postinstall": "install-electron && electron-builder install-app-deps && npm run verify:electron",
     "prepare": "node .husky/install.mjs",
     "verify:electron": "node scripts/verify-electron-runtime.cjs",
     "verify:release-artifacts": "node scripts/assert-release-artifact-names.cjs",
@@ -412,8 +412,6 @@
       "node_modules/**/*",
       "!**/better-sqlite3/build/Release/test_extension.node"
     ],
-    "detectUpdateChannel": false,
-    "generateUpdatesFilesForAllChannels": true,
     "extraResources": [
       {
         "from": "assets",
@@ -435,154 +433,6 @@
       ],
       "icon": "assets/icon.ico",
       "artifactName": "rest-cafe-${version}-win-${arch}.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.icns",
-      "category": "public.app-category.business",
-      "identity": "Codify Apps Private Limited (BKDY677XJA)",
-      "entitlements": "build/entitlements.plist",
-      "entitlementsInherit": "build/entitlements.plist",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "notarize": true,
-      "artifactName": "rest-cafe-${version}-mac-${arch}.${ext}",
-      "extendInfo": {
-        "NSLocalNetworkUsageDescription": "Flo Cafe connects to thermal printers, KDS displays, and the Waiter & Table Terminal on your local network.",
-        "NSBonjourServices": [
-          "_http._tcp"
-        ]
-      }
-    },
-    "mas": {
-      "category": "public.app-category.business",
-      "identity": "Codify Apps Private Limited (BKDY677XJA)",
-      "entitlements": "build/entitlements.mas.plist",
-      "entitlementsInherit": "build/entitlements.mas.inherit.plist",
-      "entitlementsLoginHelper": "build/entitlements.mas.loginhelper.plist",
-      "provisioningProfile": "build/flo.provisionprofile",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
-      "type": "distribution",
-      "extendInfo": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSLocalNetworkUsageDescription": "Flo Cafe connects to thermal printers, KDS displays, and the Waiter & Table Terminal on your local network.",
-        "NSBonjourServices": [
-          "_http._tcp"
-        ]
-      },
-      "target": [
-        {
-          "target": "mas",
-          "arch": "universal"
-        }
-      ],
-      "x64ArchFiles": "**/*.node"
-    },
-    "masDev": {
-      "identity": "Apple Development: Codify Apps Private Limited (BKDY677XJA)"
-    },
-    "linux": {
-      "synopsis": "Self-hosted Point of Sale for cafes and restaurants",
-      "description": "Flo is a free, open-source point-of-sale system for cafes, restaurants, and small kitchens. Local-first, offline-capable, no cloud lock-in, no per-seat fees.",
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "rpm",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "snap",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "icon": "assets",
-      "category": "Office",
-      "executableName": "flocafe",
-      "artifactName": "rest-cafe-${version}-linux.${ext}",
-      "extraFiles": [
-        {
-          "from": "assets/com.flo.desktop.metainfo.xml",
-          "to": "usr/share/metainfo/com.flo.desktop.metainfo.xml"
-        },
-        {
-          "from": "assets/icons",
-          "to": "usr/share/icons"
-        }
-      ],
-      "desktop": {
-        "entry": {
-          "Name": "Flo Cafe",
-          "Comment": "Free, open-source POS for cafes and restaurants",
-          "GenericName": "Point of Sale",
-          "Keywords": "pos;point of sale;restaurant;cafe;billing;invoice;",
-          "StartupWMClass": "flo-desktop"
-        }
-      }
-    },
-    "appImage": {
-      "artifactName": "flocafe-${version}-linux.appimage"
-    },
-    "snapcraft": {
-      "base": "core24",
-      "core24": {
-        "confinement": "strict",
-        "useLXD": true,
-        "extensions": [
-          "gnome"
-        ],
-        "stagePackages": [
-          "default"
-        ],
-        "plugs": [
-          "default",
-          "browser-support",
-          "cups-control",
-          "avahi-observe",
-          "avahi-control",
-          "raw-usb",
-          "removable-media",
-          "network-bind",
-          "screen-inhibit-control"
-        ],
-        "environment": {
-          "TMPDIR": "$XDG_RUNTIME_DIR"
-        }
-      }
     },
     "nsis": {
       "oneClick": false,

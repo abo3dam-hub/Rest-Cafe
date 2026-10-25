@@ -92,16 +92,15 @@ was rejected, so a future reader does not re-open a settled question.
 ## Operator guides
 
 These sit at flat paths under `docs/` because they are referenced from outside this tree: the
-top-level READMEs, a merchant-visible string in the translation files, and the Linux packaging
+top-level READMEs and a merchant-visible string in the translation files
 metadata. Do not move them without a coordinated change to those references.
 
 | Page | Audience |
 | --- | --- |
 | [printers.md](printers.md) | Merchants and support: connecting a printer and diagnosing the queue. |
-| [linux.md](linux.md) | Merchants and support: Linux packages, printing permissions, and the tray. |
 | [google-drive-setup.md](google-drive-setup.md) | Maintainers: provisioning the optional Drive backup OAuth client. |
 
 ## Other repository assets
 
 - [`images/flo-cafe-pos.webp`](images/flo-cafe-pos.webp): the POS screenshot used in `README.md`
-  and in the Linux AppStream metadata. Do not move it.
+ Do not move it.
