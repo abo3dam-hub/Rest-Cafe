@@ -332,11 +332,6 @@ port to a guest or shared network.
 `electron` and web APIs. The CSP, the external-window URL allowlist, and in-window navigation
 confinement add to that isolation.
 
-**The WhatsApp session is not encrypted at rest.** `main/services/whatsapp.ts` creates the
-credential directory with mode `0o700`, so another OS user cannot read it, but the session files
-themselves are not encrypted with the OS keychain. Malware or another process running as the same
-user can copy the linked session.
-
 **Inline script is allowed by the Content Security Policy.** `main/csp.ts` emits
 `script-src 'self' 'unsafe-inline'`. Remote script and `eval` are blocked; inline script is not.
 `connect-src` is widened to the request's own origin when the `Host` header matches a safe pattern,

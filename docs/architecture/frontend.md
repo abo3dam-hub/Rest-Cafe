@@ -334,12 +334,12 @@ defaults.
 [`electron-api-contract.ts`](../../frontend/src/types/electron-api-contract.ts) makes two different
 kinds of assertion:
 
-- `ElectronApiContractChecks` pins twelve exact signatures with `Equal<>`: `dbApplySafeFixes`,
+- `ElectronApiContractChecks` pins ten exact signatures with `Equal<>`: `dbApplySafeFixes`,
   `getMasterPinStatus`, `getSettings`, `setSetting`, `setThemeEffective`, `getKdsInfo`,
-  `openKdsWindow`, `openWhatsAppShare`, `getAppInfo`, `getPrinters`, `getStatus`, `onUpdateStatus`.
+  `openKdsWindow`, `getAppInfo`, `getPrinters`, `getStatus`.
 - `ElectronApiMethodPresence` is a `Pick<>`, so the other listed members including
-  `backupDatabase`, `restoreBackup`, `pickRestoreFile`, `dbHealthCheck`, `dbInitialize`,
-  `getUpdateStatus`, `checkForUpdates`, and `restartAndInstall` are checked for **presence only**.
+  `backupDatabase`, `restoreBackup`, `pickRestoreFile`, `dbHealthCheck`, and `dbInitialize`
+  are checked for **presence only**.
 
 On top of that, `preload.ts` is CommonJS and never mentions `ElectronAPI`, so it is not
 type-bound to the renderer declaration at all. A preload signature change can therefore compile
@@ -651,11 +651,10 @@ frontend/src/
 │   │   InitializeDatabaseDialog, LocalePreferencesPanel, MasterPinPrompt,
 │   │   PaymentMethodsSettings, PermissionAuditLog, PermissionMatrix,
 │   │   PrintersSettingsTab, SettingsTabShell, TaxConfigurationPanel,
-│   │   Toggle, WhatsAppEnableCard
-│   ├── support/                The support hub: SupportTicketForm, DiagnosticsPanel
+│   │   Toggle
+│   ├── support/                The support hub: DiagnosticsPanel
 │   ├── tables/                 Floorplan editor, table move modal, table turnover badge
 │   ├── ui/                     shadcn/ui primitives
-│   └── updates/                Update download prompt and install guard dialog
 ├── hooks/                      Printer, KDS, theme, update, cash, approver, and formatting hooks
 ├── lib/
 │   ├── i18n/                   Language registry, loader, and the 24 message files

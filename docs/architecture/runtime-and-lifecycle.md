@@ -112,15 +112,13 @@ The steps run in this order, which drains dependents before the things they depe
 | 3 | Server App | yes |
 | 4 | Main server | yes |
 | 5 | KDS server | yes |
-| 6 | cloud sync | yes |
-| 7 | telemetry | yes |
-| 8 | Google Drive | yes |
-| 9 | WhatsApp | yes |
-| 10 | Bonjour / mDNS | no |
-| 11 | HTTP handler drain | yes |
-| 12 | database admission | yes |
-| 13 | database request drain | yes |
-| 14 | close the database | close step |
+| 6 | operation diagnostics | yes |
+| 7 | local backup | yes |
+| 8 | Bonjour / mDNS | no |
+| 9 | HTTP handler drain | yes |
+| 10 | database admission | yes |
+| 11 | database request drain | yes |
+| 12 | close the database | close step |
 
 Every HTTP listener is stopped before the database so that no handler can begin new database work
 after the drain starts. The close step is skipped if any earlier step that blocks the database
@@ -160,16 +158,14 @@ Everything else that `initialize()` starts is absent:
 | Service | Started by `dev-server.js`? |
 | --- | --- |
 | Main API, KDS, Server App, database | yes |
-| cloud sync, telemetry, Google Drive | no |
 | mDNS advertisement | no |
 | Printer initialization | no |
 | Electron windows, tray, menu, auto-updater, power-monitor recovery | no, there is no Electron runtime |
 
 Its shutdown path is a hand-written sequence that mirrors the drain order but skips the tray, raster
-surface, cloud sync, telemetry, Google Drive, and mDNS steps, because those services were never
-started.
+surface and mDNS steps, because those services were never started.
 
-**Practical rule:** reproduce a cloud-sync, backup, printer, or LAN-discovery bug against a packaged
+**Practical rule:** reproduce a backup, printer, or LAN-discovery bug against a packaged
 build, not against `dev-server.js`. If a behaviour only appears under `npm run dev`, check whether
 `initialize()` does something `startStandaloneServers` does not.
 
