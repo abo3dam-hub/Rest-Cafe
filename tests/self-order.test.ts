@@ -206,6 +206,115 @@ async function main() {
     });
     assert.equal(unknown.status, 400, 'unknown product is rejected');
 
+    // 6b. Tampered and orphaned tokens are rejected.
+    const tampered = token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A');
+    const tamperedInfo = await requestJson(appBaseUrl, `/api/self-order/info?t=${tampered}`);
+    assert.equal(tamperedInfo.status, 401, 'a tampered token is rejected');
+
+    db.prepare("INSERT INTO tables (id, number) VALUES ('table-3', '9')").run();
+    const orphanToken = selfOrder.getSelfOrderToken('table-3');
+    db.prepare("DELETE FROM tables WHERE id = 'table-3'").run();
+    const orphanInfo = await requestJson(appBaseUrl, `/api/self-order/info?t=${orphanToken}`);
+    assert.equal(orphanInfo.status, 401, 'a token whose table was deleted is rejected');
+
+    // 6c. The QR token is not a staff credential.
+    const staffWithQrToken = await requestJson(mainBaseUrl, '/api/orders', { token });
+    assert.equal(staffWithQrToken.status, 401, 'self-order token does not authenticate staff APIs');
+    const adminWithQrToken = await requestJson(mainBaseUrl, '/api/self-order-admin', { token });
+    assert.equal(adminWithQrToken.status, 401, 'self-order token does not authenticate admin APIs');
+
+    // 6d. Quantity rules: zero/negative/over-cap rejected, fractional floored
+    // for products that do not allow fractional quantities.
+    for (const badQty of [0, -2, 501]) {
+      const bad = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+        method: 'POST',
+        body: { items: [{ product_id: 'prod-1', quantity: badQty }] },
+      });
+      assert.equal(bad.status, 400, `quantity ${badQty} is rejected`);
+    }
+    const fractional = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'self-order-test-fractional-1' },
+      body: { items: [{ product_id: 'prod-1', variant_id: 'var-1', quantity: 1.9 }] },
+    });
+    assert.equal(fractional.status, 201, 'fractional quantity on a whole-unit product is accepted');
+    assert.equal(fractional.body.order.total, 32000, 'fractional quantity is floored to 1');
+    const belowOne = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      body: { items: [{ product_id: 'prod-1', quantity: 0.5 }] },
+    });
+    assert.equal(belowOne.status, 400, 'a quantity that floors to zero is rejected');
+
+    // 6e. Inactive products and foreign variants are refused.
+    db.prepare(
+      "INSERT INTO products (id, category_id, name, price, is_active) VALUES ('prod-2', 'cat-1', 'Hidden', 9000, 0)",
+    ).run();
+    const inactive = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      body: { items: [{ product_id: 'prod-2', quantity: 1 }] },
+    });
+    assert.equal(inactive.status, 400, 'an inactive product is rejected');
+    db.prepare(
+      "INSERT INTO products (id, category_id, name, price, is_active) VALUES ('prod-3', 'cat-1', 'Fries', 8000, 1)",
+    ).run();
+    const foreignVariant = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      body: { items: [{ product_id: 'prod-3', variant_id: 'var-1', quantity: 1 }] },
+    });
+    assert.equal(foreignVariant.status, 400, 'a variant of another product is rejected');
+
+    // 6f. Add-on group linkage: unlinked groups are refused, category-linked
+    // groups are accepted at the database price.
+    db.prepare("INSERT INTO addon_groups (id, name) VALUES ('grp-2', 'Other')").run();
+    db.prepare(
+      "INSERT INTO addons (id, addon_group_id, name, price, is_active) VALUES ('addon-2', 'grp-2', 'Foreign', 1000, 1)",
+    ).run();
+    const foreignAddon = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      body: {
+        items: [{ product_id: 'prod-1', quantity: 1, addons: [{ id: 'addon-2', quantity: 1 }] }],
+      },
+    });
+    assert.equal(foreignAddon.status, 400, 'an add-on from an unlinked group is rejected');
+    db.prepare("INSERT INTO addon_groups (id, name) VALUES ('grp-3', 'CatExtras')").run();
+    db.prepare(
+      "INSERT INTO category_addon_groups (category_id, addon_group_id) VALUES ('cat-1', 'grp-3')",
+    ).run();
+    db.prepare(
+      "INSERT INTO addons (id, addon_group_id, name, price, is_active) VALUES ('addon-3', 'grp-3', 'Sauce', 500, 1)",
+    ).run();
+    const categoryAddon = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'self-order-test-cat-addon-1' },
+      body: {
+        items: [
+          {
+            product_id: 'prod-1',
+            variant_id: 'var-1',
+            quantity: 1,
+            addons: [{ id: 'addon-3', quantity: 1 }],
+          },
+        ],
+      },
+    });
+    assert.equal(categoryAddon.status, 201, 'a category-linked add-on is accepted');
+    assert.equal(
+      categoryAddon.body.order.total,
+      32000 + 500,
+      'category-linked add-on is priced from the database',
+    );
+
+    // 6g. A price changed after the menu was read is charged at the new price.
+    db.prepare("UPDATE products SET price = 8500 WHERE id = 'prod-3'").run();
+    const repriced = await requestJson(appBaseUrl, `/api/self-order/orders?t=${token}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'self-order-test-repriced-1' },
+      body: { items: [{ product_id: 'prod-3', quantity: 2 }] },
+    });
+    assert.equal(repriced.status, 201, 'order after a price change is created');
+    assert.equal(repriced.body.order.total, 17000, 'the changed database price is charged');
+    db.prepare("UPDATE products SET price = 8000 WHERE id = 'prod-3'").run();
+
     // 7. Owner admin: list, regenerate (old token dies), disable.
     const login = await requestJson(mainBaseUrl, '/api/auth/login', {
       method: 'POST',
