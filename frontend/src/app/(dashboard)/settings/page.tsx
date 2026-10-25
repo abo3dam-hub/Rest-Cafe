@@ -57,14 +57,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
-import type { ProductAnalyticsLevel } from '@/components/analytics/ProductAnalyticsDialog';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { normalizeOptionalPhone } from '@/lib/phone';
 import { useConfirm } from '@/hooks/use-confirm';
 import { MasterPinPrompt } from '@/components/settings/MasterPinPrompt';
-import AutoUpdateCheckToggle from '@/components/settings/AutoUpdateCheckToggle';
-import BetaChannelToggle from '@/components/settings/BetaChannelToggle';
 import { OfflineModeCard } from '@/components/settings/OfflineModeCard';
 import { HealthCheckDialog } from '@/components/settings/HealthCheckDialog';
 import { InitializeDatabaseDialog } from '@/components/settings/InitializeDatabaseDialog';
@@ -101,7 +98,6 @@ import type { HealthCheckReport } from '@/types/electron';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatDate } from '@/hooks/useFormatDate';
-import { useUpdateStatus } from '@/hooks/useUpdateStatus';
 import { tenantCan } from '@/lib/permissions';
 
 const CLOUD_ACCOUNT_STATUS_CHANGED_EVENT = 'flo:cloud-account-status-changed';
@@ -359,10 +355,8 @@ export default function SettingsPage() {
   const posSettings = usePosSettingsStore();
   const { printMethod, setPrintMethod } = usePrinterStore();
   const t = useTranslations('settings');
-  const tAnalytics = useTranslations('productAnalytics');
   const tCommon = useTranslations('common');
   const tRestore = useTranslations('restore');
-  const tUpdate = useTranslations('update');
   const { formatDate, formatTime, formatDateTime } = useFormatDate();
   const isAdmin = tenantCan(currentTenant, 'settings.manage');
   const isOwner = tenantCan(currentTenant, 'cloud.account.manage');
@@ -1093,15 +1087,6 @@ export default function SettingsPage() {
   const [moreAppsLoading, setMoreAppsLoading] = useState(true);
   const [revflo, setRevflo] = useState<MoreApp | null>(null);
 
-  // ── Updates ─────────────────────────────────────────────────────────────────
-  const {
-    updateStatus,
-    appVersion,
-    isElectron,
-    checkForUpdates: handleCheckUpdates,
-    downloadUpdate: handleDownloadUpdate,
-  } = useUpdateStatus();
-
   // ── Printers ─────────────────────────────────────────────────────────────
   const [hwPrinters, setHwPrinters] = useState<HwPrinter[]>([]);
 
@@ -1676,9 +1661,6 @@ export default function SettingsPage() {
       setRefreshingDeletionStatus(false);
     }
   };
-
-  const [analyticsLevel, setAnalyticsLevel] = useState<ProductAnalyticsLevel>('off');
-  const [savingAnalytics, setSavingAnalytics] = useState(false);
 
   const [diagnosticsConsent, setDiagnosticsConsent] = useState(true);
   const [savingDiagnosticsConsent, setSavingDiagnosticsConsent] = useState(false);
@@ -2724,16 +2706,8 @@ export default function SettingsPage() {
       }
       if (tab === 'privacy') {
         setCloudPrivacyHydrated(false);
-        const [analyticsResponse, telemetryResponse, diagnosticsResponse] = await Promise.all([
-          get('/settings/product-analytics').catch(() => null),
-          get('/settings/telemetry_enabled').catch(() => null),
-          get('/settings/diagnostics_consent').catch(() => null),
-        ]);
+        const diagnosticsResponse = await get('/settings/diagnostics_consent').catch(() => null);
         if (!active()) return;
-        setAnalyticsLevel(
-          analyticsResponse?.data?.level ??
-            (telemetryResponse?.data.setting?.value === 'true' ? 'anonymous' : 'off'),
-        );
         setDiagnosticsConsent(
           diagnosticsResponse ? diagnosticsResponse.data.setting?.value !== 'false' : true,
         );
@@ -3036,20 +3010,6 @@ export default function SettingsPage() {
       toast.error(t('cloudRegistrationFailed'));
     } finally {
       setRegisteringCloud(false);
-    }
-  };
-
-  const saveAnalyticsLevel = async (level: ProductAnalyticsLevel) => {
-    const previous = analyticsLevel;
-    setAnalyticsLevel(level);
-    setSavingAnalytics(true);
-    try {
-      await api.put('/settings/product-analytics', { level });
-    } catch {
-      setAnalyticsLevel(previous);
-      toast.error(t('saveFailed'));
-    } finally {
-      setSavingAnalytics(false);
     }
   };
 
@@ -3920,12 +3880,6 @@ export default function SettingsPage() {
             <SettingsNavItem
               label={t('privacy')}
               value="privacy"
-              active={activeTab}
-              onClick={handleSettingsTabChange}
-            />
-            <SettingsNavItem
-              label={t('tabUpdates')}
-              value="updates"
               active={activeTab}
               onClick={handleSettingsTabChange}
             />
@@ -5542,35 +5496,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <fieldset className="space-y-2" data-testid="product-analytics-level">
-                  <legend className="text-sm font-medium text-foreground">
-                    {tAnalytics('settingsLabel')}
-                  </legend>
-                  {(['full', 'anonymous', 'off'] as const).map((level) => (
-                    <label key={level} className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="product-analytics-level"
-                        value={level}
-                        checked={analyticsLevel === level}
-                        disabled={savingAnalytics}
-                        onChange={() => void saveAnalyticsLevel(level)}
-                        className="mt-0.5 border-gray-300 dark:border-border text-brand focus:ring-brand"
-                      />
-                      <span className="text-sm text-foreground">
-                        {tAnalytics(
-                          level === 'full'
-                            ? 'levelFull'
-                            : level === 'anonymous'
-                              ? 'levelAnonymous'
-                              : 'levelOff',
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <p className="text-xs text-muted-foreground">{tAnalytics('settingsHint')}</p>
-
                 <div className="border-t border-border pt-4">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -5638,7 +5563,6 @@ export default function SettingsPage() {
                             cloud_orders_enabled: !!data.cloud_orders_enabled,
                             cloud_last_sync: data.cloud_last_sync || null,
                           }));
-                          setAnalyticsLevel('off');
                           setDiagnosticsConsent(false);
                           await fetchCloudAccount();
                           notifyCloudAccountStatusChanged();
@@ -6282,192 +6206,6 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
-            </SettingsTabShell>
-          </TabsContent>
-
-          {/* Software Updates tab */}
-          <TabsContent value="updates">
-            <SettingsTabShell>
-              <div className="bg-card rounded-xl border border-border p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <RefreshCw size={20} className="text-muted-foreground" />
-                  <h2 className="font-semibold text-foreground">{t('updates')}</h2>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">
-                  {!isElectron
-                    ? t('softwareUpdatesHintBrowser')
-                    : updateStatus?.status === 'store-managed'
-                      ? t('softwareUpdatesHintStore')
-                      : updateStatus?.status === 'linux-managed'
-                        ? t('softwareUpdatesHintLinuxManaged')
-                        : t('softwareUpdatesHintDefault')}
-                </p>
-
-                {/* Update controls only exist in the desktop app; hide them for
-                browser/LAN users instead of showing a dead button (#467). */}
-                {isElectron &&
-                  updateStatus &&
-                  updateStatus.status !== 'store-managed' &&
-                  updateStatus.status !== 'linux-managed' && (
-                    <div
-                      className={`p-4 rounded-lg mb-4 ${
-                        updateStatus.status === 'available' ||
-                        updateStatus.status === 'ready-to-install'
-                          ? 'bg-green-50 border border-green-200 dark:bg-green-950/50 dark:border-green-800'
-                          : updateStatus.status === 'up-to-date'
-                            ? 'bg-green-50 border border-green-200 dark:bg-green-950/50 dark:border-green-800'
-                            : updateStatus.status === 'check-failed'
-                              ? 'bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-800'
-                              : updateStatus.status === 'offline' ||
-                                  updateStatus.status === 'dev-mode'
-                                ? 'bg-yellow-50 border border-yellow-200 dark:bg-yellow-950/50 dark:border-yellow-800'
-                                : 'bg-muted border border-border'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        {(updateStatus.status === 'checking' ||
-                          updateStatus.status === 'downloading') && (
-                          <RefreshCw size={16} className="animate-spin text-brand" />
-                        )}
-                        {updateStatus.status === 'available' && (
-                          <Check size={16} className="text-green-600" />
-                        )}
-                        {updateStatus.status === 'up-to-date' && (
-                          <CheckCircle2 size={16} className="text-green-600" />
-                        )}
-                        {updateStatus.status === 'ready-to-install' && (
-                          <CheckCircle2 size={16} className="text-green-600" />
-                        )}
-                        {updateStatus.status === 'check-failed' && (
-                          <span className="text-red-600">✕</span>
-                        )}
-                        {updateStatus.status === 'offline' && (
-                          <span className="text-yellow-600">⚠</span>
-                        )}
-                        {updateStatus.status === 'dev-mode' && (
-                          <span className="text-yellow-600">⚠</span>
-                        )}
-                        {updateStatus.status === 'not-checked-yet' && (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                        <span className="font-medium">
-                          {updateStatus.status === 'available'
-                            ? t('updateStatusAvailable')
-                            : updateStatus.status === 'up-to-date'
-                              ? t('updateStatusUpToDate')
-                              : updateStatus.status === 'ready-to-install'
-                                ? t('updateStatusReadyToInstall')
-                                : updateStatus.status === 'not-checked-yet'
-                                  ? t('updateStatusNotCheckedYet')
-                                  : updateStatus.status === 'check-failed'
-                                    ? t('updateStatusCheckFailed')
-                                    : updateStatus.status === 'offline'
-                                      ? t('updateStatusOffline')
-                                      : updateStatus.status === 'checking'
-                                        ? t('checking')
-                                        : updateStatus.status === 'dev-mode'
-                                          ? t('devModeTitle')
-                                          : t('updateStatusDownloading')}
-                        </span>
-                      </div>
-                      {appVersion && (
-                        <p className="text-sm font-medium text-foreground">
-                          {t('version')}: <Ltr>{appVersion}</Ltr>
-                        </p>
-                      )}
-                      {updateStatus.version && updateStatus.version !== appVersion && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {t('updateLatestAvailable')} <Ltr>{updateStatus.version}</Ltr>
-                        </p>
-                      )}
-                      {updateStatus.percent !== undefined && (
-                        <div className="mt-2">
-                          <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2">
-                            <div
-                              className="bg-brand h-2 rounded-full transition-all"
-                              style={{ width: `${updateStatus.percent}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {t('percentDownloaded', { percent: updateStatus.percent.toFixed(1) })}
-                          </p>
-                        </div>
-                      )}
-                      {updateStatus.status === 'up-to-date' && (
-                        <p className="text-sm text-muted-foreground">{t('upToDate')}</p>
-                      )}
-                      {updateStatus.status === 'not-checked-yet' && (
-                        <p className="text-sm text-muted-foreground">{t('notCheckedYetHint')}</p>
-                      )}
-                      {updateStatus.status === 'dev-mode' && (
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                          {t('devModeDisabled')}
-                        </p>
-                      )}
-                      {(updateStatus.status === 'check-failed' ||
-                        updateStatus.status === 'offline') && (
-                        <p className="text-sm mt-1 text-red-600 dark:text-red-300">
-                          {updateStatus.reason === 'manifest-missing'
-                            ? t('updateErrorManifestMissing')
-                            : updateStatus.reason === 'download-failed'
-                              ? t('updateErrorDownloadFailed')
-                              : updateStatus.status === 'offline'
-                                ? t('updateStatusOfflineHint')
-                                : t('updateErrorGeneric')}
-                        </p>
-                      )}
-                      {(updateStatus.status === 'check-failed' ||
-                        updateStatus.status === 'offline') &&
-                        updateStatus.error && (
-                          <details className="mt-1">
-                            <summary className="text-xs text-muted-foreground cursor-pointer">
-                              {t('errorDetails')}
-                            </summary>
-                            <p className="text-xs text-muted-foreground mt-0.5 break-all">
-                              <Ltr>{updateStatus.error}</Ltr>
-                            </p>
-                          </details>
-                        )}
-                    </div>
-                  )}
-
-                {isElectron &&
-                  updateStatus?.status !== 'store-managed' &&
-                  updateStatus?.status !== 'linux-managed' && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleCheckUpdates}
-                        disabled={
-                          updateStatus?.status === 'checking' ||
-                          updateStatus?.status === 'available' ||
-                          updateStatus?.status === 'downloading' ||
-                          updateStatus?.status === 'ready-to-install'
-                        }
-                        className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 bg-brand text-white hover:opacity-90"
-                      >
-                        <RefreshCw
-                          size={16}
-                          className={updateStatus?.status === 'checking' ? 'animate-spin' : ''}
-                        />
-                        {updateStatus?.status === 'checking' ? t('checking') : t('checkForUpdates')}
-                      </button>
-                      {updateStatus?.status === 'available' && (
-                        <button
-                          onClick={() => void handleDownloadUpdate()}
-                          data-testid="settings-download-update"
-                          className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border border-brand text-brand hover:bg-brand/10"
-                        >
-                          {tUpdate('downloadNow')}
-                        </button>
-                      )}
-                    </div>
-                  )}
-              </div>
-
-              {/* #463: beta/pre-release channel opt-in; feature-detects the
-              beta-release-channel IPC contract and degrades visibly when absent. */}
-              {isElectron && <AutoUpdateCheckToggle />}
-              {isElectron && <BetaChannelToggle />}
             </SettingsTabShell>
           </TabsContent>
         </div>

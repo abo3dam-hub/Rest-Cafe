@@ -53,28 +53,13 @@ export interface ElectronAPI {
   // Tail of the current session's log file, for attaching to support tickets.
   getLogTail: () => Promise<{ text: string; truncated: boolean } | ElectronIpcError>;
 
-  // Reports caught renderer errors to anonymous telemetry via main process.
+  // Reports caught renderer errors to the local diagnostics recorder in the main process.
   reportRendererError?: (report: {
     message?: string;
     stack?: string;
     digest?: string;
     route?: string;
   }) => Promise<ElectronActionResult>;
-
-  getPostHogBootstrap?: () => Promise<
-    | { enabled: false }
-    | {
-        enabled: true;
-        distinctId: string;
-        identified: boolean;
-        token: string;
-        host: string;
-        telemetryEnabled: boolean;
-        accountLinked: boolean;
-        diagnosticsEnabled: boolean;
-        superProperties: Record<string, string>;
-      }
-  >;
 
   // Printers. Writing one goes through the permission-gated HTTP route.
   getPrinters: () => Promise<ElectronPrinter[] | ElectronIpcError>;
@@ -110,30 +95,6 @@ export interface ElectronAPI {
   getStatus: () => Promise<ElectronStatus>;
   // Reports renderer readiness to main with epoch validation.
   windowReady: (payload: { epoch: number }) => Promise<ElectronActionResult | ElectronIpcError>;
-
-  // Updates
-  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
-  getUpdateStatus: () => Promise<{
-    status: UpdateStatus['status'];
-    version?: string;
-    percent?: number;
-    reason?: UpdateFailureReason;
-    error?: string;
-    info: { version: string };
-  }>;
-  /** Persisted beta opt-in (#463); returns true if subscribed to the beta feed. */
-  getBetaChannel: () => Promise<boolean>;
-  /** Change the beta channel opt-in; refused while an update is staged or in flight. */
-  setBetaChannel: (enabled: boolean) => Promise<ElectronActionResult>;
-  checkForUpdates: () => Promise<void>;
-  /** Start downloading an available update; refused unless one is waiting. */
-  downloadUpdate: () => Promise<ElectronActionResult>;
-  /** Persisted preference for the automatic startup update check (default on). */
-  getAutoUpdateCheck: () => Promise<boolean>;
-  setAutoUpdateCheck: (enabled: boolean) => Promise<ElectronActionResult>;
-  // #463: the main process authorizes the manager/owner PIN before quitting
-  // to install; a denied request resolves with success:false instead of restarting.
-  restartAndInstall: (pin?: string) => Promise<ElectronActionResult>;
 
   // Platform
   platform: string;
@@ -238,31 +199,6 @@ export interface HealthCheckReport {
   idealSchemaVersion: number;
   findings: HealthFinding[];
   summary: { safeCount: number; manualReviewCount: number };
-}
-
-/** Why an update check or download failed, when the main process knows. */
-export type UpdateFailureReason = 'manifest-missing' | 'download-failed' | 'unknown';
-
-export interface UpdateStatus {
-  // #467 honest state model — mirrors main/update-state.ts.
-  status:
-    | 'not-checked-yet'
-    | 'checking'
-    | 'up-to-date'
-    | 'available'
-    | 'downloading'
-    | 'ready-to-install'
-    | 'check-failed'
-    | 'offline'
-    | 'store-managed'
-    | 'linux-managed'
-    | 'dev-mode';
-  version?: string;
-  releaseDate?: string;
-  releaseNotes?: unknown;
-  percent?: number;
-  reason?: UpdateFailureReason;
-  error?: string;
 }
 
 declare global {

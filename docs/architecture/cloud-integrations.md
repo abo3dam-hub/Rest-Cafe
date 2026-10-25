@@ -51,16 +51,17 @@ error code is persisted so the settings screen can explain the failure after a r
   endpoints are emptied in code, so there is nowhere to sync to. The module's local diagnostics
   recorders (for example print-failure capture into local tables) still run; only transmission
   is gone.
-- **Anonymous telemetry** — never started (`telemetry.start()` is not called); no anonymous id
-  is created for a new install.
+- **Anonymous telemetry** — removed end to end: the service, its startup path, and its
+  settings surface are deleted, and no anonymous id is created for a new install.
 - **WhatsApp receipt delivery** — removed end to end: service, routes, IPC, and UI. The dormant
   database tables remain only so migrations stay valid.
-- **Automatic updates** — the updater is disabled and there is no update channel. New builds
-  are produced from this repository (GitHub Actions, manual trigger) and installed by hand.
+- **Automatic updates** — removed end to end: the updater library, its IPC channels, and its
+  settings UI are deleted. New builds are produced from this repository (GitHub Actions,
+  manual trigger) and installed by hand.
 - **Country tax-pack downloads** — the remote catalog is gone; taxes are manual configuration
   only (see [product invariants](../reference/product-invariants.md)).
-- **PostHog** — the bootstrap stays inert: no project token is configured in this build, so
-  nothing is sent.
+- **PostHog product analytics** — removed end to end: the main-process service, the renderer
+  bootstrap and client library, and the product-analytics settings surface are deleted.
 - **Support tickets / RevFlo pairing** — outbound support plumbing from the upstream product
   is not part of this fork's network surface.
 

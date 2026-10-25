@@ -10,7 +10,6 @@ import { NumberInputWheelGuard } from '@/components/layout/NumberInputWheelGuard
 import { DirectionalToaster } from '@/components/layout/DirectionalToaster';
 import DesktopDragSurface from '@/components/layout/DesktopDragSurface';
 import { I18nProvider } from '@/components/providers/I18nProvider';
-import { PostHogBootstrap } from '@/components/analytics/PostHogBootstrap';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -74,9 +73,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Suspense fallback={null}>
-          <PostHogBootstrap />
-        </Suspense>
+        <Suspense fallback={null}></Suspense>
         <I18nProvider>
           <DesktopDragSurface />
           <MenuActionHandler />

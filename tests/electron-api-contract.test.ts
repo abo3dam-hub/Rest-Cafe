@@ -79,39 +79,29 @@ async function run(): Promise<void> {
     Object.keys(exposedApi!).sort(),
     [
       'backupDatabase',
-      'checkForUpdates',
       'dbApplySafeFixes',
       'dbHealthCheck',
       'dbInitialize',
-      'downloadUpdate',
       'getAppInfo',
       'getApplicationMenu',
-      'getAutoUpdateCheck',
-      'getBetaChannel',
       'getKdsInfo',
       'getLogTail',
       'getMasterPinStatus',
-      'getPostHogBootstrap',
       'getPrinters',
       'getSettings',
       'getStatus',
-      'getUpdateStatus',
       'getWindowState',
       'onMenuAction',
-      'onUpdateStatus',
       'onWindowStateChanged',
       'openApplicationMenu',
       'openKdsWindow',
       'pickRestoreFile',
       'platform',
       'reportRendererError',
-      'restartAndInstall',
       'rasterizeKotDocument',
       'rasterizePrintDocument',
       'restoreBackup',
       'saveHtmlAsPdf',
-      'setAutoUpdateCheck',
-      'setBetaChannel',
       'setSetting',
       'setThemeEffective',
       'windowAction',
@@ -122,7 +112,19 @@ async function run(): Promise<void> {
   // The printer and daily-summary bridges are removed, not merely unwired:
   // both are reachable only through permission-gated HTTP routes now, and an
   // origin-checked IPC channel is the wrong place for either one.
-  for (const removed of ['savePrinter', 'getDailySummary']) {
+  for (const removed of [
+    'savePrinter',
+    'getDailySummary',
+    'getUpdateStatus',
+    'onUpdateStatus',
+    'checkForUpdates',
+    'downloadUpdate',
+    'getBetaChannel',
+    'setBetaChannel',
+    'getAutoUpdateCheck',
+    'setAutoUpdateCheck',
+    'restartAndInstall',
+  ]) {
     assert.equal(
       Object.prototype.hasOwnProperty.call(exposedApi, removed),
       false,
@@ -135,7 +137,6 @@ async function run(): Promise<void> {
   const call = (name: string, ...args: unknown[]) =>
     (exposedApi![name] as (...callArgs: unknown[]) => Promise<unknown>)(...args);
   await call('getSettings');
-  await call('getPostHogBootstrap');
   await call('setSetting', 'theme_mode', 'dark');
   await call('getKdsInfo');
   await call('openKdsWindow');
@@ -152,11 +153,6 @@ async function run(): Promise<void> {
     defaultFileName: 'menu.pdf',
     pageSize: 'A4',
   });
-  await call('getBetaChannel');
-  await call('setBetaChannel', true);
-  await call('downloadUpdate');
-  await call('getAutoUpdateCheck');
-  await call('setAutoUpdateCheck', false);
   await call('windowReady', { epoch: 1 });
   await call('windowAction', 'minimize');
   await call('getWindowState');
@@ -168,19 +164,6 @@ async function run(): Promise<void> {
   });
   await call('getApplicationMenu');
   await call('openApplicationMenu', '0', 12, 0);
-
-  const receivedStatuses: unknown[] = [];
-  const unsubscribe = (
-    exposedApi!['onUpdateStatus'] as (callback: (status: unknown) => void) => () => void
-  )((status) => receivedStatuses.push(status));
-  const structuredReleaseNotes = {
-    status: 'available',
-    releaseNotes: [{ version: '3.4.0', note: 'Improved update delivery' }],
-  };
-  eventHandlers.get('update-status')?.({}, structuredReleaseNotes);
-  assert.deepEqual(receivedStatuses, [structuredReleaseNotes]);
-  unsubscribe();
-  assert.equal(eventHandlers.has('update-status'), false);
 
   const receivedWindowStates: unknown[] = [];
   const unsubscribeWindowState = (
@@ -194,7 +177,6 @@ async function run(): Promise<void> {
 
   assert.deepEqual(calls, [
     { channel: 'get-settings', args: [] },
-    { channel: 'get-posthog-bootstrap', args: [] },
     { channel: 'set-setting', args: ['theme_mode', 'dark'] },
     { channel: 'get-kds-info', args: [] },
     { channel: 'open-kds-window', args: [] },
@@ -211,11 +193,6 @@ async function run(): Promise<void> {
       channel: 'save-html-as-pdf',
       args: [{ html: '<html></html>', defaultFileName: 'menu.pdf', pageSize: 'A4' }],
     },
-    { channel: 'updates:get-beta-channel', args: [] },
-    { channel: 'updates:set-beta-channel', args: [true] },
-    { channel: 'download-update', args: [] },
-    { channel: 'updates:get-auto-check', args: [] },
-    { channel: 'updates:set-auto-check', args: [false] },
     { channel: 'window-ready', args: [{ epoch: 1, documentNonce }] },
     { channel: 'window-action', args: ['minimize'] },
     { channel: 'get-window-state', args: [] },
@@ -227,7 +204,14 @@ async function run(): Promise<void> {
     { channel: 'open-application-menu', args: ['0', 12, 0] },
   ]);
 
-  for (const removedChannel of ['save-printer', 'get-daily-summary']) {
+  for (const removedChannel of [
+    'save-printer',
+    'get-daily-summary',
+    'get-update-status',
+    'check-for-updates',
+    'download-update',
+    'restart-and-install',
+  ]) {
     assert.equal(
       calls.some(({ channel }) => channel === removedChannel),
       false,

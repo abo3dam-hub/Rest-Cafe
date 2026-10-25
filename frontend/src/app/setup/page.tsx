@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { TimeZoneSelect } from '@/components/TimeZoneSelect';
-import type { ProductAnalyticsLevel } from '@/components/analytics/ProductAnalyticsDialog';
 import { CurrencySelect } from '@/components/CurrencySelect';
 import { useLocale, useTranslations, type AppConfig } from 'use-intl';
 import { LANGUAGES, getBrowserLanguage, type Language } from '@/lib/i18n';
@@ -108,7 +107,6 @@ export default function SetupPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [productUpdates, setProductUpdates] = useState(false);
   const [marketing, setMarketing] = useState(false);
-  const [analyticsLevel, setAnalyticsLevel] = useState<ProductAnalyticsLevel | null>(null);
   const passwordsEntered = form.password.length > 0 && form.confirmPassword.length > 0;
   const passwordsMatch = !passwordsEntered || form.password === form.confirmPassword;
   const ownerEmail = form.email.trim().toLowerCase();
@@ -132,7 +130,6 @@ export default function SetupPage() {
   const isPasswordValid = validatePassword;
   const passwordMeetsRequirements = form.password.length === 0 || isPasswordValid(form.password);
   const t = useTranslations('setup');
-  const tAnalytics = useTranslations('productAnalytics');
   const tSettings = useTranslations('settings');
   const locale = useLocale();
   const [, setMounted] = useState(false);
@@ -210,10 +207,6 @@ export default function SetupPage() {
       toast.error(t('errorTermsRequired'));
       return false;
     }
-    if (!analyticsLevel) {
-      toast.error(tAnalytics('choiceRequired'));
-      return false;
-    }
     return true;
   };
 
@@ -282,7 +275,6 @@ export default function SetupPage() {
         cloud_server_url: cloudServerUrl.trim() || DEFAULT_CLOUD_SERVER_URL,
         email_product_updates: productUpdates,
         email_marketing: marketing,
-        product_analytics_level: analyticsLevel ?? undefined,
         ...regionalPayload,
       });
       completeSetup();
@@ -724,60 +716,6 @@ export default function SetupPage() {
                     </span>
                   </label>
 
-                  <fieldset
-                    className="space-y-3 rounded-lg border border-border px-3 py-3 text-sm"
-                    data-testid="setup-analytics-choice"
-                  >
-                    <legend className="px-1 font-medium text-foreground">
-                      {tAnalytics('title')}
-                    </legend>
-                    <p className="text-muted-foreground">{tAnalytics('intro')}</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {(['full', 'anonymous'] as const).map((level) => (
-                        <label
-                          key={level}
-                          className={`cursor-pointer rounded-lg border p-3 focus-within:ring-2 focus-within:ring-brand ${
-                            analyticsLevel === level ? 'border-brand bg-brand/5' : 'border-border'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="setup-analytics-level"
-                            value={level}
-                            checked={analyticsLevel === level}
-                            onChange={() => setAnalyticsLevel(level)}
-                            className="sr-only"
-                          />
-                          <span className="block font-medium text-foreground">
-                            {tAnalytics(level === 'full' ? 'linkEmail' : 'keepAnonymous')}
-                          </span>
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            {tAnalytics(level === 'full' ? 'fullHint' : 'anonymousHint')}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {tAnalytics('errorsTitle')}:
-                      </span>{' '}
-                      {tAnalytics('errorsBody')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{tAnalytics('neverSee')}</p>
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input
-                        type="radio"
-                        name="setup-analytics-level"
-                        value="off"
-                        checked={analyticsLevel === 'off'}
-                        onChange={() => setAnalyticsLevel('off')}
-                        className="h-3.5 w-3.5"
-                      />
-                      {tAnalytics('dontShare')}
-                    </label>
-                    <p className="text-xs text-muted-foreground">{tAnalytics('changeLater')}</p>
-                  </fieldset>
-
                   <div className="space-y-3 rounded-lg border border-border px-3 py-3 text-sm">
                     <p className="font-medium text-foreground">{t('emailCommunicationTitle')}</p>
                     <p className="text-muted-foreground">{t('emailCommunicationDescription')}</p>
@@ -807,7 +745,6 @@ export default function SetupPage() {
                       ownerEmailInvalid ||
                       !passwordsMatch ||
                       !termsAccepted ||
-                      !analyticsLevel ||
                       !isPasswordValid(form.password)
                     }
                     className="w-full"

@@ -24,7 +24,6 @@ import { usePrinterStore } from '@/hooks/usePrinter';
 import type { CashSession } from '@/hooks/useCashSession';
 import { printerService } from '@/lib/printer/PrinterService';
 import api from '@/lib/api';
-import UpdateBadge from './UpdateBadge';
 import { Ltr } from './Ltr';
 
 interface StatusInfo {
@@ -51,7 +50,7 @@ async function printWebUsbAction(response: PrinterActionResponse): Promise<void>
   );
 }
 
-export default function StatusBar({ showUpdateBadge = true }: { showUpdateBadge?: boolean }) {
+export default function StatusBar() {
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
   const tPos = useTranslations('pos');
@@ -577,8 +576,6 @@ export default function StatusBar({ showUpdateBadge = true }: { showUpdateBadge?
             <span>{tSupport('tabDiagnostics')}</span>
             {isDrawerOpen ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
           </button>
-
-          {showUpdateBadge && <UpdateBadge />}
         </div>
       </footer>
     </>

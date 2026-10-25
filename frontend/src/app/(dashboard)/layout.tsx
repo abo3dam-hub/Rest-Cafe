@@ -7,8 +7,6 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import StatusBar from '@/components/layout/StatusBar';
 import GlobalNotifications from '@/components/layout/GlobalNotifications';
 import TitleBar from '@/components/layout/TitleBar';
-import UpdateAvailableDialog from '@/components/updates/UpdateAvailableDialog';
-import ProductAnalyticsDialog from '@/components/analytics/ProductAnalyticsDialog';
 import { usePrinterStatusSync } from '@/hooks/usePrinter';
 import { useReceiptSettingsSync } from '@/hooks/useReceiptSettingsSync';
 import { normalizePathname } from '@/lib/utils';
@@ -54,11 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {children}
             </div>
-            <StatusBar showUpdateBadge={false} />
+            <StatusBar />
           </SidebarInset>
         </div>
-        <UpdateAvailableDialog />
-        {!isPos && <ProductAnalyticsDialog />}
       </SidebarProvider>
     </AuthGuard>
   );

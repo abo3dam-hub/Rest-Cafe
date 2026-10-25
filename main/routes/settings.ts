@@ -32,17 +32,11 @@ import {
 } from '../services/customer-display-tokens';
 import { requireMasterPin } from '../middleware/master-pin';
 import { resolveTaxIdFormat, validateTaxRegistrationNumber } from '../services/tax';
-import { sendEvent, telemetry } from '../services/telemetry';
-import { readProductAnalyticsChoice, syncPostHogIdentity } from '../services/posthog';
 import {
   OFFLINE_MODE_SETTING,
   isOfflineMode,
   notifyOfflineModeEnabled,
 } from '../services/offline-mode';
-import {
-  PRODUCT_ANALYTICS_LEVEL_SETTING,
-  parseProductAnalyticsLevel,
-} from '../services/posthog-identity';
 import {
   getCountryByCode,
   getCurrencyFractionDigits,
@@ -151,8 +145,6 @@ const SENSITIVE_SETTING_KEYS = new Set([
   'cloud_device_secret',
   'cloud_deletion_status_token',
   'cloud_last_error',
-  'posthog_project_token',
-  'posthog_host',
 ]);
 
 function isGoogleDriveSettingKey(key: string): boolean {
@@ -508,7 +500,6 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       ...localeUpdates,
     });
     cloudSync.refreshRegistrationProfile();
-    syncPostHogIdentity();
 
     res.json(businessShape(getAllSettings(db)));
   } catch (error: any) {
@@ -730,46 +721,6 @@ router.put('/kds', requirePermission('settings.manage'), (req: Request, res: Res
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Product analytics sharing level (must come BEFORE /:key wildcard) ──────
-
-router.get(
-  '/product-analytics',
-  requirePermission('settings.manage'),
-  (_req: Request, res: Response) => {
-    try {
-      res.json(readProductAnalyticsChoice());
-    } catch (error: any) {
-      console.error('[API] Internal error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// `off` also stops the anonymous collector; the other levels keep it on.
-router.put(
-  '/product-analytics',
-  requirePermission('settings.manage'),
-  (req: Request, res: Response) => {
-    try {
-      const level = parseProductAnalyticsLevel(req.body?.level);
-      if (!level) {
-        return res.status(400).json({ error: 'level must be "full", "anonymous" or "off"' });
-      }
-      const telemetry = level === 'off' ? 'false' : 'true';
-      upsertSettings(getDatabase(), {
-        [PRODUCT_ANALYTICS_LEVEL_SETTING]: level,
-        telemetry_enabled: telemetry,
-        anonymous_data_consent: telemetry,
-      });
-      syncPostHogIdentity();
-      res.json(readProductAnalyticsChoice());
-    } catch (error: any) {
-      console.error('[API] Internal error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
 
 // ─── POS catalog sort (must come BEFORE /:key wildcard) ─────────────────────
 
@@ -1651,7 +1602,6 @@ router.put(
            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
         )
         .run(OFFLINE_MODE_SETTING, value ? 'true' : 'false', now());
-      syncPostHogIdentity();
       if (value) {
         cloudSync.suspendForOfflineMode();
         googleDrive.suspendForOfflineMode();
@@ -1659,7 +1609,6 @@ router.put(
       } else {
         cloudSync.reload();
         cloudSync.refreshRegistrationProfile();
-        telemetry.resumeDailyChecks();
       }
       res.json({ offline_mode: isOfflineMode() });
     } catch (error: unknown) {
@@ -2130,14 +2079,6 @@ router.put(
         saveSetting.run(req.params.key, valueToPersist as string, now());
       }
 
-      // Sync legacy anonymous_data_consent mirror with canonical telemetry_enabled.
-      if (req.params.key === 'telemetry_enabled') {
-        db.prepare(`
-        INSERT INTO settings (key, value, updated_at) VALUES ('anonymous_data_consent', ?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `).run(value, now());
-      }
-
       // Best-effort push of the effective diagnostics permission to FloAdmin.
       if (diagnosticsChoice) {
         const settings = getAllSettings(db);
@@ -2146,18 +2087,6 @@ router.put(
           settings.diagnostics_transmission_enabled === 'true';
         void cloudSync.setDiagnosticsConsent(enabled);
       }
-      if (req.params.key === 'split_checks_enabled' && boolFlag(value) === 'true') {
-        void sendEvent('feature_used', { feature: 'split_checks', action: 'enabled' });
-      }
-      if (
-        req.params.key === 'telemetry_enabled' ||
-        req.params.key === 'email' ||
-        req.params.key === 'diagnostics_consent' ||
-        req.params.key === 'diagnostics_transmission_enabled'
-      ) {
-        syncPostHogIdentity();
-      }
-
       const setting = db.prepare('SELECT * FROM settings WHERE key = ?').get(req.params.key);
       res.json({ setting });
     } catch (error: any) {

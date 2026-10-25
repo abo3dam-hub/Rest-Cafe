@@ -103,7 +103,6 @@ interface ChargeOrderRow {
   packaging_charge: number | null;
   charges_breakdown: string | null;
 }
-import { sendEvent } from '../services/telemetry';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 import {
   getCurrencyFractionDigits,
@@ -2851,11 +2850,6 @@ router.post(
         return billIds.map((id) =>
           parseRowJson(db.prepare('SELECT * FROM bills WHERE id = ?').get(id)),
         );
-      });
-      void sendEvent('feature_used', {
-        feature: 'split_checks',
-        action: 'created',
-        check_count: result.length,
       });
       notifyOrderUpdated();
       res.status(201).json({ bills: result });

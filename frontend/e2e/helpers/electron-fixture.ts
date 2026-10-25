@@ -11,7 +11,6 @@ import type {
   HealthCheckReport,
   KdsInfo,
   TitleBarMode,
-  UpdateStatus,
   WindowControlAction,
 } from '../../src/types/electron';
 
@@ -101,7 +100,6 @@ export async function injectElectronFixture(
       node: 'fixture',
       platform: config.platform ?? 'darwin',
     };
-    const updateStatus: UpdateStatus = { status: 'dev-mode' };
     const healthReport: HealthCheckReport = {
       generatedAt: new Date(0).toISOString(),
       liveSchemaVersion: 0,
@@ -167,21 +165,6 @@ export async function injectElectronFixture(
           if (idx !== -1) windowStateListeners.splice(idx, 1);
         };
       },
-      onUpdateStatus: (callback) => {
-        callback(updateStatus);
-        return () => {};
-      },
-      getUpdateStatus: async () => ({
-        status: updateStatus.status,
-        info: { version: appInfo.version },
-      }),
-      getBetaChannel: async () => false,
-      setBetaChannel: async () => result,
-      checkForUpdates: async () => undefined,
-      downloadUpdate: async () => result,
-      getAutoUpdateCheck: async () => true,
-      setAutoUpdateCheck: async () => result,
-      restartAndInstall: async () => result,
     };
 
     Object.defineProperty(window, 'electronAPI', { configurable: true, value: api });

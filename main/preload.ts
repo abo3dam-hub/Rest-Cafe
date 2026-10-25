@@ -28,15 +28,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLogTail: () => ipcRenderer.invoke('get-log-tail'),
 
   // Fire-and-forget: reports a caught renderer render exception (see the
-  // dashboard error boundary) to anonymous telemetry via main.
+  // dashboard error boundary) to the local diagnostics recorder in main.
   reportRendererError: (report: {
     message?: string;
     stack?: string;
     digest?: string;
     route?: string;
   }) => ipcRenderer.invoke('report-renderer-error', report),
-
-  getPostHogBootstrap: () => ipcRenderer.invoke('get-posthog-bootstrap'),
 
   getStatus: () => ipcRenderer.invoke('get-status'),
 
@@ -64,22 +62,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('rasterize-print-document', request),
   rasterizeKotDocument: (request: unknown) => ipcRenderer.invoke('rasterize-kot-document', request),
   saveHtmlAsPdf: (request: unknown) => ipcRenderer.invoke('save-html-as-pdf', request),
-
-  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
-  getBetaChannel: () => ipcRenderer.invoke('updates:get-beta-channel'),
-  setBetaChannel: (enabled: boolean) => ipcRenderer.invoke('updates:set-beta-channel', enabled),
-  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-  downloadUpdate: () => ipcRenderer.invoke('download-update'),
-  getAutoUpdateCheck: () => ipcRenderer.invoke('updates:get-auto-check'),
-  setAutoUpdateCheck: (enabled: boolean) => ipcRenderer.invoke('updates:set-auto-check', enabled),
-  restartAndInstall: (pin?: string) => ipcRenderer.invoke('restart-and-install', pin),
-  onUpdateStatus: (callback: (status: unknown) => void) => {
-    const handler = (_event: unknown, status: unknown) => callback(status);
-    ipcRenderer.on('update-status', handler);
-    return () => {
-      ipcRenderer.removeListener('update-status', handler);
-    };
-  },
 
   // Windows/Linux title-bar menu row. The labels come from the main-process
   // application menu; each click pops that entry's real submenu.

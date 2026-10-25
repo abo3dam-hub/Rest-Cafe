@@ -48,7 +48,6 @@ import {
   retainBackupLocally,
   setLocalBackupEnabled,
 } from './services/local-backup';
-import { readPostHogBootstrap } from './services/posthog';
 
 // Cap on the log content attached to a support ticket (most recent bytes only).
 const LOG_TAIL_MAX_BYTES = 200_000;
@@ -703,14 +702,6 @@ export function registerIpcHandlers(
       correlation_id: randomUUID(),
     });
     return { success: true };
-  });
-
-  handle('get-posthog-bootstrap', async () => {
-    try {
-      return readPostHogBootstrap();
-    } catch {
-      return { enabled: false };
-    }
   });
 
   // Printers

@@ -44,11 +44,6 @@ import {
   resolveEffectivePermissions,
 } from '../services/authorization';
 import { serializeOperationFailure } from '../lib/operation-failure';
-import { capturePostHogUsage, syncPostHogIdentity } from '../services/posthog';
-import {
-  PRODUCT_ANALYTICS_LEVEL_SETTING,
-  parseProductAnalyticsLevel,
-} from '../services/posthog-identity';
 
 const router = Router();
 
@@ -911,11 +906,8 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       email_marketing,
       product_analytics_level,
     } = req.body;
-    // Without a choice the store shares anonymously and the owner is asked after setup.
-    const analyticsLevel = parseProductAnalyticsLevel(product_analytics_level);
-    // Rest&Cafe: telemetry is never enabled in this build, whatever the
-    // setup wizard's analytics choice says.
-    const telemetryChoice = 'false';
+    // Rest&Cafe collects no analytics or telemetry: the setup wizard's
+    // analytics choice is accepted in the payload and ignored.
     const email = normalizeEmail(req.body.email);
     // Rest&Cafe has no country profiles: regional settings are plain
     // settings with generic defaults (SYP / Asia/Damascus), all editable
@@ -1080,11 +1072,8 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
         service_model: normalizedServiceModel,
         setup_profile: pendingCurrencyReset ? 'empty' : normalizedSetupProfile,
         onboarding_completed: 'true',
-        anonymous_data_consent: telemetryChoice,
-        telemetry_enabled: telemetryChoice,
-        ...(analyticsLevel ? { [PRODUCT_ANALYTICS_LEVEL_SETTING]: analyticsLevel } : {}),
-        telemetry_scope:
-          'usage_stats,country,app_version,platform,session_duration,feature_usage,error_diagnostics',
+        anonymous_data_consent: 'false',
+        telemetry_enabled: 'false',
         split_checks_enabled: 'false',
         // '1'/'0', not 'true'/'false' — mirrors FloAdmin's own `stores` table and
         // matches how cloud-sync.ts reads this key everywhere else.
@@ -1114,12 +1103,6 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     } catch (error) {
       console.warn('[Auth] Cloud registration profile refresh deferred after setup:', error);
     }
-    syncPostHogIdentity();
-    capturePostHogUsage('setup_completed', {
-      setup_profile: normalizedSetupProfile,
-      service_model: normalizedServiceModel,
-      business_type,
-    });
 
     const token = jwt.sign(
       { userId, email, role: INITIAL_ADMIN_ROLE, jti: randomUUID() },

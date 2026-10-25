@@ -11,7 +11,6 @@ import {
   assertAdministrationReachable,
 } from '../services/authorization';
 import { cloudSync } from '../services/cloud-sync';
-import { syncPostHogIdentity } from '../services/posthog';
 import { serializeOperationFailure } from '../lib/operation-failure';
 import { isValidEmail } from './auth';
 import { ROLE_ACCESS, ROLE_KEYS, OPERATIONAL_ROLES, hasRole } from '../../shared/role-permissions';
@@ -560,7 +559,6 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
       });
     }
     invalidateUserAuthCache(req.params.id as string);
-    syncPostHogIdentity();
     if (ownerEmailSynced) {
       try {
         cloudSync.refreshRegistrationProfile();

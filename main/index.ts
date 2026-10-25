@@ -24,54 +24,20 @@ import {
   now,
   withDatabaseRequest,
 } from './db';
-import {
-  BETA_CHANNEL_SETTING_KEY,
-  parseStoredBetaChannelEnabled,
-  resolveUpdateChannel,
-} from './update-channel';
 import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/catalog';
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
 import { cloudSync } from './services/cloud-sync';
-import { isOfflineMode, onOfflineModeEnabled } from './services/offline-mode';
-import { telemetry } from './services/telemetry';
-import { capturePostHogException, startPostHog, stopPostHog } from './services/posthog';
+import { isOfflineMode } from './services/offline-mode';
 import { googleDrive } from './services/google-drive';
 import { localBackup } from './services/local-backup';
 import { startKdsServer, stopKdsServer, getKdsPort, isKdsServerRunning } from './kds-server';
 import { startServerApp, stopServerApp, getServerAppPort, isServerAppRunning } from './server-app';
 import { initPrinter } from './printers/thermal';
 import { destroySharedRasterRenderer } from './printers/raster-renderer';
-import { registerIpcHandlers } from './ipc';
+import { isTrustedMainWindowSender, registerIpcHandlers } from './ipc';
 import { authorizeMasterPin } from './services/master-pin';
 import log from 'electron-log/main';
-import { autoUpdater } from 'electron-updater';
-import { CancellationToken } from 'builder-util-runtime';
 import { isAllowedLocalWindowUrl, isSafeExternalUrl } from './security/url-allowlist';
-import {
-  AUTO_UPDATE_CHECK_SETTING_KEY,
-  canAcceptUpdateCheckResult,
-  canStartUpdateDownload,
-  classifyUpdateError,
-  initialUpdateState,
-  isMissingUpdateConfigError,
-  isUpdateCheckInFlight,
-  isInstallReady,
-  isDevelopmentOrUnpackedArtifact,
-  missingUpdateConfigState,
-  oneShotUpdateState,
-  parseStoredAutoUpdateCheckEnabled,
-  type StoredUpdateStatus,
-  type UpdateErrorPhase,
-} from './update-state';
-import {
-  createAutoUpdaterErrorHandler,
-  createRestartAndInstallHandler,
-  createSuspendUpdaterForOfflineMode,
-  createUpdateCheckTracker,
-  linkUpdateCheckRequests,
-  type UpdateRequestExecutor,
-  type UpdateShutdownState,
-} from './updater-shutdown';
 import { clearStaleRenderCachesOnVersionChange } from './startup-cache';
 import {
   createLocalWindowOpenHandler,
@@ -80,7 +46,6 @@ import {
   resolveTitleBarMode,
   type TitleBarMode,
 } from './window-options';
-import { registerDirectUpdateIpcHandlers } from './update-ipc';
 import {
   applyTitleBarOverlayTheme,
   resolveTitleBarOverlayColors,
@@ -123,17 +88,6 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
 }
 
-// Mac App Store builds: Electron sets process.mas = true inside the MAS sandbox.
-// MAS_BUILD=1 is the build-time fallback (dev/CI).
-const isMasBuild =
-  process.env.MAS_BUILD === '1' || (process as NodeJS.Process & { mas?: boolean }).mas === true;
-
-// MSIX apps install under WindowsApps; check path for runtime detection.
-const isMsixBuild =
-  process.platform === 'win32' && process.execPath.toLowerCase().includes('windowsapps');
-
-// Either store build: skip third-party auto-updater entirely.
-const isStoreBuild = isMasBuild || isMsixBuild;
 const UNPACKED_DEV_MARKER = 'flo-unpacked-dev.marker';
 
 log.initialize();
@@ -143,334 +97,9 @@ log.transports.console.level = 'debug';
 const logPath = log.transports.file.getFile().path.replace(/[^\/\\]+$/, '');
 console.log('[Log] Log files location:', logPath);
 
-// Persisted update state: transitions are routed here for status recovery.
-let storedUpdateStatus: StoredUpdateStatus = initialUpdateState();
-let updaterPhase: UpdateErrorPhase = 'check';
-let stagedUpdateReady = false;
-const updateCheckTracker = createUpdateCheckTracker({
-  shouldRunDeferredCheck: () =>
-    !isOfflineMode() && !isInstallReady(storedUpdateStatus, stagedUpdateReady),
-});
 let startupFailure = false;
-let isInstallingUpdate = false;
-let betaChannelTransitionTail: Promise<void> = Promise.resolve();
 
 // Beta channel opt-in stored in SQLite settings; defaults to stable on error.
-function readBetaChannelEnabled(): boolean {
-  try {
-    const row = getDatabase()
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get(BETA_CHANNEL_SETTING_KEY) as { value: string | null } | undefined;
-    const prerelease = autoUpdater.currentVersion.prerelease[0];
-    const isBetaBuild = prerelease === 'beta';
-    return parseStoredBetaChannelEnabled(row?.value, isBetaBuild);
-  } catch (error) {
-    log.warn('[Update] Could not read beta-channel preference; using stable:', error);
-    return false;
-  }
-}
-
-function writeBetaChannelEnabled(enabled: boolean): void {
-  getDatabase()
-    .prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)')
-    .run(BETA_CHANNEL_SETTING_KEY, enabled ? 'true' : 'false', now());
-}
-
-function readAutoUpdateCheckEnabled(): boolean {
-  try {
-    const row = getDatabase()
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get(AUTO_UPDATE_CHECK_SETTING_KEY) as { value: string | null } | undefined;
-    return parseStoredAutoUpdateCheckEnabled(row?.value);
-  } catch (error) {
-    log.warn('[Update] Could not read automatic update preference; checking anyway:', error);
-    return true;
-  }
-}
-
-function writeAutoUpdateCheckEnabled(enabled: boolean): void {
-  getDatabase()
-    .prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)')
-    .run(AUTO_UPDATE_CHECK_SETTING_KEY, enabled ? 'true' : 'false', now());
-}
-
-function enqueueBetaChannelTransition<T>(operation: () => Promise<T>): Promise<T> {
-  const transition = betaChannelTransitionTail.then(operation, operation);
-  betaChannelTransitionTail = transition.then(
-    () => undefined,
-    () => undefined,
-  );
-  return transition;
-}
-
-function configureAutoUpdaterChannel(betaOptInOverride?: boolean): void {
-  const prerelease = autoUpdater.currentVersion.prerelease[0];
-  const versionChannel = typeof prerelease === 'string' ? prerelease : null;
-  const resolved = resolveUpdateChannel({
-    versionPrereleaseChannel: versionChannel,
-    betaOptIn: betaOptInOverride ?? readBetaChannelEnabled(),
-  });
-
-  autoUpdater.channel = resolved.channel;
-  autoUpdater.allowPrerelease = resolved.allowPrerelease;
-  // Allow downgrade only for beta builds remaining on beta feed.
-  autoUpdater.allowDowngrade = resolved.allowDowngrade;
-
-  if (resolved.channel) {
-    log.info(`[Update] Opted into ${resolved.channel} release channel`);
-  } else if (versionChannel) {
-    // Unsupported prerelease channels fall back to stable updates.
-    log.warn(
-      `[Update] Unsupported prerelease channel ${versionChannel}; using stable updates only`,
-    );
-  }
-}
-
-function setUpdateStatus(next: StoredUpdateStatus): void {
-  if (next.status !== storedUpdateStatus.status) {
-    const reasonSuffix = next.reason ? ` (${next.reason})` : '';
-    log.info(
-      `[Update] Status change: ${storedUpdateStatus.status} -> ${next.status}${reasonSuffix}`,
-    );
-  }
-  storedUpdateStatus = next;
-  mainWindow?.webContents.send('update-status', storedUpdateStatus);
-}
-
-function setupAutoUpdater(): void {
-  autoUpdater.logger = log;
-  configureAutoUpdaterChannel();
-  // The user approves both the download and the restart-to-install.
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-
-  // electron-updater has no public check cancellation; every provider metadata request uses this executor.
-  const updaterHttpExecutor = (
-    autoUpdater as unknown as { httpExecutor?: UpdateRequestExecutor | null }
-  ).httpExecutor;
-  if (updaterHttpExecutor) {
-    linkUpdateCheckRequests(updaterHttpExecutor, () => updateCheckToken);
-  } else {
-    log.warn('[Update] Updater HTTP executor unavailable; Offline mode cannot abort checks');
-  }
-
-  autoUpdater.on('checking-for-update', () => {
-    if (isOfflineMode() || !updateCheckTracker.canAcceptCheckEvent()) return;
-    console.log('[Update] Checking for updates...');
-    updaterPhase = 'check';
-    setUpdateStatus({ status: 'checking' });
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    if (
-      !canAcceptUpdateCheckResult(
-        storedUpdateStatus,
-        updaterPhase,
-        isOfflineMode(),
-        updateCheckTracker.canAcceptCheckEvent(),
-      )
-    ) {
-      return;
-    }
-    console.log('[Update] Update available, awaiting user approval to download:', info.version);
-    updaterPhase = 'check';
-    setUpdateStatus({
-      status: 'available',
-      version: info.version,
-      releaseDate: info.releaseDate,
-      releaseNotes: info.releaseNotes,
-    });
-  });
-
-  autoUpdater.on('update-not-available', () => {
-    if (
-      !canAcceptUpdateCheckResult(
-        storedUpdateStatus,
-        updaterPhase,
-        isOfflineMode(),
-        updateCheckTracker.canAcceptCheckEvent(),
-      )
-    ) {
-      return;
-    }
-    console.log('[Update] No updates available');
-    setUpdateStatus({ status: 'up-to-date' });
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    console.log(`[Update] Download progress: ${progress.percent.toFixed(1)}%`);
-    setUpdateStatus({
-      status: 'downloading',
-      percent: progress.percent,
-      version: storedUpdateStatus.version,
-    });
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    // The renderer's update badge shows a "Restart Now" prompt. Because
-    // autoInstallOnAppQuit is disabled, only that explicit action installs it.
-    console.log('[Update] Download complete:', info.version);
-    stagedUpdateReady = true;
-    updaterPhase = 'check';
-    setUpdateStatus({
-      status: 'ready-to-install',
-      version: info.version,
-    });
-  });
-
-  autoUpdater.on(
-    'error',
-    createAutoUpdaterErrorHandler({
-      getPhase: () => updaterPhase,
-      setPhase: (phase) => {
-        updaterPhase = phase;
-      },
-      isInstallReady: () => isInstallReady(storedUpdateStatus, stagedUpdateReady),
-      isInstallingUpdate: () => isInstallingUpdate,
-      isOfflineSuppressed: () => isOfflineMode(),
-      isStaleCheckSuppressed: () =>
-        updaterPhase === 'check' && !updateCheckTracker.canAcceptCheckEvent(),
-      setUpdateStatus,
-      onInstallFailure: () => requestRuntimeRelaunchOnce('update-install-failed'),
-      logInfo: (message, detail) => log.info(message, detail),
-    }),
-  );
-  onOfflineModeEnabled(suspendUpdaterForOfflineMode);
-}
-
-function checkForUpdates(): void {
-  if (isInstallReady(storedUpdateStatus, stagedUpdateReady)) {
-    log.info('[Update] Ignoring check while a staged update awaits installation');
-    return;
-  }
-
-  if (isUpdateCheckInFlight(storedUpdateStatus, updaterPhase)) {
-    log.info('[Update] Ignoring check while another update operation is in progress');
-    return;
-  }
-
-  if (isOfflineMode()) {
-    setUpdateStatus({ status: 'offline', reason: 'unknown', error: 'Offline mode is on' });
-    return;
-  }
-
-  // Linux: only AppImage supports self-update via electron-updater;
-  // package manager installs are notified accordingly.
-  if (process.platform === 'linux' && !process.env.APPIMAGE) {
-    log.info('[Update] Linux non-AppImage install — updates managed by package manager');
-    setUpdateStatus(oneShotUpdateState('linux-managed'));
-    return;
-  }
-
-  if (isStoreBuild) {
-    log.debug('[Update] Store build — updates handled by the platform store');
-    setUpdateStatus(oneShotUpdateState('store-managed'));
-    return;
-  }
-
-  const isUpdaterDevelopmentArtifact = isDevelopmentOrUnpackedArtifact({
-    defaultApp: (process as NodeJS.Process & { defaultApp?: boolean }).defaultApp === true,
-    packaged: app.isPackaged,
-    unpackedMarker: fs.existsSync(path.join(process.resourcesPath, UNPACKED_DEV_MARKER)),
-  });
-  const configPath = path.join(process.resourcesPath, 'app-update.yml');
-  let configMissing = false;
-  let configProbeFailed = false;
-  let configProbeError: unknown;
-  if (!isUpdaterDevelopmentArtifact) {
-    try {
-      fs.statSync(configPath);
-    } catch (error) {
-      if (isMissingUpdateConfigError(error)) {
-        configMissing = true;
-      } else {
-        configProbeFailed = true;
-        configProbeError = error;
-      }
-    }
-  }
-  const configDetail = `app-update.yml not found at ${configPath}`;
-  if (isUpdaterDevelopmentArtifact) {
-    log.debug('[Update] Skipping update check in dev mode');
-    setUpdateStatus(oneShotUpdateState('dev-mode'));
-    return;
-  }
-
-  if (configProbeFailed) {
-    const classified = classifyUpdateError(configProbeError, 'check');
-    log.info(
-      `[Update] Update configuration probe classified as ${classified.state}` +
-        `/${classified.reason}:`,
-      classified.detail,
-    );
-    setUpdateStatus({
-      status: classified.state,
-      reason: classified.reason,
-      error: classified.detail,
-    });
-    return;
-  }
-
-  if (configMissing) {
-    log.info('[Update] Packaged build is missing app-update.yml at', configPath);
-    setUpdateStatus(missingUpdateConfigState(false, configDetail));
-    return;
-  }
-
-  updaterPhase = 'check';
-  setUpdateStatus({ status: 'checking' });
-  updateCheckTracker.beginCheck(() => {
-    updaterPhase = 'check';
-    setUpdateStatus({ status: 'checking' });
-    const checkToken = new CancellationToken();
-    updateCheckToken = checkToken;
-    return autoUpdater
-      .checkForUpdates()
-      .catch((err) => {
-        // Record error state; catch prevents unhandled rejection.
-        console.error('[Update] Check failed:', err);
-      })
-      .finally(() => {
-        if (updateCheckToken === checkToken) updateCheckToken = null;
-      });
-  });
-}
-
-let updateCheckToken: CancellationToken | null = null;
-let updateDownloadToken: CancellationToken | null = null;
-
-const suspendUpdaterForOfflineMode = createSuspendUpdaterForOfflineMode({
-  getPhase: () => updaterPhase,
-  setPhase: (phase) => {
-    updaterPhase = phase;
-  },
-  getStatus: () => storedUpdateStatus,
-  setUpdateStatus,
-  cancelDownload: () => {
-    updateDownloadToken?.cancel();
-    updateDownloadToken = null;
-  },
-  invalidateCheck: () => {
-    updateCheckToken?.cancel();
-    updateCheckTracker.invalidateActiveCheck();
-  },
-});
-
-function downloadUpdate(): { success: boolean; error?: string } {
-  if (isOfflineMode()) return { success: false, error: 'Offline mode is on' };
-  if (!canStartUpdateDownload(storedUpdateStatus, updaterPhase, stagedUpdateReady)) {
-    return { success: false, error: 'No update is waiting to be downloaded' };
-  }
-  log.info(`[Update] User approved download of ${storedUpdateStatus.version ?? 'update'}`);
-  updaterPhase = 'download';
-  setUpdateStatus({ status: 'downloading', percent: 0, version: storedUpdateStatus.version });
-  updateDownloadToken = new CancellationToken();
-  autoUpdater.downloadUpdate(updateDownloadToken).catch((err) => {
-    // The updater 'error' event records the failure state.
-    console.error('[Update] Download failed:', err);
-  });
-  return { success: true };
-}
 
 // Best-effort startup check for tax pack plugin updates.
 async function checkTaxPackUpdatesOnStartup(): Promise<void> {
@@ -545,18 +174,6 @@ function clearRendererStabilityResetTimer(): void {
     rendererStabilityResetTimer = null;
   }
 }
-const updateShutdownState: UpdateShutdownState = {
-  setInstallingUpdate: (value) => {
-    isInstallingUpdate = value;
-  },
-  setQuitting: (value) => {
-    isQuitting = value;
-    if (value) {
-      runtimeState = 'stopping';
-      log.info('[Lifecycle] Runtime is stopping');
-    }
-  },
-};
 
 function showMainWindow(expectedWindow?: BrowserWindow): boolean {
   if (isQuitting || isShutdownRequested()) return false;
@@ -1478,7 +1095,6 @@ function createMenu(): void {
         ...(process.platform !== 'darwin'
           ? [{ label: 'About Flo', click: () => showAbout() }]
           : []),
-        ...(isStoreBuild ? [] : [{ label: 'Check for Updates', click: () => checkForUpdates() }]),
         {
           label: 'Open Logs Folder',
           click: () => shell.showItemInFolder(log.transports.file.getFile().path),
@@ -1550,12 +1166,9 @@ async function initialize(): Promise<void> {
     await startServer();
     if (isShutdownRequested()) return;
 
-    // Rest&Cafe: cloud sync and telemetry are never started in this build.
-    // Their local recorders (e.g. print-failure diagnostics) keep working;
-    // only the network layer stays off. Manual updates only (phase 1).
-    // cloudSync.start();
-    // telemetry.start();
-    startPostHog();
+    // Rest&Cafe: no cloud sync, telemetry, or analytics services exist in
+    // this build. Local recorders (e.g. print-failure diagnostics) keep
+    // working. Manual updates only.
     googleDrive.start();
     localBackup.start();
 
@@ -1586,48 +1199,44 @@ async function initialize(): Promise<void> {
       () => currentEffectiveIsDark,
     );
 
-    registerDirectUpdateIpcHandlers({
-      ipcMain,
-      getMainWindow: () => mainWindow,
-      getServerPort,
-      getStoredUpdateStatus: () => storedUpdateStatus,
-      getStagedUpdateReady: () => stagedUpdateReady,
-      getUpdaterPhase: () => updaterPhase,
-      getAppVersion: () => app.getVersion(),
-      checkForUpdates,
-      downloadUpdate: () => downloadUpdate(),
-      readAutoUpdateCheckEnabled,
-      writeAutoUpdateCheckEnabled,
-      readBetaChannelEnabled,
-      writeBetaChannelEnabled,
-      enqueueBetaChannelTransition,
-      configureAutoUpdaterChannel,
-      setUpdateStatus,
-      restartAndInstallHandler: createRestartAndInstallHandler({
-        isInstallReady: () => isInstallReady(storedUpdateStatus, stagedUpdateReady),
-        authorize: (pin) => authorizeMasterPin(pin, 'ipc:restart-and-install'),
-        runCleanup,
-        quitAndInstall: (isSilent, isForceRunAfter) =>
-          autoUpdater.quitAndInstall(isSilent, isForceRunAfter),
-        updateState: updateShutdownState,
-        onInstallFailure: () => requestRuntimeRelaunchOnce('update-install-failed'),
-        warn: (message) => log.warn(message),
-        error: (message, error) => log.error(message, error),
-      }),
-      isServerRunning,
-      isKdsServerRunning,
-      isServerAppRunning,
-      getResolvedTitleBarMode: () => resolvedTitleBarMode,
-      getRendererReadinessEpoch,
-      getRendererDocumentNonce,
-      getCurrentEffectiveIsDark: () => currentEffectiveIsDark,
-      setCurrentEffectiveIsDark: (isDark) => {
-        currentEffectiveIsDark = isDark;
-      },
-      applyTitleBarOverlayTheme,
-      resolveTitleBarOverlayColors,
-      withDatabaseRequest,
-      log,
+    // Main-window status and theme IPC. Software updates are manual (the
+    // owner installs new builds by hand), so no update channels exist.
+    ipcMain.handle('get-status', (event) => {
+      if (!isTrustedMainWindowSender(event, () => mainWindow, getServerPort())) {
+        return { error: 'Unauthorized sender' };
+      }
+      const mem = process.memoryUsage();
+      return {
+        server: isServerRunning() ? 'running' : 'stopped',
+        kdsServer: isKdsServerRunning() ? 'running' : 'stopped',
+        serverApp: isServerAppRunning() ? 'running' : 'stopped',
+        memory: {
+          heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+          rss: Math.round(mem.rss / 1024 / 1024),
+        },
+        uptime: process.uptime(),
+        port: getServerPort(),
+        titleBarMode: resolvedTitleBarMode,
+        titleBarEpoch: getRendererReadinessEpoch(),
+        titleBarDocumentNonce: getRendererDocumentNonce() ?? undefined,
+        effectiveTheme: currentEffectiveIsDark ? 'dark' : 'light',
+      };
+    });
+
+    ipcMain.handle('set-theme-effective', (event, isDark: unknown) => {
+      if (!isTrustedMainWindowSender(event, () => mainWindow, getServerPort())) {
+        return { success: false, error: 'Unauthorized sender' };
+      }
+      if (typeof isDark !== 'boolean') {
+        return { success: false, error: 'isDark must be boolean' };
+      }
+      currentEffectiveIsDark = isDark;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        applyTitleBarOverlayTheme(mainWindow, isDark, process.platform);
+        mainWindow.setBackgroundColor(resolveTitleBarOverlayColors(isDark).color);
+      }
+      return { success: true };
     });
 
     runtimeState = 'ready';
@@ -1639,26 +1248,6 @@ async function initialize(): Promise<void> {
     registerChildProcessCrashTelemetry();
     createTray();
     createMenu();
-    // Auto-updater configured on non-store platforms.
-    // Rest&Cafe: updates are fully manual in phase 1, so the updater stays
-    // off unless RESTCAFE_ENABLE_UPDATER=1 is set explicitly (future phase,
-    // pointed at our own repo). Manual installs only until then.
-    if (!isStoreBuild) {
-      if (
-        process.env.FLO_E2E_SKIP_OPTIONAL_NETWORK !== '1' &&
-        process.env.RESTCAFE_ENABLE_UPDATER === '1'
-      ) {
-        setupAutoUpdater();
-        if (readAutoUpdateCheckEnabled()) {
-          setTimeout(() => checkForUpdates(), 5000);
-        } else {
-          log.info('[Update] Automatic update check disabled; waiting for a manual check');
-        }
-      }
-    } else {
-      // Store builds skip auto-updater and report store-managed status.
-      setUpdateStatus(oneShotUpdateState('store-managed'));
-    }
     if (process.env.FLO_E2E_SKIP_OPTIONAL_NETWORK !== '1') {
       setTimeout(() => {
         void checkTaxPackUpdatesOnStartup();
@@ -1762,8 +1351,6 @@ const cleanupCoordinator = createShutdownCoordinator(
     { name: 'Main server', run: () => stopServer(), blocksDatabase: true },
     { name: 'KDS server', run: () => stopKdsServer(), blocksDatabase: true },
     { name: 'cloud sync', run: () => cloudSync.shutdown(), blocksDatabase: true },
-    { name: 'telemetry', run: () => telemetry.stop(), blocksDatabase: true },
-    { name: 'posthog', run: () => stopPostHog(), blocksDatabase: true },
     { name: 'Google Drive', run: () => googleDrive.stop(), blocksDatabase: true },
     { name: 'local backup', run: () => localBackup.stop(), blocksDatabase: true },
     { name: 'Bonjour', run: () => stopMdns() },
@@ -1775,8 +1362,7 @@ const cleanupCoordinator = createShutdownCoordinator(
   ],
   {
     onFatalTimeout: () => {
-      // Avoid exit(1) on timeout during update installation so updater can hand off.
-      if (!isInstallingUpdate && !runtimeRelaunchRequested) {
+      if (!runtimeRelaunchRequested) {
         app.exit(1);
       }
     },
@@ -1806,7 +1392,6 @@ const { runCleanup, isShutdownRequested, shutdownSignal } = createShutdownEntryp
   destroyWindow: () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
   },
-  isInstallingUpdate: () => isInstallingUpdate,
   reportFailure: (context, error) => {
     console.error(`[Flo] Cleanup failed before ${context}:`, error);
   },
@@ -1822,7 +1407,6 @@ process.on('uncaughtException', (error) => {
       capture_point: 'fc.electron.main.uncaught',
       outcome: 'unknown',
     });
-    capturePostHogException('uncaughtException', error);
   }
 });
 
@@ -1834,6 +1418,5 @@ process.on('unhandledRejection', (reason) => {
       capture_point: 'fc.electron.main.unhandled_rejection',
       outcome: 'unknown',
     });
-    capturePostHogException('unhandledRejection', reason);
   }
 });

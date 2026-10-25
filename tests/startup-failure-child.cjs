@@ -150,17 +150,6 @@ Module._load = function (request, parent, isMain) {
         },
       },
     };
-  if (request === './services/telemetry')
-    return {
-      telemetry: {
-        start() {
-          events.push('telemetry.start');
-        },
-        stop: () => {
-          events.push('telemetry.stop');
-        },
-      },
-    };
   if (request === './services/google-drive')
     return {
       googleDrive: {
@@ -195,7 +184,6 @@ setTimeout(
             'server.stop',
             'kds.stop',
             'cloud.shutdown',
-            'telemetry.stop',
             'drive.stop',
             'database.admission',
             'database.close',
@@ -208,7 +196,6 @@ setTimeout(
             'server.stop',
             'kds.stop',
             'cloud.shutdown',
-            'telemetry.stop',
             'drive.stop',
             'database.admission',
             'database.close',
@@ -217,15 +204,9 @@ setTimeout(
     const passed =
       orderMatches &&
       (startupFailureRace
-        ? exitCodes.length === 1 &&
-          exitCodes[0] === 1 &&
-          !events.includes('telemetry.start') &&
-          !events.includes('drive.start')
+        ? exitCodes.length === 1 && exitCodes[0] === 1 && !events.includes('drive.start')
         : startupRace
-          ? exitCodes.length === 1 &&
-            exitCodes[0] === 0 &&
-            !events.includes('telemetry.start') &&
-            !events.includes('drive.start')
+          ? exitCodes.length === 1 && exitCodes[0] === 0 && !events.includes('drive.start')
           : exitCodes.length === 1 && exitCodes[0] === 1);
     process.stdout.write(JSON.stringify({ passed, events, exitCodes }) + '\n');
     fs.rmSync(testDir, { recursive: true, force: true });

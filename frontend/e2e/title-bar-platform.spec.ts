@@ -222,29 +222,22 @@ test('browser Electron fixture exposes the complete renderer API and explicit in
     keys: Object.keys(window.electronAPI || {}).sort(),
     focus: document.documentElement.dataset.floWindowFocused,
     appInfo: await window.electronAPI?.getAppInfo(),
-    updateStatus: await window.electronAPI?.getUpdateStatus(),
   }));
   expect(contract.keys).toEqual([
     'backupDatabase',
-    'checkForUpdates',
     'dbApplySafeFixes',
     'dbHealthCheck',
     'dbInitialize',
-    'downloadUpdate',
     'getAppInfo',
     'getApplicationMenu',
-    'getAutoUpdateCheck',
-    'getBetaChannel',
     'getKdsInfo',
     'getLogTail',
     'getMasterPinStatus',
     'getPrinters',
     'getSettings',
     'getStatus',
-    'getUpdateStatus',
     'getWindowState',
     'onMenuAction',
-    'onUpdateStatus',
     'onWindowStateChanged',
     'openApplicationMenu',
     'openKdsWindow',
@@ -253,10 +246,7 @@ test('browser Electron fixture exposes the complete renderer API and explicit in
     'platform',
     'rasterizeKotDocument',
     'rasterizePrintDocument',
-    'restartAndInstall',
     'restoreBackup',
-    'setAutoUpdateCheck',
-    'setBetaChannel',
     'setSetting',
     'setThemeEffective',
     'windowAction',
@@ -264,7 +254,6 @@ test('browser Electron fixture exposes the complete renderer API and explicit in
   ]);
   expect(contract.focus).toBe('false');
   expect(contract.appInfo).toMatchObject({ version: 'e2e', platform: 'darwin' });
-  expect(contract.updateStatus).toMatchObject({ status: 'dev-mode', info: { version: 'e2e' } });
 });
 
 test('browser Electron fixture drives authenticated title-bar and fallback controls', async ({

@@ -5,7 +5,6 @@ import { useTranslations } from 'use-intl';
 import { useAuthStore } from '@/store/auth';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ApplicationMenuRow from './ApplicationMenuRow';
-import UpdateBadge from './UpdateBadge';
 import { useDesktopTitleBarSync } from './titlebar-sync';
 
 const subscribeToElectronCapability = () => () => {};
@@ -65,11 +64,6 @@ export default function TitleBar() {
         {/* Windows/Linux: the frameless window has no native menu bar, so the
             top-level application menu is restored here (macOS keeps the native one). */}
         <ApplicationMenuRow />
-
-        {/* Trailing edge: Update badge */}
-        <div className="flo-title-bar__interactive pointer-events-auto ms-auto flex items-center">
-          <UpdateBadge />
-        </div>
       </div>
 
       {/* Centered business name */}

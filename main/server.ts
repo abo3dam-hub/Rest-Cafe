@@ -28,7 +28,6 @@ import {
   isTokenRevoked,
   isTokenStale,
 } from './middleware/security';
-import { postHogApiFailureMiddleware } from './services/posthog';
 import { API_JSON_BODY_LIMIT } from './http-limits';
 import { buildCspHeader } from './csp';
 import { resolveContainedPath } from './lib/path-containment';
@@ -195,7 +194,6 @@ export function startServer(): Promise<void> {
     app = express();
 
     app.use(cors(corsOptions));
-    app.use(postHogApiFailureMiddleware);
     // Scope the anonymous pre-login route to a body limit far below the
     // general API import limit, so it can't force a large allocation.
     app.use('/api/support-ticket/pre-login', express.json({ limit: '300kb' }));

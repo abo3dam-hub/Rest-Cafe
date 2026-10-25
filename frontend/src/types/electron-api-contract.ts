@@ -8,7 +8,6 @@ import type {
   ElectronPrinter,
   ElectronStatus,
   KdsInfo,
-  UpdateStatus,
 } from './electron';
 
 type Equal<Actual, Expected> =
@@ -53,9 +52,6 @@ export type ElectronApiContractChecks = [
   Expect<Equal<ElectronAPI['getAppInfo'], () => Promise<ElectronAppInfo | ElectronIpcError>>>,
   Expect<Equal<ElectronAPI['getPrinters'], () => Promise<ElectronPrinter[] | ElectronIpcError>>>,
   Expect<Equal<ElectronAPI['getStatus'], () => Promise<ElectronStatus>>>,
-  Expect<
-    Equal<ElectronAPI['onUpdateStatus'], (callback: (status: UpdateStatus) => void) => () => void>
-  >,
 ];
 
 // savePrinter and getDailySummary are deliberately absent: both are removed
@@ -79,13 +75,6 @@ export type ElectronApiMethodPresence = Pick<
   | 'getAppInfo'
   | 'getStatus'
   | 'getPrinters'
-  | 'onUpdateStatus'
-  | 'getUpdateStatus'
-  | 'checkForUpdates'
-  | 'downloadUpdate'
-  | 'getAutoUpdateCheck'
-  | 'setAutoUpdateCheck'
-  | 'restartAndInstall'
   | 'platform'
 >;
 
@@ -93,5 +82,4 @@ export type ElectronApiContractModels = [
   Expect<Equal<keyof KdsInfo, 'url' | 'wsUrl' | 'localIP' | 'port'>>,
   Expect<Equal<ElectronPrinter['connection_type'], 'network' | 'usb' | 'webusb'>>,
   Expect<Equal<ElectronPrinter['port'], number | null>>,
-  Expect<Equal<UpdateStatus['releaseNotes'], unknown>>,
 ];
