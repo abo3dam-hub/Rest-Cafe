@@ -797,7 +797,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
           {taxMode === 'off' && t('modeOffHint')}
-          {taxMode === 'manual' && t('modeManualHint', { country: storeCountry })}
+          {taxMode === 'manual' && t('modeManualHint')}
           {manualBuilderOpen && taxMode !== 'manual' && t('modeManualUnsavedHint')}
         </p>
       </section>
@@ -820,7 +820,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t('manualBuilderHint', { country: storeCountry || t('yourStore') })}
+            {t('manualBuilderHint')}
           </p>
 
           <div className="mt-4 space-y-3">
@@ -981,7 +981,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
 
           {manualOverrideConfirm && (
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <span>{t('manualOverrideConfirm', { country: storeCountry })}</span>
+              <span>{t('manualOverrideConfirm')}</span>
               <div className="flex gap-2 shrink-0">
                 <Button variant="outline" onClick={() => setManualOverrideConfirm(null)}>
                   {t('cancel')}
@@ -1028,7 +1028,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                 <h3 className="font-semibold text-foreground">{t('installedPacks')}</h3>
               </div>
               <span className="text-xs text-muted-foreground">
-                {t('installedPacksHint', { country: storeCountry })}
+                {t('installedPacksHint')}
               </span>
             </div>
 
@@ -1037,7 +1037,6 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                 {detail.active_version ? (
                   <>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <Info label={t('storeCountry')} value={storeCountry} />
                       <Info label={t('jurisdiction')} value={selectedPack.jurisdiction} />
                       <Info label={t('activeVersion')} value={detail.active_version.version} />
                       <Info label={t('trustStatus')} value={detail.pack.trust_status} />
