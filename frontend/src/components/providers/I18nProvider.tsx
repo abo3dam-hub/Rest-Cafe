@@ -8,7 +8,7 @@ import { getCachedMessages, loadLocaleMessages } from '@/lib/i18n/loader';
 
 /** Wraps application in use-intl's IntlProvider with lazy-loaded messages,
  * packaged English fallback, and atomic locale switching. */
-function resolveInitialLanguage(): Language {
+export function resolveInitialLanguage(): Language {
   if (typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem('pos-settings');
