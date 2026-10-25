@@ -185,12 +185,16 @@ async function run(): Promise<void> {
   );
   fs.writeFileSync(tokenPath, 'unreadable-token', { mode: 0o600 });
   const ambiguousRestore = await restoreHandler(trustedSender, '1234', validManaged);
-  assert.deepEqual(
-    ambiguousRestore,
-    { success: false, error: 'conflict' },
-    'ambiguous restore state blocks an unconfigured local restore',
+  assert.equal(
+    ambiguousRestore.success,
+    true,
+    'stale Google Drive restore state is ignored and no longer blocks a local restore',
   );
-  assert.equal(fs.existsSync(restoreIntentPath), true, 'ambiguous restore state remains protected');
+  assert.equal(
+    fs.existsSync(restoreIntentPath),
+    true,
+    'stale restore state file is left untouched',
+  );
 
   console.log('✅ Restore managed-path boundary and IPC tests passed');
 }

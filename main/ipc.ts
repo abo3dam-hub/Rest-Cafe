@@ -37,7 +37,6 @@ import {
 } from './window-readiness';
 import { isThemeMode, appendThemeQueryParam } from './title-bar-theme';
 import { isOrdersLayout } from './routes/settings';
-import { googleDrive } from './services/google-drive';
 import { rasterizeKotDocumentForWebUsb, rasterizePrintDocumentForWebUsb } from './printers/thermal';
 import { isKotDocument, isPrintDocument } from '../shared/print/document';
 import log from 'electron-log/main';
@@ -351,43 +350,15 @@ export function registerIpcHandlers(
         }
       }
 
-      await googleDrive.prepareForDatabaseRestore();
-      try {
-        if (versionMismatch) {
-          const restoreResult = await withDatabaseMaintenanceLock(
-            (signal) => restoreBackup(backupPath, false, signal),
-            shutdownSignal,
-          );
-          const cleanup = restoreResult.success ? googleDrive.completeDatabaseRestore() : null;
-          clearUserAuthCache();
-          clearInMemoryRevokedTokens();
-          clearJWTSecretCache();
-          const cleanupPending =
-            restoreResult.cleanupPending === true || cleanup?.cleanupPending === true;
-          return {
-            success: restoreResult.success,
-            mode: restoreResult.mode,
-            backupVersion,
-            currentVersion: getCurrentSchemaVersion(),
-            tablesRestored: restoreResult.tablesRestored,
-            message: restoreResult.success
-              ? `Restored ${restoreResult.tablesRestored} tables (data-only mode due to version mismatch)`
-              : `Restore failed: ${restoreResult.error}`,
-            error: restoreResult.error,
-            cleanupPending,
-          };
-        }
-
+      if (versionMismatch) {
         const restoreResult = await withDatabaseMaintenanceLock(
-          (signal) => restoreBackup(backupPath, true, signal),
+          (signal) => restoreBackup(backupPath, false, signal),
           shutdownSignal,
         );
-        const cleanup = restoreResult.success ? googleDrive.completeDatabaseRestore() : null;
         clearUserAuthCache();
         clearInMemoryRevokedTokens();
         clearJWTSecretCache();
-        const cleanupPending =
-          restoreResult.cleanupPending === true || cleanup?.cleanupPending === true;
+        const cleanupPending = restoreResult.cleanupPending === true;
         return {
           success: restoreResult.success,
           mode: restoreResult.mode,
@@ -395,14 +366,33 @@ export function registerIpcHandlers(
           currentVersion: getCurrentSchemaVersion(),
           tablesRestored: restoreResult.tablesRestored,
           message: restoreResult.success
-            ? 'Database restored successfully'
+            ? `Restored ${restoreResult.tablesRestored} tables (data-only mode due to version mismatch)`
             : `Restore failed: ${restoreResult.error}`,
           error: restoreResult.error,
           cleanupPending,
         };
-      } finally {
-        googleDrive.releaseDatabaseRestore();
       }
+
+      const restoreResult = await withDatabaseMaintenanceLock(
+        (signal) => restoreBackup(backupPath, true, signal),
+        shutdownSignal,
+      );
+      clearUserAuthCache();
+      clearInMemoryRevokedTokens();
+      clearJWTSecretCache();
+      const cleanupPending = restoreResult.cleanupPending === true;
+      return {
+        success: restoreResult.success,
+        mode: restoreResult.mode,
+        backupVersion,
+        currentVersion: getCurrentSchemaVersion(),
+        tablesRestored: restoreResult.tablesRestored,
+        message: restoreResult.success
+          ? 'Database restored successfully'
+          : `Restore failed: ${restoreResult.error}`,
+        error: restoreResult.error,
+        cleanupPending,
+      };
     } catch (error: unknown) {
       console.error('[IPC] restore-backup: Error:', error);
       return { success: false, error: getErrorMessage(error) };
@@ -445,12 +435,7 @@ export function registerIpcHandlers(
         return { success: false, error: 'Confirmation phrase does not match' };
       }
 
-      let restorePrepared = false;
       try {
-        // The owner's typed INITIALIZE may discard a Drive restore boundary that can
-        // never resolve on its own; the reset invalidates Drive state either way.
-        await googleDrive.prepareForDatabaseRestore({ discardUnresolvedBoundary: true });
-        restorePrepared = true;
         const keepLocalBackup = isLocalBackupEnabled();
         const { backupPath } = await resetDatabaseWithBackup(shutdownSignal);
         let localBackupFailed = false;
@@ -459,21 +444,18 @@ export function registerIpcHandlers(
         } else {
           setLocalBackupEnabled(false);
         }
-        const cleanup = googleDrive.completeDatabaseRestore();
         clearUserAuthCache();
         clearInMemoryRevokedTokens();
         clearJWTSecretCache();
         return {
           success: true,
           backupPath,
-          cleanupPending: cleanup.cleanupPending,
+          cleanupPending: false,
           localBackupFailed,
         };
       } catch (error: unknown) {
         console.error('[IPC] db-initialize: Error:', error);
         return { success: false, error: getErrorMessage(error) };
-      } finally {
-        if (restorePrepared) googleDrive.releaseDatabaseRestore();
       }
     },
   );

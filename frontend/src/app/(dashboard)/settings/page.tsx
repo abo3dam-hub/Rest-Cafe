@@ -85,9 +85,6 @@ import {
 import {
   DatabaseSettingsTab,
   type BackupInfo,
-  type GoogleDriveStatus,
-  type GoogleDriveDestination,
-  type GoogleDriveRemoteBackup,
   type ImportPayload,
   type MasterPinStatus,
   type PinGate,
@@ -101,35 +98,11 @@ import { useFormatDate } from '@/hooks/useFormatDate';
 import { tenantCan } from '@/lib/permissions';
 
 const CLOUD_ACCOUNT_STATUS_CHANGED_EVENT = 'flo:cloud-account-status-changed';
-const GOOGLE_DRIVE_JOB_POLL_INTERVAL_MS = 500;
-const GOOGLE_DRIVE_JOB_STATUS_RETRY_WINDOW_MS = 30_000;
 // Must match RESTORE_CONFIRMATION in main/routes/database.ts.
 const RESTORE_CONFIRMATION = 'RESTORE BACKUP';
 
 function isRequestCancelled(error: unknown): boolean {
   return axios.isCancel(error);
-}
-
-async function fetchGoogleDriveJob(jobId: string) {
-  const retryDeadline = Date.now() + GOOGLE_DRIVE_JOB_STATUS_RETRY_WINDOW_MS;
-  while (true) {
-    try {
-      const response = await api.get(`/settings/google-drive/jobs/${encodeURIComponent(jobId)}`);
-      return response.data?.job;
-    } catch (error) {
-      if (
-        !axios.isAxiosError(error) ||
-        error.response?.status !== 503 ||
-        Date.now() >= retryDeadline
-      )
-        throw error;
-      const delay = Math.min(
-        GOOGLE_DRIVE_JOB_POLL_INTERVAL_MS,
-        Math.max(0, retryDeadline - Date.now()),
-      );
-      await new Promise((resolve) => window.setTimeout(resolve, delay));
-    }
-  }
 }
 
 function notifyCloudAccountStatusChanged(): void {
@@ -806,38 +779,6 @@ export default function SettingsPage() {
         return { success: true };
       }
       return { success: false, error: result.error || t('restoreFailedGeneric') };
-    }
-
-    if (pinGate.mode === 'restore-google-drive') {
-      try {
-        const response = await api.post('/settings/google-drive/restore', {
-          master_pin: pin,
-          file_id: pinGate.payload.fileId,
-          expected_sha256: pinGate.payload.sha256,
-          confirmation: 'RESTORE GOOGLE DRIVE BACKUP',
-        });
-        setGoogleDriveStatus((previous) => ({ ...previous, ...response.data }));
-        const jobId = response.data?.job?.id;
-        if (typeof jobId !== 'string')
-          return { success: false, error: t('googleDriveRestoreFailed') };
-        while (true) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, GOOGLE_DRIVE_JOB_POLL_INTERVAL_MS),
-          );
-          const job = await fetchGoogleDriveJob(jobId);
-          if (!job) return { success: false, error: t('googleDriveRestoreFailed') };
-          setGoogleDriveStatus((previous) => ({ ...previous, job }));
-          if (job.state === 'succeeded') {
-            setPinGate(null);
-            window.location.reload();
-            return { success: true };
-          }
-          if (job.state === 'failed' || job.state === 'cancelled')
-            return { success: false, error: t('googleDriveRestoreFailed') };
-        }
-      } catch {
-        return { success: false, error: t('googleDriveRestoreFailed') };
-      }
     }
 
     if (pinGate.mode === 'delete-backup') {
@@ -1665,46 +1606,6 @@ export default function SettingsPage() {
   const [diagnosticsConsent, setDiagnosticsConsent] = useState(true);
   const [savingDiagnosticsConsent, setSavingDiagnosticsConsent] = useState(false);
 
-  const [googleDriveStatus, setGoogleDriveStatus] = useState<GoogleDriveStatus>({
-    configured: false,
-    auth_state: 'disconnected',
-    secure_storage_available: true,
-    connected: false,
-    account_email: null,
-    frequency: 'daily',
-    retention_count: 7,
-    destination_folder_id: null,
-    destination_folder_name: null,
-    last_backup_at: null,
-    last_backup_status: null,
-    last_error: null,
-    last_attempt_at: null,
-    last_success_at: null,
-    last_success_kind: null,
-    next_retry_at: null,
-    retention_status: null,
-    revoke_status: null,
-    warning_acknowledged: false,
-    warning_required: true,
-    job: null,
-  });
-  const [remoteBackups, setRemoteBackups] = useState<GoogleDriveRemoteBackup[]>([]);
-  const [remoteBackupsLoading, setRemoteBackupsLoading] = useState(false);
-  const [remoteBackupsNextCursor, setRemoteBackupsNextCursor] = useState<string | null>(null);
-  const [remoteBackupsHasMore, setRemoteBackupsHasMore] = useState(false);
-  const [remoteBackupsLoadingMore, setRemoteBackupsLoadingMore] = useState(false);
-  const [remoteBackupsLoadMoreError, setRemoteBackupsLoadMoreError] = useState<string | null>(null);
-  const driveBackupsGenerationRef = useRef(0);
-  const [googleDriveDestinations, setGoogleDriveDestinations] = useState<GoogleDriveDestination[]>(
-    [],
-  );
-  const [googleDriveDestinationsLoading, setGoogleDriveDestinationsLoading] = useState(false);
-  const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false);
-  const [disconnectingGoogleDrive, setDisconnectingGoogleDrive] = useState(false);
-  const [backingUpGoogleDrive, setBackingUpGoogleDrive] = useState(false);
-  const [savingGoogleDrivePrefs, setSavingGoogleDrivePrefs] = useState(false);
-  const [managingGoogleDriveDestination, setManagingGoogleDriveDestination] = useState(false);
-
   // Kitchen workflow toggle states (defaults to enabled).
   const [kdsEnabledSetting, setKdsEnabledSetting] = useState(true);
   const [requireKitchenDeliveredSetting, setRequireKitchenDeliveredSetting] = useState(false);
@@ -1895,121 +1796,6 @@ export default function SettingsPage() {
       toast.success(t('reloadedFromDb'));
     } catch {
       toast.error(t('reloadFailed'));
-    }
-  };
-
-  const fetchGoogleDriveStatus = async (signal?: AbortSignal): Promise<boolean> => {
-    try {
-      const res = await api.get('/settings/google-drive', signal ? { signal } : undefined);
-      if (signal?.aborted) return false;
-      setGoogleDriveStatus({
-        configured: !!res.data.configured,
-        auth_state: res.data.auth_state || 'disconnected',
-        secure_storage_available: res.data.secure_storage_available !== false,
-        connected: !!res.data.connected,
-        account_email: res.data.account_email || null,
-        frequency: res.data.frequency === 'weekly' ? 'weekly' : 'daily',
-        retention_count: Number(res.data.retention_count) || 7,
-        destination_folder_id: res.data.destination_folder_id || null,
-        destination_folder_name: res.data.destination_folder_name || null,
-        last_backup_at: res.data.last_backup_at || null,
-        last_backup_status: res.data.last_backup_status || null,
-        last_error: res.data.last_error || null,
-        last_attempt_at: res.data.last_attempt_at || null,
-        last_success_at: res.data.last_success_at || null,
-        last_success_kind: res.data.last_success_kind || null,
-        next_retry_at: res.data.next_retry_at || null,
-        retention_status: res.data.retention_status || null,
-        revoke_status:
-          res.data.revoke_status === 'confirmed' || res.data.revoke_status === 'unconfirmed'
-            ? res.data.revoke_status
-            : null,
-        warning_acknowledged: res.data.warning_acknowledged === true,
-        warning_required: res.data.warning_required !== false,
-        job: res.data.job || null,
-      });
-      return !!res.data.configured && !!res.data.connected;
-    } catch (error) {
-      if (isRequestCancelled(error)) return false;
-      // Leave defaults (not configured / not connected) — this section is
-      // optional and must never block the rest of Settings from loading.
-      return false;
-    }
-  };
-
-  const fetchRemoteGoogleDriveBackups = async () => {
-    const generation = ++driveBackupsGenerationRef.current;
-    setRemoteBackupsLoading(true);
-    setRemoteBackupsLoadingMore(false);
-    setRemoteBackupsLoadMoreError(null);
-    try {
-      const response = await api.get('/settings/google-drive/backups?limit=5');
-      if (generation !== driveBackupsGenerationRef.current) return;
-      setRemoteBackups(Array.isArray(response.data?.backups) ? response.data.backups : []);
-      setRemoteBackupsNextCursor(
-        typeof response.data?.nextCursor === 'string' ? response.data.nextCursor : null,
-      );
-      setRemoteBackupsHasMore(Boolean(response.data?.hasMore));
-    } catch {
-      if (generation !== driveBackupsGenerationRef.current) return;
-      toast.error(t('googleDriveRemoteHistoryFailed'));
-    } finally {
-      if (generation === driveBackupsGenerationRef.current) {
-        setRemoteBackupsLoading(false);
-      }
-    }
-  };
-
-  const loadMoreRemoteGoogleDriveBackups = async () => {
-    if (
-      remoteBackupsLoading ||
-      remoteBackupsLoadingMore ||
-      !remoteBackupsHasMore ||
-      !remoteBackupsNextCursor
-    ) {
-      return;
-    }
-    const generation = driveBackupsGenerationRef.current;
-    setRemoteBackupsLoadingMore(true);
-    setRemoteBackupsLoadMoreError(null);
-    try {
-      const response = await api.get(
-        `/settings/google-drive/backups?limit=10&cursor=${encodeURIComponent(remoteBackupsNextCursor)}`,
-      );
-      if (generation !== driveBackupsGenerationRef.current) return;
-      const incoming: GoogleDriveRemoteBackup[] = Array.isArray(response.data?.backups)
-        ? response.data.backups
-        : [];
-      setRemoteBackups((prev) => {
-        const seen = new Set(prev.map((item) => item.id));
-        return [...prev, ...incoming.filter((item) => !seen.has(item.id))];
-      });
-      setRemoteBackupsNextCursor(
-        typeof response.data?.nextCursor === 'string' ? response.data.nextCursor : null,
-      );
-      setRemoteBackupsHasMore(Boolean(response.data?.hasMore));
-    } catch {
-      if (generation !== driveBackupsGenerationRef.current) return;
-      setRemoteBackupsLoadMoreError(t('googleDriveRemoteHistoryFailed'));
-    } finally {
-      if (generation === driveBackupsGenerationRef.current) {
-        setRemoteBackupsLoadingMore(false);
-      }
-    }
-  };
-
-  const fetchGoogleDriveDestinations = async () => {
-    setGoogleDriveDestinationsLoading(true);
-    try {
-      const response = await api.get('/settings/google-drive/destinations');
-      setGoogleDriveDestinations(
-        Array.isArray(response.data?.destinations) ? response.data.destinations : [],
-      );
-    } catch {
-      setGoogleDriveDestinations([]);
-      toast.error(t('googleDriveDestinationLoadFailed'));
-    } finally {
-      setGoogleDriveDestinationsLoading(false);
     }
   };
 
@@ -2730,15 +2516,6 @@ export default function SettingsPage() {
           fetchBackups(signal),
         ]);
         if (!masterPinLoaded || !backupsLoaded) throw new Error('Data hydration failed');
-        if (isOwner) {
-          // Drive status stays optional: awaiting it would gate tab caching on a slow
-          // integration call and re-request it on every revisit.
-          void fetchGoogleDriveStatus(signal)
-            .then((driveReady) =>
-              driveReady && active() ? fetchRemoteGoogleDriveBackups() : undefined,
-            )
-            .catch(() => {});
-        }
         return;
       }
       if (tab === 'account') {
@@ -3024,202 +2801,6 @@ export default function SettingsPage() {
       toast.error(t('saveFailed'));
     } finally {
       setSavingDiagnosticsConsent(false);
-    }
-  };
-
-  const connectGoogleDrive = async () => {
-    const confirmationMessage = `${t('googleDrivePrivacyAcknowledgement')}\n\n⚠️ ${t('googleDrivePermissionNotice')}`;
-    const acknowledged = await confirm(confirmationMessage, {
-      title: t('googleDrivePrivacyWarningTitle'),
-      confirmLabel: t('googleDriveAcknowledge'),
-    });
-    if (!acknowledged) return;
-    driveBackupsGenerationRef.current += 1;
-    setRemoteBackups([]);
-    setRemoteBackupsLoading(false);
-    setRemoteBackupsLoadingMore(false);
-    setRemoteBackupsNextCursor(null);
-    setRemoteBackupsHasMore(false);
-    setRemoteBackupsLoadMoreError(null);
-    setGoogleDriveDestinations([]);
-    setConnectingGoogleDrive(true);
-    try {
-      const res = await api.post('/settings/google-drive/connect', {
-        warning_acknowledged: true,
-        allow_switch: true,
-      });
-      setGoogleDriveStatus((prev) => ({ ...prev, ...res.data }));
-      await fetchRemoteGoogleDriveBackups();
-      toast.success(t('googleDriveConnectedSuccess'));
-      fetchBackups();
-    } catch (err: unknown) {
-      const errorCode = (err as { response?: { data?: { error?: string } } })?.response?.data
-        ?.error;
-      if (errorCode === 'permission_denied') {
-        toast.error(t('googleDrivePermissionDenied'), { duration: 6000 });
-      } else {
-        toast.error(t('googleDriveConnectFailed'));
-      }
-    } finally {
-      setConnectingGoogleDrive(false);
-    }
-  };
-
-  const disconnectGoogleDrive = async () => {
-    const ok = await confirm(t('googleDriveDisconnectConfirm'), {
-      confirmLabel: t('googleDriveDisconnect'),
-      destructive: true,
-    });
-    if (!ok) return;
-    setDisconnectingGoogleDrive(true);
-    try {
-      const res = await api.post('/settings/google-drive/disconnect');
-      setGoogleDriveStatus((prev) => ({ ...prev, ...res.data }));
-      driveBackupsGenerationRef.current += 1;
-      setRemoteBackups([]);
-      setRemoteBackupsLoading(false);
-      setRemoteBackupsLoadingMore(false);
-      setRemoteBackupsNextCursor(null);
-      setRemoteBackupsHasMore(false);
-      setRemoteBackupsLoadMoreError(null);
-      setGoogleDriveDestinations([]);
-      if (res.data?.revoke_status === 'unconfirmed') toast.error(t('googleDriveRevokePending'));
-      else toast.success(t('googleDriveDisconnectedSuccess'));
-    } catch {
-      toast.error(t('googleDriveDisconnectFailed'));
-    } finally {
-      setDisconnectingGoogleDrive(false);
-    }
-  };
-
-  const backupToGoogleDriveNow = async () => {
-    const acknowledged = await confirm(t('googleDrivePrivacyAcknowledgement'), {
-      title: t('googleDrivePrivacyWarningTitle'),
-      confirmLabel: t('googleDriveAcknowledge'),
-    });
-    if (!acknowledged) return;
-    setBackingUpGoogleDrive(true);
-    try {
-      const res = await api.post('/settings/google-drive/backup-now', {
-        warning_acknowledged: true,
-      });
-      setGoogleDriveStatus((prev) => ({ ...prev, ...res.data }));
-      const jobId = res.data?.job?.id;
-      if (typeof jobId !== 'string') {
-        toast.success(t('googleDriveBackupQueued'));
-        return;
-      }
-      while (true) {
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, GOOGLE_DRIVE_JOB_POLL_INTERVAL_MS),
-        );
-        const job = await fetchGoogleDriveJob(jobId);
-        if (!job) throw new Error('Google Drive backup job was not found');
-        setGoogleDriveStatus((previous) => ({ ...previous, job }));
-        if (job.state === 'succeeded' || job.state === 'retention_pending') {
-          await Promise.all([fetchGoogleDriveStatus(), fetchRemoteGoogleDriveBackups()]);
-          if (job.state === 'retention_pending') toast.error(t('googleDriveRetentionPending'));
-          else toast.success(t('googleDriveBackupSuccess'));
-          return;
-        }
-        if (
-          job.state === 'failed' ||
-          job.state === 'cancelled' ||
-          job.state === 'offline_pending'
-        ) {
-          await fetchGoogleDriveStatus();
-          toast.error(
-            t(
-              job.state === 'offline_pending'
-                ? 'googleDriveBackupRetryPending'
-                : 'googleDriveBackupFailed',
-            ),
-          );
-          return;
-        }
-      }
-    } catch {
-      toast.error(t('googleDriveBackupFailed'));
-      fetchGoogleDriveStatus();
-    } finally {
-      setBackingUpGoogleDrive(false);
-    }
-  };
-
-  const restoreRemoteGoogleDriveBackup = async (backup: GoogleDriveRemoteBackup) => {
-    if (masterPinStatus.available && !masterPinStatus.isSet) {
-      toast.error(t('setMasterPinFirst'));
-      return;
-    }
-    if (!masterPinStatus.available) {
-      toast.error(tCommon('notAvailable'));
-      return;
-    }
-    const message = `${t('restoreConfirm', { fileName: backup.name })}\n\n${t('googleDriveRestoreNotice')}`;
-    const ok = await confirm(message, {
-      title: t('googleDriveRestoreTitle'),
-      confirmLabel: t('googleDriveRestore'),
-      destructive: true,
-    });
-    if (!ok) return;
-
-    setPinGate({
-      mode: 'restore-google-drive',
-      payload: { fileId: backup.id, sha256: backup.sha256 },
-    });
-  };
-
-  const updateGoogleDrivePrefs = async (patch: {
-    frequency?: 'daily' | 'weekly';
-    retention_count?: number;
-  }) => {
-    const previous = googleDriveStatus;
-    setGoogleDriveStatus((prev) => ({ ...prev, ...patch }));
-    setSavingGoogleDrivePrefs(true);
-    try {
-      const res = await api.put('/settings/google-drive', patch);
-      setGoogleDriveStatus((prev) => ({ ...prev, ...res.data }));
-    } catch {
-      setGoogleDriveStatus(previous);
-      toast.error(t('googleDriveSavePreferencesFailed'));
-    } finally {
-      setSavingGoogleDrivePrefs(false);
-    }
-  };
-
-  const createGoogleDriveDestination = async () => {
-    setManagingGoogleDriveDestination(true);
-    try {
-      const res = await api.post('/settings/google-drive/destinations');
-      setGoogleDriveStatus((previous) => ({ ...previous, ...res.data }));
-      await fetchGoogleDriveDestinations();
-      toast.success(t('googleDriveDestinationCreated'));
-    } catch {
-      toast.error(t('googleDriveDestinationCreateFailed'));
-    } finally {
-      setManagingGoogleDriveDestination(false);
-    }
-  };
-
-  const selectGoogleDriveDestination = async (folderId: string) => {
-    const destination = googleDriveDestinations.find((candidate) => candidate.id === folderId);
-    if (!destination) {
-      toast.error(t('googleDriveDestinationSelectFailed'));
-      return;
-    }
-    const previous = googleDriveStatus;
-    setManagingGoogleDriveDestination(true);
-    try {
-      const res = await api.put('/settings/google-drive', {
-        destination_folder_id: destination.id,
-      });
-      setGoogleDriveStatus((current) => ({ ...current, ...res.data }));
-      await fetchGoogleDriveDestinations();
-    } catch {
-      setGoogleDriveStatus(previous);
-      toast.error(t('googleDriveDestinationSelectFailed'));
-    } finally {
-      setManagingGoogleDriveDestination(false);
     }
   };
 
@@ -5656,20 +5237,6 @@ export default function SettingsPage() {
               backupsHasMore={backupsHasMore}
               backupsLoadingMore={backupsLoadingMore}
               backupsLoadMoreError={backupsLoadMoreError}
-              googleDriveStatus={googleDriveStatus}
-              googleDriveDestinations={googleDriveDestinations}
-              googleDriveDestinationsLoading={googleDriveDestinationsLoading}
-              remoteBackups={remoteBackups}
-              remoteBackupsLoading={remoteBackupsLoading}
-              remoteBackupsHasMore={remoteBackupsHasMore}
-              remoteBackupsLoadingMore={remoteBackupsLoadingMore}
-              remoteBackupsLoadMoreError={remoteBackupsLoadMoreError}
-              setGoogleDriveStatus={setGoogleDriveStatus}
-              connectingGoogleDrive={connectingGoogleDrive}
-              disconnectingGoogleDrive={disconnectingGoogleDrive}
-              savingGoogleDrivePrefs={savingGoogleDrivePrefs}
-              managingGoogleDriveDestination={managingGoogleDriveDestination}
-              backingUpGoogleDrive={backingUpGoogleDrive}
               onFetchBackups={fetchBackups}
               onLoadMoreBackups={loadMoreBackups}
               onCreateBackup={handleCreateBackup}
@@ -5677,15 +5244,6 @@ export default function SettingsPage() {
               onRestoreFromHistory={handleRestoreFromHistory}
               onRestoreFromFile={handleRestoreFromFile}
               onDeleteBackup={handleDeleteBackup}
-              onConnectGoogleDrive={connectGoogleDrive}
-              onDisconnectGoogleDrive={disconnectGoogleDrive}
-              onCreateGoogleDriveDestination={createGoogleDriveDestination}
-              onSelectGoogleDriveDestination={selectGoogleDriveDestination}
-              onUpdateGoogleDrivePrefs={updateGoogleDrivePrefs}
-              onBackupToGoogleDriveNow={backupToGoogleDriveNow}
-              onFetchRemoteBackups={fetchRemoteGoogleDriveBackups}
-              onLoadMoreRemoteBackups={loadMoreRemoteGoogleDriveBackups}
-              onRestoreRemoteBackup={restoreRemoteGoogleDriveBackup}
               onRunImport={runImport}
               onRequestPinGate={setPinGate}
               onRunHealthCheck={runHealthCheck}
@@ -6254,13 +5812,11 @@ export default function SettingsPage() {
                 ? t('confirmImportTitle')
                 : pinGate?.mode === 'restore'
                   ? t('confirmRestoreTitle')
-                  : pinGate?.mode === 'restore-google-drive'
-                    ? t('googleDriveRestoreTitle')
-                    : pinGate?.mode === 'delete-cloud'
-                      ? t('cloudConfirmDeletion')
-                      : pinGate?.mode === 'cancel-cloud-deletion'
-                        ? t('cloudCancelDeletionTitle')
-                        : undefined
+                  : pinGate?.mode === 'delete-cloud'
+                    ? t('cloudConfirmDeletion')
+                    : pinGate?.mode === 'cancel-cloud-deletion'
+                      ? t('cloudCancelDeletionTitle')
+                      : undefined
         }
         onCancel={() => setPinGate(null)}
         onSubmit={handlePinGateSubmit}

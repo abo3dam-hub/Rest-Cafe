@@ -150,17 +150,6 @@ Module._load = function (request, parent, isMain) {
         },
       },
     };
-  if (request === './services/google-drive')
-    return {
-      googleDrive: {
-        start() {
-          events.push('drive.start');
-        },
-        stop: () => {
-          events.push('drive.stop');
-        },
-      },
-    };
   if (request === './printers/thermal')
     return { initPrinter: async () => {}, printReceipt() {}, printKOT() {} };
   if (request === './ipc') return { registerIpcHandlers() {} };
@@ -184,7 +173,6 @@ setTimeout(
             'server.stop',
             'kds.stop',
             'cloud.shutdown',
-            'drive.stop',
             'database.admission',
             'database.close',
           ]
@@ -196,7 +184,6 @@ setTimeout(
             'server.stop',
             'kds.stop',
             'cloud.shutdown',
-            'drive.stop',
             'database.admission',
             'database.close',
           ];
@@ -204,9 +191,9 @@ setTimeout(
     const passed =
       orderMatches &&
       (startupFailureRace
-        ? exitCodes.length === 1 && exitCodes[0] === 1 && !events.includes('drive.start')
+        ? exitCodes.length === 1 && exitCodes[0] === 1
         : startupRace
-          ? exitCodes.length === 1 && exitCodes[0] === 0 && !events.includes('drive.start')
+          ? exitCodes.length === 1 && exitCodes[0] === 0
           : exitCodes.length === 1 && exitCodes[0] === 1);
     process.stdout.write(JSON.stringify({ passed, events, exitCodes }) + '\n');
     fs.rmSync(testDir, { recursive: true, force: true });

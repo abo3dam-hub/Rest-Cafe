@@ -28,7 +28,6 @@ import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/ca
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
 import { cloudSync } from './services/cloud-sync';
 import { isOfflineMode } from './services/offline-mode';
-import { googleDrive } from './services/google-drive';
 import { localBackup } from './services/local-backup';
 import { startKdsServer, stopKdsServer, getKdsPort, isKdsServerRunning } from './kds-server';
 import { startServerApp, stopServerApp, getServerAppPort, isServerAppRunning } from './server-app';
@@ -1169,7 +1168,6 @@ async function initialize(): Promise<void> {
     // Rest&Cafe: no cloud sync, telemetry, or analytics services exist in
     // this build. Local recorders (e.g. print-failure diagnostics) keep
     // working. Manual updates only.
-    googleDrive.start();
     localBackup.start();
 
     console.log('[Flo] Starting KDS server on port 3002...');
@@ -1351,7 +1349,6 @@ const cleanupCoordinator = createShutdownCoordinator(
     { name: 'Main server', run: () => stopServer(), blocksDatabase: true },
     { name: 'KDS server', run: () => stopKdsServer(), blocksDatabase: true },
     { name: 'cloud sync', run: () => cloudSync.shutdown(), blocksDatabase: true },
-    { name: 'Google Drive', run: () => googleDrive.stop(), blocksDatabase: true },
     { name: 'local backup', run: () => localBackup.stop(), blocksDatabase: true },
     { name: 'Bonjour', run: () => stopMdns() },
     { name: 'HTTP handler cleanup', run: () => waitForHttpShutdownWork(), blocksDatabase: true },

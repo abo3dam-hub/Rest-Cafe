@@ -16,7 +16,6 @@ import { runHealthCheck, applySafeFixes } from '../services/schema-health';
 import { isMasterPinAvailable, isMasterPinSet, resetMasterPin } from '../services/master-pin';
 import { clearJWTSecretCache } from '../security/jwt-secret';
 import { getHttpRequestSignal } from '../shutdown';
-import { googleDrive } from '../services/google-drive';
 import { isSupportedCurrencyCode } from '../../shared/currencies';
 import {
   LOCAL_BACKUP_RETENTION,
@@ -224,10 +223,7 @@ router.post(
       return res.status(400).json({ error: `Type "${confirmationPhrase}" to confirm` });
     }
 
-    let restorePrepared = false;
     try {
-      await googleDrive.prepareForDatabaseRestore();
-      restorePrepared = true;
       const keepLocalBackup = isLocalBackupEnabled();
       const result = await resetDatabaseForCurrencyChange(
         currency,
@@ -240,7 +236,6 @@ router.post(
       } else {
         setLocalBackupEnabled(false);
       }
-      const cleanup = googleDrive.completeDatabaseRestore();
       clearUserAuthCache();
       clearInMemoryRevokedTokens();
       clearJWTSecretCache();
@@ -248,7 +243,7 @@ router.post(
         success: true,
         currency,
         backupPath: result.backupPath,
-        cleanupPending: result.cleanupPending || cleanup.cleanupPending,
+        cleanupPending: result.cleanupPending,
         localBackupFailed,
       });
     } catch (error: unknown) {
@@ -264,8 +259,6 @@ router.post(
       }
       console.error('[DB Tools] currency reset error:', error);
       res.status(500).json({ error: 'Currency reset failed' });
-    } finally {
-      if (restorePrepared) googleDrive.releaseDatabaseRestore();
     }
   }),
 );
@@ -278,12 +271,7 @@ router.post(
     if (req.body?.confirmation_phrase !== INITIALIZE_CONFIRM_PHRASE) {
       return res.status(400).json({ error: `Type "${INITIALIZE_CONFIRM_PHRASE}" to confirm` });
     }
-    let restorePrepared = false;
     try {
-      // The owner's typed INITIALIZE may discard a Drive restore boundary that can
-      // never resolve on its own; the reset invalidates Drive state either way.
-      await googleDrive.prepareForDatabaseRestore({ discardUnresolvedBoundary: true });
-      restorePrepared = true;
       const keepLocalBackup = isLocalBackupEnabled();
       const { backupPath } = await resetDatabaseWithBackup(getHttpRequestSignal(req));
       let localBackupFailed = false;
@@ -292,21 +280,18 @@ router.post(
       } else {
         setLocalBackupEnabled(false);
       }
-      const cleanup = googleDrive.completeDatabaseRestore();
       clearUserAuthCache();
       clearInMemoryRevokedTokens();
       clearJWTSecretCache();
       res.json({
         success: true,
         backupPath,
-        cleanupPending: cleanup.cleanupPending,
+        cleanupPending: false,
         localBackupFailed,
       });
     } catch (error: any) {
       console.error('[DB Tools] initialize error:', error);
       res.status(500).json({ error: 'Initialize failed' });
-    } finally {
-      if (restorePrepared) googleDrive.releaseDatabaseRestore();
     }
   }),
 );

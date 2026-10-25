@@ -167,7 +167,7 @@ the desktop app locally:
 - **Multi-language support:** 25 localized languages with full bidirectional RTL rendering (Arabic, Persian, Urdu).
 - **131 Country profiles:** 109 world currencies with localized phone parsing, number formatting, and timezone handling.
 - **Country tax packs:** Signed regional tax pack integration and manual rule engine.
-- **Automated database backups:** Pre-migration automatic snapshots, manual exports, and optional Google Drive sync.
+- **Automated database backups:** Pre-migration automatic snapshots and manual exports, stored locally.
 - **Customer loyalty & CRM:** Customer directory, purchase histories, and point redemption.
 - **Cash drawer management:** Cash pulse on checkout and end-of-shift cash drawer reconciliations.
 - **Daily sales & accounting export:** Audit-ready CSV/Excel reporting with financial reconciliation identities.
@@ -182,7 +182,7 @@ Core POS operation and local data are offline-first. Order entry, billing, KDS c
 
 - **Data location:** The SQLite database and local backups reside in the operating system user-data directory, separate from installed application binaries. Standard in-place application updates do not remove them. As a best practice, create a manual backup before reinstalling, moving to a new machine, or changing distribution channels.
 - **Pre-migration backups:** FloCafe automatically creates a timestamped database backup before running schema migrations.
-- **Optional network features:** Google Drive backup is the only outbound integration, and it communicates over the network only when explicitly configured and enabled by the store owner. Cloud sync, telemetry, and WhatsApp were removed from this fork in code.
+- **Optional network features:** None outbound. The app serves the POS, the kitchen display, and the Server App on the local network only. Cloud sync, telemetry, WhatsApp, and Google Drive were removed from this fork in code.
 
 ## Languages and regional support
 
@@ -273,7 +273,6 @@ If FloCafe is useful to you, consider starring the repository.
 - **Documentation index:** [docs/README.md](docs/README.md)
 - **Printer guide & troubleshooting:** [docs/printers.md](docs/printers.md)
 - **Internationalization & translations:** [docs/architecture/internationalization.md](docs/architecture/internationalization.md)
-- **Google Drive backup setup:** [docs/google-drive-setup.md](docs/google-drive-setup.md)
 - **Bug reports & feature proposals:** [GitHub Issues](https://github.com/FreeOpenSourcePOS/FloCafe/issues)
 - **General questions & ideas:** [GitHub Discussions](https://github.com/FreeOpenSourcePOS/FloCafe/discussions)
 

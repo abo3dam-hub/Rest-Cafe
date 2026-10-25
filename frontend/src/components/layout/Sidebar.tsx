@@ -186,7 +186,6 @@ export default function AppSidebar() {
               'payment-methods.manage',
               'cloud.manage',
               'cloud.account.manage',
-              'google-drive.manage',
               'database.manage',
               'mobile-access.manage',
               'kitchen.stations.manage',
