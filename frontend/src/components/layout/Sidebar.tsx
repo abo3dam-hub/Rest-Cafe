@@ -69,7 +69,6 @@ interface NavItem {
 
 // null = show for all business types
 const ALL_NAV_ITEMS: NavItem[] = [
-  { href: '/pos', labelKey: 'pos', icon: ShoppingCart, permission: 'pos.use', businessTypes: null },
   {
     href: '/dashboard',
     labelKey: 'dashboard',
@@ -77,6 +76,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     permission: 'dashboard.view',
     businessTypes: null,
   },
+  { href: '/pos', labelKey: 'pos', icon: ShoppingCart, permission: 'pos.use', businessTypes: null },
   {
     href: '/orders',
     labelKey: 'orders',

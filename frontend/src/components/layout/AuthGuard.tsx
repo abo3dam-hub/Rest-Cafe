@@ -11,8 +11,8 @@ import { normalizePathname } from '@/lib/utils';
 import type { Tenant } from '@/lib/types';
 
 export const LANDING_PAGE_CANDIDATES = [
-  ['pos.use', '/pos'],
   ['dashboard.view', '/dashboard'],
+  ['pos.use', '/pos'],
   ['orders.read', '/orders'],
   ['kitchen.use', '/kds'],
   ['tables.view', '/tables'],

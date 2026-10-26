@@ -23,8 +23,6 @@ import { usePrinterStore } from '@/hooks/usePrinter';
 import {
   Settings,
   Monitor,
-  Users,
-  Gift,
   Info,
   Lock,
   Smartphone,
@@ -329,8 +327,7 @@ export default function SettingsPage() {
   const [globalCashbackPercent, setGlobalCashbackPercent] = useState('0');
   const [savedGlobalCashbackPercent, setSavedGlobalCashbackPercent] = useState('0');
   const loyaltyFormRef = useRef({ loyaltyEnabled, globalCashbackPercent });
-  const [globalRateCandidates, setGlobalRateCandidates] = useState(0);
-  const [applyingGlobalRate, setApplyingGlobalRate] = useState(false);
+  const [, setGlobalRateCandidates] = useState(0);
   const [savingLoyalty, setSavingLoyalty] = useState(false);
 
   // Discount settings
@@ -2525,20 +2522,6 @@ export default function SettingsPage() {
     }
   };
 
-  const applyGlobalRateToProducts = async () => {
-    setApplyingGlobalRate(true);
-    try {
-      const res = await api.post('/products/loyalty/apply-global-rate');
-      const updated = Number(res.data.updated) || 0;
-      setGlobalRateCandidates(0);
-      toast.success(t('applyGlobalRateDone', { count: updated }));
-    } catch {
-      toast.error(t('saveFailed'));
-    } finally {
-      setApplyingGlobalRate(false);
-    }
-  };
-
   const saveDiscount = async (silent = false) => {
     setSavingDiscount(true);
     try {
@@ -2874,12 +2857,6 @@ export default function SettingsPage() {
               </p>
             </div>
             <SettingsNavItem
-              label={t('loyalty')}
-              value="loyalty"
-              active={activeTab}
-              onClick={handleSettingsTabChange}
-            />
-            <SettingsNavItem
               label={t('discounts')}
               value="discounts"
               active={activeTab}
@@ -3158,51 +3135,6 @@ export default function SettingsPage() {
                       });
                     }}
                   />
-                </div>
-              </div>
-
-              {/* POS Workflow */}
-              <div className="bg-card rounded-xl border border-border p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Users size={20} className="text-muted-foreground" />
-                  <h2 className="font-semibold text-foreground">{t('posWorkflow')}</h2>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground">{t('customerMandatory')}</p>
-                      <p className="text-sm text-muted-foreground">{t('customerMandatoryHint')}</p>
-                    </div>
-                    <Toggle
-                      value={posSettings.customerMandatory}
-                      label={t('customerMandatory')}
-                      onChange={(v) => {
-                        posSettings.setCustomerMandatory(v);
-                        toast.success(
-                          v ? t('customerMandatoryEnabled') : t('customerMandatoryDisabled'),
-                          { id: 'pos-local' },
-                        );
-                      }}
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground">{t('phoneDigitsDerived')}</p>
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-border">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground">{t('enforcePhoneLength')}</p>
-                      <p className="text-sm text-muted-foreground">{t('enforcePhoneLengthHint')}</p>
-                    </div>
-                    <Toggle
-                      value={posSettings.enforcePhoneLength}
-                      label={t('enforcePhoneLength')}
-                      onChange={(v) => {
-                        posSettings.setEnforcePhoneLength(v);
-                        toast.success(
-                          v ? t('enforcePhoneLengthEnabled') : t('enforcePhoneLengthDisabled'),
-                          { id: 'pos-local' },
-                        );
-                      }}
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -4168,92 +4100,6 @@ export default function SettingsPage() {
               )}
 
               <SelfOrderSettingsCard />
-            </SettingsTabShell>
-          </TabsContent>
-
-          <TabsContent value="loyalty">
-            <SettingsTabShell>
-              {/* Loyalty */}
-              <div className="bg-card rounded-xl border border-border p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Gift size={20} className="text-muted-foreground" />
-                  <h2 className="font-semibold text-foreground">{t('loyaltyProgram')}</h2>
-                </div>
-                <div className="space-y-5">
-                  {/* Enable toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">{t('enableLoyalty')}</p>
-                      <p className="text-sm text-muted-foreground">{t('loyaltyHint')}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        markHydrationTouched('loyaltyEnabled');
-                        setLoyaltyEnabled(!loyaltyEnabled);
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        loyaltyEnabled ? 'bg-brand' : 'bg-gray-200 dark:bg-input'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-card transition-transform ${
-                          loyaltyEnabled
-                            ? 'translate-x-6 rtl:-translate-x-6'
-                            : 'translate-x-1 rtl:-translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {/* Global Cashback Input */}
-                  {loyaltyEnabled && (
-                    <div className="pt-4 border-t border-border flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">{t('globalLoyaltyRate')}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {t('globalLoyaltyRateHint')}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={globalCashbackPercent}
-                          onChange={(e) => {
-                            markHydrationTouched('globalCashbackPercent');
-                            setGlobalCashbackPercent(e.target.value);
-                          }}
-                          placeholder="0"
-                          className="w-20 px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand focus:border-brand transition-shadow text-end"
-                        />
-                        <span className="text-muted-foreground font-medium">%</span>
-                      </div>
-                    </div>
-                  )}
-                  {/* Products upgraded from before the tri-state all sit at 0%
-                    ("earns nothing"), so the global rate does nothing for them
-                    until the owner explicitly opts them in. */}
-                  {loyaltyEnabled && globalRateCandidates > 0 && (
-                    <div className="pt-4 border-t border-border">
-                      <p className="font-medium text-foreground">{t('applyGlobalRateTitle')}</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {t('applyGlobalRateHint', { count: globalRateCandidates })}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={applyGlobalRateToProducts}
-                        disabled={applyingGlobalRate}
-                        className="mt-3 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-border hover:bg-muted disabled:opacity-50"
-                      >
-                        {applyingGlobalRate
-                          ? t('applyGlobalRateWorking')
-                          : t('applyGlobalRateAction', { count: globalRateCandidates })}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
             </SettingsTabShell>
           </TabsContent>
 

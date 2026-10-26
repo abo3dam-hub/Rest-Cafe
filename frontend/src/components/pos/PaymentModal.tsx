@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
-  Wallet,
   ArrowLeftRight,
   CheckCircle2,
-  Sparkles,
   User,
   Percent,
   ChevronDown,
@@ -32,7 +30,6 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { useTranslations, type AppConfig } from 'use-intl';
 import { PAYMENT_METHODS, type CustomPaymentMethod } from '@/lib/payment-methods';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
-import { useFormatNumber } from '@/hooks/useFormatNumber';
 import { useCurrencyUnitAdapter } from '@/hooks/useCurrencyUnitAdapter';
 import { getCountryByCode, getCurrencyMinorUnitFactor } from '@/lib/countries';
 import { getDiscountInputStep, normalizeFixedDiscountValue } from '@/lib/currency-input';
@@ -158,7 +155,6 @@ export default function PaymentModal({
   const toMinorUnits = (amount: number) => Math.round(amount * minorFactor);
 
   const [justPaid, setJustPaid] = useState(false);
-  const [, setPointsEarned] = useState(0);
   const [payments, setPayments] = useState<Payment[]>(
     PAYMENT_METHODS.map((method) => ({ method: method.key, amount: '' })),
   );
@@ -201,7 +197,7 @@ export default function PaymentModal({
   const [discountPin, setDiscountPin] = useState('');
   const [discountApproverId, setDiscountApproverId] = useState<string | null>(null);
   const [applyingDiscount, setApplyingDiscount] = useState(false);
-  const [loyaltySettings, setLoyaltySettings] = useState<{ loyalty_enabled: boolean } | null>(null);
+  const [, setLoyaltySettings] = useState<{ loyalty_enabled: boolean } | null>(null);
   const [amountTarget, setAmountTarget] = useState<AmountTarget>(null);
 
   // An attempt whose outcome is unknown keeps its key and its exact request:
@@ -806,7 +802,6 @@ export default function PaymentModal({
       : 0;
 
   const currencyFmt = useFormatCurrency();
-  const fmtNum = useFormatNumber();
 
   const handleApplyDiscount = async (customVal?: number) => {
     if (
@@ -1149,12 +1144,8 @@ export default function PaymentModal({
         }
         return;
       }
-      const earned = res.data?.loyaltyPointsEarned > 0 ? res.data.loyaltyPointsEarned : 0;
-      setPointsEarned(earned);
       if (res.data?.kitchenDeliveryOverridden) {
         toast.success(t('kitchenDeliveryOverrideSuccess'));
-      } else if (earned > 0) {
-        toast.success(t('paymentRecordedWithPoints', { points: earned }));
       } else {
         toast.success(t('paymentRecorded'));
       }
@@ -1667,24 +1658,6 @@ export default function PaymentModal({
               </div>
             </div>
 
-            {/* Loyalty Info Strip (staff reference) */}
-            {loyaltySettings?.loyalty_enabled && effectiveCustomerId && (
-              <div className="flex items-center gap-2 px-3.5 py-2.5 bg-muted border border-border rounded-xl">
-                <Sparkles size={13} className="text-muted-foreground shrink-0" />
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
-                  <span className="text-foreground font-medium">{t('loyalty')}</span>
-                  <span className="font-semibold text-foreground">
-                    {walletBalance !== null
-                      ? t('pointsApproxValue', {
-                          count: fmtNum(walletBalance),
-                          value: currencyFmt(Math.floor(walletBalance / LOYALTY_REDEMPTION_RATE)),
-                        })
-                      : '…'}
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Discount */}
             {!bill.split_group_id && discountMode !== 'none' && (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -2088,73 +2061,6 @@ export default function PaymentModal({
               </div>
             )}
 
-            {/* Loyalty Wallet Section */}
-            {loyaltySettings?.loyalty_enabled && effectiveCustomerId && walletBalance !== null && (
-              <div className="space-y-1">
-                <div className="flex min-h-12">
-                  <button
-                    type="button"
-                    disabled={processing || attemptLocked || walletBalance <= 0}
-                    onClick={() => {
-                      if (attemptLocked) return;
-                      const allocatedElsewhere = payments.reduce(
-                        (sum, payment) => sum + toStoredUnit(parseFloat(payment.amount) || 0),
-                        0,
-                      );
-                      const maxWalletStored = Math.floor(walletBalance / LOYALTY_REDEMPTION_RATE);
-                      const dueStored = Math.min(
-                        maxWalletStored,
-                        Math.max(0, remaining - allocatedElsewhere),
-                      );
-                      const dueDisplay = toDisplayUnit(dueStored);
-                      setWalletAmount(dueDisplay > 0 ? String(dueDisplay) : '');
-                      setAmountTarget({ kind: 'wallet' });
-                    }}
-                    className={`touch-target w-36 shrink-0 justify-start rounded-s-xl border px-3 gap-2 text-sm font-semibold ${walletAmt > 0 ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/40 disabled:bg-muted disabled:text-muted-foreground disabled:border-border'}`}
-                  >
-                    <Wallet size={15} />
-                    <span className="truncate">{t('loyaltyWallet')}</span>
-                  </button>
-                  <div className="flex flex-1 items-center border border-s-0 border-purple-200 dark:border-purple-800/40 rounded-e-xl bg-card focus-within:ring-2 focus-within:ring-purple-400">
-                    <span className="ps-3 text-muted-foreground text-xs">{inputCurrencyLabel}</span>
-                    <input
-                      type="number"
-                      value={walletAmount}
-                      onFocus={() => setAmountTarget({ kind: 'wallet' })}
-                      onChange={(e) => {
-                        if (attemptLocked) return;
-                        const v = e.target.value;
-                        const maxWalletCurrencyStored = Math.floor(
-                          walletBalance / LOYALTY_REDEMPTION_RATE,
-                        );
-                        const maxDisplay = toDisplayUnit(
-                          Math.min(maxWalletCurrencyStored, remaining),
-                        );
-                        const clamped = parseFloat(v) > maxDisplay ? String(maxDisplay) : v;
-                        setWalletAmount(clamped);
-                      }}
-                      placeholder="0.00"
-                      disabled={processing || attemptLocked || walletBalance <= 0}
-                      inputMode="decimal"
-                      className="min-w-0 flex-1 px-2 py-2 text-end text-base font-semibold outline-none rounded-e-xl disabled:bg-muted"
-                      step={inputCurrencyStep}
-                      min="0"
-                      max={toDisplayUnit(
-                        Math.min(Math.floor(walletBalance / LOYALTY_REDEMPTION_RATE), remaining),
-                      )}
-                    />
-                  </div>
-                </div>
-                <p className="px-1 text-[11px] text-muted-foreground text-end">
-                  {walletBalance > 0
-                    ? t('pointsApproxValue', {
-                        count: fmtNum(walletBalance),
-                        value: currencyFmt(Math.floor(walletBalance / LOYALTY_REDEMPTION_RATE)),
-                      })
-                    : t('noBalance')}
-                </p>
-              </div>
-            )}
             {amountTarget && !processing && !attemptLocked && (
               <CurrencyTouchNumberPad
                 value={activeAmountValue}

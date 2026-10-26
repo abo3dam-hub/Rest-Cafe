@@ -50,17 +50,9 @@ assert.match(
 );
 assert.match(kds, /text-yellow-700 dark:text-yellow-300/, 'waiting KDS labels use dark-mode text');
 
-const customers = source('frontend/src/app/(dashboard)/customers/page.tsx');
-assert.match(
-  customers,
-  /text-muted-foreground whitespace-nowrap.*formatDate/s,
-  'ledger dates use semantic text color',
-);
-assert.match(
-  customers,
-  /text-end text-foreground whitespace-nowrap.*fmt\(b\.total\)/s,
-  'ledger totals use semantic text color',
-);
+// The customers-page loyalty ledger modal guarded here was removed from the
+// UI by the Rest&Cafe simplification delivery (loyalty UI hidden; backend
+// ledger data preserved), so its two source guards no longer apply.
 
 const payment = source('frontend/src/components/pos/PaymentModal.tsx');
 assert.match(payment, /sm:max-w-4xl/, 'desktop payment modal stays wide');

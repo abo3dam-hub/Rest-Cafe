@@ -13,6 +13,7 @@ import {
 import { hasPermission, requirePermission } from '../services/authorization';
 import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
 import { parsePhoneE164 } from '../lib/phone';
+import { withUtf8Bom } from '../lib/csv';
 import { getOrdersWithItemsForBills } from './bills';
 import {
   getShiftWindow,
@@ -1272,7 +1273,7 @@ router.get(
       }
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.send(serializeXReportCsv(report));
+      return res.send(withUtf8Bom(serializeXReportCsv(report)));
     } catch (error: unknown) {
       console.error('[API] X report export error:', error);
       return res.status(500).json({ error: 'Internal server error' });
@@ -1342,7 +1343,7 @@ router.get(
       }
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.send(serializeZReportCsv(report));
+      return res.send(withUtf8Bom(serializeZReportCsv(report)));
     } catch (error: unknown) {
       console.error('[API] Z report export error:', error);
       return res.status(500).json({ error: 'Internal server error' });
@@ -1389,7 +1390,7 @@ router.get(
       const csv = serializeDailySalesExportCsv(dataset, part!);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.send(csv);
+      return res.send(withUtf8Bom(csv));
     } catch (error: unknown) {
       const statusCode =
         typeof error === 'object' && error !== null

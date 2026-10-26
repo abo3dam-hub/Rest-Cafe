@@ -9,7 +9,8 @@ Module._load = function (request: string, parent: unknown, isMain: boolean) {
   return originalLoad.apply(this, arguments as any);
 };
 
-const { initTestDb, createApp, startServer, seedOwnerUser, seedManagerUser, seedCategory, seedProduct, installAndActivateTestTaxPack, api, assert, assertEqual, assertOrThrow, assertEqualOrThrow, getResults, closeDatabase, now } = require('./helpers/test-setup');
+const { initTestDb, createApp, startServer, seedOwnerUser, seedManagerUser, seedCategory,
+  seedTable, seedProduct, installAndActivateTestTaxPack, api, assert, assertEqual, assertOrThrow, assertEqualOrThrow, getResults, closeDatabase, now } = require('./helpers/test-setup');
 const { orderRoutes } = require('../main/routes/orders');
 const { billRoutes, allocateSignedMinorUnits, allocateTaxSnapshots } = require('../main/routes/bills');
 const { paymentMethodRoutes } = require('../main/routes/payment-methods');
@@ -26,6 +27,7 @@ async function main() {
   assertEqual(JSON.stringify(allocateSignedMinorUnits(-2, [1, 3])), JSON.stringify([-1, -1]), 'negative round-off uses signed largest-remainder allocation');
   const { authHeader } = seedOwnerUser(db);
   seedCategory(db, 'split-cat', 'Split menu');
+  seedTable(db, 'tbl-split', 3, 4);
   seedProduct(db, 'split-coffee', 'split-cat', 'Coffee', 100);
   seedProduct(db, 'split-toast', 'split-cat', 'Toast', 90);
   const app = createApp({ '/api/orders': orderRoutes, '/api/bills': billRoutes, '/api/payment-methods': paymentMethodRoutes, '/api/settings': settingsRoutes, '/api/reports': reportRoutes });
@@ -85,7 +87,7 @@ async function main() {
     const googlePayId = add.data.payment_method.id;
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('split_checks_enabled', 'true', ?)").run(now());
 
-    const orderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }, { product_id: 'split-toast', quantity: 1 }] }, headers: authHeader });
+    const orderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }, { product_id: 'split-toast', quantity: 1 }] }, headers: authHeader });
     assertEqual(orderRes.status, 201, 'two-pax order created');
     const order = orderRes.data.order;
     const coffee = order.items.find((item: any) => item.product_id === 'split-coffee');
@@ -106,7 +108,7 @@ async function main() {
     assertEqual(secondPay.status, 200, 'second guest check paid with custom method');
     assertEqual((db.prepare('SELECT status FROM orders WHERE id = ?').get(order.id) as any).status, 'completed', 'order completes only after every check is paid');
 
-    const paidSiblingOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const paidSiblingOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const paidSiblingItem = paidSiblingOrderRes.data.order.items[0];
     const paidSiblingBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: paidSiblingOrderRes.data.order.id }, headers: authHeader });
     const paidSiblingSplit = await api(baseUrl, `/api/bills/${paidSiblingBillRes.data.bill.id}/split-check`, { method: 'POST', body: { checks: [
@@ -132,7 +134,7 @@ async function main() {
     // ── Issue #253 Regression Tests ──────────────────────────────────────────
     // A. Two-Cent / Four-Check Underflow
     seedProduct(db, 'split-tiny', 'split-cat', 'Tiny Product', 0.02);
-    const underflowOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 4, items: [{ product_id: 'split-tiny', quantity: 4 }] }, headers: authHeader });
+    const underflowOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 4, items: [{ product_id: 'split-tiny', quantity: 4 }] }, headers: authHeader });
     const underflowItem = underflowOrderRes.data.order.items[0];
     const underflowBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: underflowOrderRes.data.order.id }, headers: authHeader });
     db.prepare('UPDATE bills SET subtotal = 0.02, total = 0.02, balance = 0.02 WHERE id = ?').run(underflowBillRes.data.bill.id);
@@ -149,7 +151,7 @@ async function main() {
 
     // B. One-Cent Split
     seedProduct(db, 'split-1cent', 'split-cat', '1 Cent Product', 0.01);
-    const oneCentOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-1cent', quantity: 2 }] }, headers: authHeader });
+    const oneCentOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-1cent', quantity: 2 }] }, headers: authHeader });
     const oneCentItem = oneCentOrderRes.data.order.items[0];
     const oneCentBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: oneCentOrderRes.data.order.id }, headers: authHeader });
     db.prepare('UPDATE bills SET subtotal = 0.01, total = 0.01, balance = 0.01 WHERE id = ?').run(oneCentBillRes.data.bill.id);
@@ -165,7 +167,7 @@ async function main() {
     // C. Unequal Weight Allocation
     seedProduct(db, 'split-unequal-a', 'split-cat', 'Product A', 6.00);
     seedProduct(db, 'split-unequal-b', 'split-cat', 'Product B', 4.00);
-    const unevenOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-unequal-a', quantity: 1 }, { product_id: 'split-unequal-b', quantity: 1 }] }, headers: authHeader });
+    const unevenOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-unequal-a', quantity: 1 }, { product_id: 'split-unequal-b', quantity: 1 }] }, headers: authHeader });
     const itemA = unevenOrderRes.data.order.items.find((i: any) => i.product_id === 'split-unequal-a');
     const itemB = unevenOrderRes.data.order.items.find((i: any) => i.product_id === 'split-unequal-b');
     const unevenBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: unevenOrderRes.data.order.id }, headers: authHeader });
@@ -182,7 +184,7 @@ async function main() {
     // D. Void Adjustment Exclusion
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('kds_enabled', 'true', datetime('now'))").run();
     const mgrUser = seedManagerUser(db);
-    const voidOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }, { product_id: 'split-toast', quantity: 1 }] }, headers: authHeader });
+    const voidOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }, { product_id: 'split-toast', quantity: 1 }] }, headers: authHeader });
     const voidOrder = voidOrderRes.data.order;
     const voidItemToCancel = voidOrder.items.find((i: any) => i.product_id === 'split-toast');
     const activeItemToKeep = voidOrder.items.find((i: any) => i.product_id === 'split-coffee');
@@ -202,7 +204,7 @@ async function main() {
     assert(!billItemRows.some((bi: any) => bi.order_item_id === voidAdjRow.id), 'bill_items rows do not reference void_adjustment item ID');
 
     // E. Repeat Safety
-    const repeatOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const repeatOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const repeatItem = repeatOrderRes.data.order.items[0];
     const repeatBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: repeatOrderRes.data.order.id }, headers: authHeader });
     const repeatSplitPayload = { checks: [
@@ -234,7 +236,7 @@ async function main() {
     assertEqual(totalSplitGroups.n, 1, 'only one split group exists in database for order');
 
     // F. Concurrent HTTP Request Regression
-    const concOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const concOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const concItem = concOrderRes.data.order.items[0];
     const concBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: concOrderRes.data.order.id }, headers: authHeader });
     const concPayload1 = { checks: [
@@ -262,7 +264,7 @@ async function main() {
     seedProduct(db, 'split-resplit-a', 'split-cat', 'Resplit A', 120);
     seedProduct(db, 'split-resplit-b', 'split-cat', 'Resplit B', 80);
     const resplitOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3,
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3,
       items: [{ product_id: 'split-resplit-a', quantity: 3 }, { product_id: 'split-resplit-b', quantity: 1 }],
     }, headers: authHeader });
     assertEqualOrThrow(resplitOrderRes.status, 201, 'three-guest order created');
@@ -348,7 +350,7 @@ async function main() {
 
     // Rejection grid: a re-split may only consume its own source allocation.
     const outsiderOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 2,
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 2,
       items: [{ product_id: 'split-resplit-a', quantity: 2 }, { product_id: 'split-resplit-b', quantity: 1 }],
     }, headers: authHeader });
     const outsiderOrder = outsiderOrderRes.data.order;
@@ -416,7 +418,7 @@ async function main() {
     // the original rejection instead of becoming a re-split source.
     seedProduct(db, 'split-legacy-pair', 'split-cat', 'Legacy Pair Item', 40);
     const legacyPairOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-legacy-pair', quantity: 2 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-legacy-pair', quantity: 2 }],
     }, headers: authHeader });
     const legacyPairOrder = legacyPairOrderRes.data.order;
     const legacyPairItem = legacyPairOrder.items[0];
@@ -435,7 +437,7 @@ async function main() {
     // A split group can grow when an unpaid child is divided again.
     seedProduct(db, 'split-many', 'split-cat', 'Many Guest Item', 1);
     const manyOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 20, items: [{ product_id: 'split-many', quantity: 21 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 20, items: [{ product_id: 'split-many', quantity: 21 }],
     }, headers: authHeader });
     const manyOrder = manyOrderRes.data.order;
     const manyItem = manyOrder.items[0];
@@ -459,7 +461,7 @@ async function main() {
     // re-derived from the order, once a child carries a discount, tax, itemised
     // charges and a negative round-off.
     const conservationOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3, items: [{ product_id: 'split-resplit-a', quantity: 3 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3, items: [{ product_id: 'split-resplit-a', quantity: 3 }],
     }, headers: authHeader });
     const conservationOrder = conservationOrderRes.data.order;
     const conservationItem = conservationOrder.items[0];
@@ -516,7 +518,7 @@ async function main() {
     // into exact minor units.
     seedProduct(db, 'split-penny', 'split-cat', 'Penny Item', 0.01);
     const pennyOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3, items: [{ product_id: 'split-penny', quantity: 3 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3, items: [{ product_id: 'split-penny', quantity: 3 }],
     }, headers: authHeader });
     const pennyOrder = pennyOrderRes.data.order;
     const pennyItem = pennyOrder.items[0];
@@ -556,7 +558,7 @@ async function main() {
     seedProduct(db, 'split-addon-meal', 'split-cat', 'Add-on Meal', 10);
     db.prepare('INSERT INTO addon_group_product (product_id, addon_group_id) VALUES (?, ?)').run('split-addon-meal', resplitAddonGroupId);
     const addonOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 4,
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 4,
       items: [{
         product_id: 'split-addon-meal',
         quantity: 4,
@@ -617,7 +619,7 @@ async function main() {
     seedProduct(db, 'split-cancel-keep', 'split-cat', 'Cancel Keep Item', 100);
     seedProduct(db, 'split-cancel-drop', 'split-cat', 'Cancel Drop Item', 50);
     const cancelOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 2,
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 2,
       items: [{ product_id: 'split-cancel-keep', quantity: 2 }, { product_id: 'split-cancel-drop', quantity: 1 }],
     }, headers: authHeader });
     assertEqualOrThrow(cancelOrderRes.status, 201, 'the cancel-regression order is created');
@@ -660,7 +662,7 @@ async function main() {
     // A complimentary line still has to divide into zero-total checks.
     seedProduct(db, 'split-free-item', 'split-cat', 'Complimentary Item', 0);
     const freeOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 4, items: [{ product_id: 'split-free-item', quantity: 4 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 4, items: [{ product_id: 'split-free-item', quantity: 4 }],
     }, headers: authHeader });
     assertEqualOrThrow(freeOrderRes.status, 201, 'the complimentary order is created');
     const freeItem = freeOrderRes.data.order.items[0];
@@ -691,7 +693,7 @@ async function main() {
     // as it was, including the source rows the split clears before reinserting.
     seedProduct(db, 'split-atomic', 'split-cat', 'Atomic Item', 60);
     const atomicOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3, items: [{ product_id: 'split-atomic', quantity: 3 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3, items: [{ product_id: 'split-atomic', quantity: 3 }],
     }, headers: authHeader });
     assertEqualOrThrow(atomicOrderRes.status, 201, 'the atomic-regression order is created');
     const atomicOrder = atomicOrderRes.data.order;
@@ -761,7 +763,7 @@ async function main() {
     // or after it, never twice into the same share.
     seedProduct(db, 'split-race', 'split-cat', 'Race Item', 90);
     const raceOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3, items: [{ product_id: 'split-race', quantity: 3 }],
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3, items: [{ product_id: 'split-race', quantity: 3 }],
     }, headers: authHeader });
     assertEqualOrThrow(raceOrderRes.status, 201, 'the race-regression order is created');
     const raceOrder = raceOrderRes.data.order;
@@ -805,7 +807,7 @@ async function main() {
     seedProduct(db, 'split-legacy-inclusive', 'split-cat', 'Legacy Inclusive', 10);
     seedProduct(db, 'split-legacy-untaxed', 'split-cat', 'Legacy Untaxed', 10);
     const legacyOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: {
-      type: 'dine_in', guest_count: 3,
+      type: 'dine_in', table_id: 'tbl-split', guest_count: 3,
       items: [
         { product_id: 'split-legacy-exclusive', quantity: 2 },
         { product_id: 'split-legacy-inclusive', quantity: 1 },
@@ -938,7 +940,7 @@ async function main() {
     );
 
     // G. Nested Tax Breakdown Allocation & Reconciliation
-    const taxOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const taxOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const taxItem = taxOrderRes.data.order.items[0];
     const taxBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: taxOrderRes.data.order.id }, headers: authHeader });
     const nestedBreakdown = [
@@ -985,7 +987,7 @@ async function main() {
     assertEqual(totalTaxB, 0.01, 'Tax B reconciles across checks to 0.01');
 
     // H. Legacy Flat Tax Breakdown Allocation
-    const flatOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const flatOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const flatItem = flatOrderRes.data.order.items[0];
     const flatBillRes = await api(baseUrl, '/api/bills/generate', { method: 'POST', body: { order_id: flatOrderRes.data.order.id }, headers: authHeader });
     const flatBreakdown = [
@@ -1008,7 +1010,7 @@ async function main() {
       assertEqual(compSum, b.tax_amount, 'sum of flat component amounts equals bill tax_amount exactly');
     }
 
-    const partialLegacyOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
+    const partialLegacyOrderRes = await api(baseUrl, '/api/orders', { method: 'POST', body: { type: 'dine_in', table_id: 'tbl-split', guest_count: 2, items: [{ product_id: 'split-coffee', quantity: 2 }] }, headers: authHeader });
     const partialLegacyItem = partialLegacyOrderRes.data.order.items[0];
     const partialLegacyBreakdown = JSON.stringify([[{ title: 'Legacy Tax A', rate: 2, amount: 0.01 }, { title: 'Legacy Tax B', rate: 2, amount: 0.01 }]]);
     const partialLegacyTotal = Number((partialLegacyOrderRes.data.order.subtotal + 0.02).toFixed(2));
@@ -1082,6 +1084,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         packaging_charge: 20,
         items: [
@@ -1181,6 +1184,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         items: [
           { product_id: 'split-tax-item-a', quantity: 1 },
@@ -1250,6 +1254,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         items: [
           { product_id: 'split-mixed-legacy-item', quantity: 1 },
@@ -1303,6 +1308,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         items: [
           { product_id: 'split-owner-local-tax-a', quantity: 3 },
@@ -1349,6 +1355,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         items: [
           { product_id: 'split-mixed-legacy-item', quantity: 1 },
@@ -1402,6 +1409,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 2,
         packaging_charge: 20,
         items: [
@@ -1549,6 +1557,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-split',
         guest_count: 3,
         packaging_charge: 20,
         items: [{ product_id: 'split-tax-item-a', quantity: 3 }],

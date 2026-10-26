@@ -82,6 +82,10 @@ async function run(): Promise<void> {
     assert.ok(xCsv.headers['content-disposition'].includes(`x-report-${businessDate}.csv`));
     assert.ok(xCsv.text.includes('summary,Gross Sales,,,,500'));
     assert.ok(xCsv.text.includes("'=Formula Staff"), 'X report CSV neutralizes formula-like staff names');
+    assert.ok(
+      xCsv.text.startsWith('﻿'),
+      'X report CSV starts with the UTF-8 BOM so Excel decodes Arabic correctly',
+    );
 
     const xXlsx = await http.get(`/api/reports/x-report/export?date=${businessDate}&format=xlsx`).set(auth).buffer(true).parse(parseBuffer);
     assert.equal(xXlsx.status, 200, 'X report XLSX returns 200');
@@ -115,6 +119,10 @@ async function run(): Promise<void> {
     assert.ok(zCsv.headers['content-disposition'].includes(`z-report-Z${close.body.zReport.z_number}-${businessDate}.csv`));
     assert.ok(zCsv.text.includes('summary,Expected Cash in Drawer,,,,600\n'), 'Z report CSV includes expected cash in display units');
     assert.ok(zCsv.text.includes('summary,Cash Variance,,,,50\n'), 'Z report CSV includes cash variance in display units');
+    assert.ok(
+      zCsv.text.startsWith('﻿'),
+      'Z report CSV starts with the UTF-8 BOM so Excel decodes Arabic correctly',
+    );
 
     const zXlsx = await http.get(`/api/reports/z-report/export?date=${businessDate}&format=xlsx`).set(auth).buffer(true).parse(parseBuffer);
     assert.equal(zXlsx.status, 200, 'Z report XLSX returns 200');

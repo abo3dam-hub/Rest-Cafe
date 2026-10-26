@@ -21,6 +21,7 @@ tree.
 | [architecture/overview.md](architecture/overview.md) | You need the map: one process, three ports, three windows, and how they connect. |
 | [reference/product-invariants.md](reference/product-invariants.md) | You are about to change authorization, access control, defaults, refunds, or stock. Read this first. |
 | [AGENTS.md](../AGENTS.md) | You are an agent working in this repository. |
+| [IMPLEMENTATION_REPORT_AR.md](IMPLEMENTATION_REPORT_AR.md) | Arabic implementation report for the Rest&Cafe UI-simplification and defect-fix delivery (point-in-time record). |
 
 ## Architecture
 

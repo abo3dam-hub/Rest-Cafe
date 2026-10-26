@@ -11,7 +11,7 @@ Module._load = function (request: string, parent: unknown, isMain: boolean) {
 
 const {
   initTestDb, createApp, startServer,
-  seedOwnerUser, seedManagerUser, seedCategory, seedProduct,
+  seedOwnerUser, seedManagerUser, seedCategory, seedProduct, seedTable,
   api, assertEqualOrThrow, assertOrThrow, closeDatabase, now,
 } = require('./helpers/test-setup');
 const { orderRoutes } = require('../main/routes/orders');
@@ -23,6 +23,7 @@ async function main() {
   const owner = seedOwnerUser(db);
   const manager = seedManagerUser(db);
   seedCategory(db, 'kitchen-delivery-category', 'Kitchen Delivery Test');
+  seedTable(db, 'kitchen-delivery-table', 9, 4);
   seedProduct(db, 'kitchen-delivery-pending', 'kitchen-delivery-category', 'Taco', 500);
   seedProduct(db, 'kitchen-delivery-preparing', 'kitchen-delivery-category', 'Soup', 700);
   seedProduct(db, 'kitchen-delivery-ready', 'kitchen-delivery-category', 'Tea', 300);
@@ -78,7 +79,7 @@ async function main() {
   });
   const createSplitBills = async (suffix: string, items: any[], allocations: { itemIndex: number; quantity: number }[][]) => {
     const created = await api(baseUrl, '/api/orders', {
-      method: 'POST', body: { type: 'dine_in', items }, headers: owner.authHeader,
+      method: 'POST', body: { type: 'dine_in', table_id: 'kitchen-delivery-table', items }, headers: owner.authHeader,
     });
     assertEqualOrThrow(created.status, 201, `split order ${suffix} created`);
     const generated = await api(baseUrl, '/api/bills/generate', {

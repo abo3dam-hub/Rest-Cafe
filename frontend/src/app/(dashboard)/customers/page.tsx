@@ -11,8 +11,6 @@ import {
   Search,
   X,
   Edit,
-  Wallet,
-  History,
   TrendingUp,
   TrendingDown,
   AlertCircle,
@@ -26,7 +24,6 @@ import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useFormatDate } from '@/hooks/useFormatDate';
-import { useFormatNumber } from '@/hooks/useFormatNumber';
 
 function SortIcon({
   field,
@@ -60,7 +57,6 @@ export default function CustomersPage() {
   const tCommon = useTranslations('common');
   const fmt = useFormatCurrency();
   const { formatDate } = useFormatDate();
-  const fmtNum = useFormatNumber();
   const defaultCountry = currentTenant?.country || '';
   const dialCode = dialCodeFor(defaultCountry);
   const searchParams = useSearchParams();
@@ -84,44 +80,6 @@ export default function CustomersPage() {
     notes: '',
     country_code: dialCode,
   });
-
-  const [ledgerCustomer, setLedgerCustomer] = useState<Customer | null>(null);
-  const [ledgerData, setLedgerData] = useState<{
-    balance: number;
-    transactions: {
-      id: number;
-      type: string;
-      amount: number;
-      description: string;
-      created_at: string;
-      expires_at?: string;
-    }[];
-    bills: {
-      id: number;
-      bill_number: string;
-      total: number;
-      paid_at?: string;
-      created_at: string;
-      points_earned: number;
-      points_redeemed: number;
-    }[];
-    summary: { totalSpent: number; totalPointsEarned: number; totalPointsRedeemed: number };
-  } | null>(null);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
-
-  const openLedger = async (c: Customer) => {
-    setLedgerCustomer(c);
-    setLedgerData(null);
-    setLedgerLoading(true);
-    try {
-      const { data } = await api.get(`/customers/${c.id}/wallet`);
-      setLedgerData(data);
-    } catch {
-      toast.error(tCustomer('ledgerLoadFailed'));
-    } finally {
-      setLedgerLoading(false);
-    }
-  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -305,18 +263,8 @@ export default function CustomersPage() {
                 {tCustomer('totalSpent')}{' '}
                 <SortIcon field="spent" sortField={sortField} sortOrder={sortOrder} />
               </th>
-              <th
-                className="text-end p-4 text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted group transition-colors"
-                onClick={() => onSort('loyalty')}
-              >
-                {tCustomer('loyalty')}{' '}
-                <SortIcon field="loyalty" sortField={sortField} sortOrder={sortOrder} />
-              </th>
               <th className="text-center p-4 text-xs font-medium text-muted-foreground uppercase">
                 {tCustomers('columnActions')}
-              </th>
-              <th className="text-center p-4 text-xs font-medium text-muted-foreground uppercase">
-                {tCustomers('columnLedger')}
               </th>
             </tr>
           </thead>
@@ -350,16 +298,6 @@ export default function CustomersPage() {
                 </td>
                 <td className="p-4 text-center text-sm">{c.visits_count}</td>
                 <td className="p-4 text-end font-medium">{fmt(Number(c.total_spent))}</td>
-                <td className="p-4 text-end">
-                  {Number(c.wallet_balance) > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-purple-700 font-semibold text-sm">
-                      <Wallet size={13} />
-                      {fmtNum(Number(c.wallet_balance))} {tCustomer('ptsSuffix')}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400 text-sm">—</span>
-                  )}
-                </td>
                 <td className="p-4 text-center">
                   <Button
                     variant="ghost"
@@ -369,17 +307,6 @@ export default function CustomersPage() {
                     title={tCommon('edit')}
                   >
                     <Edit size={14} />
-                  </Button>
-                </td>
-                <td className="p-4 text-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openLedger(c)}
-                    aria-label={tCustomer('viewLedgerTitle')}
-                    title={tCustomer('viewLedgerTitle')}
-                  >
-                    <History size={14} />
                   </Button>
                 </td>
               </tr>
@@ -393,211 +320,6 @@ export default function CustomersPage() {
           <p className="text-center text-xs text-gray-400 py-3">{tCustomers('first200')}</p>
         )}
       </div>
-
-      {/* Loyalty Ledger Modal */}
-      {ledgerCustomer && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border">
-              <div>
-                <h2 className="text-lg font-bold text-foreground">{tCustomers('loyaltyLedger')}</h2>
-                <p className="text-sm text-muted-foreground">{ledgerCustomer.name}</p>
-              </div>
-              <button
-                onClick={() => setLedgerCustomer(null)}
-                aria-label={tCommon('close')}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-muted hover:bg-muted"
-              >
-                <X size={16} className="text-muted-foreground" />
-              </button>
-            </div>
-
-            {ledgerLoading ? (
-              <div className="flex-1 flex items-center justify-center py-12 text-gray-400">
-                {tCustomer('loadingLedger')}
-              </div>
-            ) : ledgerData ? (
-              <>
-                {/* Summary row */}
-                <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-muted border-b border-border">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">
-                      {tCustomer('totalSpent')}
-                    </p>
-                    <p className="text-lg font-bold text-foreground">
-                      {fmt(ledgerData.summary.totalSpent)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">
-                      {tCustomers('totalPointsEarned')}
-                    </p>
-                    <p className="text-lg font-bold text-green-600">
-                      +{ledgerData.summary.totalPointsEarned}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">
-                      {tCustomers('totalPointsRedeemed')}
-                    </p>
-                    <p className="text-lg font-bold text-red-500">
-                      -{ledgerData.summary.totalPointsRedeemed}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">
-                      {tCustomers('totalBalance')}
-                    </p>
-                    <p className="text-lg font-bold text-foreground">
-                      {ledgerData.balance}{' '}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {tCustomer('ptsSuffix')}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  {/* Billing history */}
-                  <div className="px-6 pt-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      {tCustomers('billingHistory')}
-                    </h3>
-                  </div>
-                  {ledgerData.bills.length === 0 ? (
-                    <p className="text-center text-gray-400 py-6 text-sm">
-                      {tCustomers('noBills')}
-                    </p>
-                  ) : (
-                    <table className="w-full text-sm mb-2">
-                      <thead className="bg-muted sticky top-0">
-                        <tr>
-                          <th className="text-start px-6 py-2.5 text-xs font-medium text-gray-500">
-                            {tCustomers('columnDate')}
-                          </th>
-                          <th className="text-start px-4 py-2.5 text-xs font-medium text-gray-500">
-                            {tCustomers('columnBill')}
-                          </th>
-                          <th className="text-end px-4 py-2.5 text-xs font-medium text-gray-500">
-                            {tCustomers('columnAmount')}
-                          </th>
-                          <th className="text-end px-4 py-2.5 text-xs font-medium text-gray-500">
-                            {tCustomers('columnEarned')}
-                          </th>
-                          <th className="text-end px-6 py-2.5 text-xs font-medium text-gray-500">
-                            {tCustomers('columnRedeemed')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {ledgerData.bills.map((b) => (
-                          <tr key={b.id} className="hover:bg-muted">
-                            <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
-                              {formatDate(b.paid_at || b.created_at)}
-                            </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                              {b.bill_number}
-                            </td>
-                            <td className="px-4 py-3 text-end text-foreground whitespace-nowrap">
-                              {fmt(b.total)}
-                            </td>
-                            <td className="px-4 py-3 text-end whitespace-nowrap">
-                              {b.points_earned > 0 ? (
-                                <span className="text-green-600 font-semibold">
-                                  +{b.points_earned}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-3 text-end whitespace-nowrap">
-                              {b.points_redeemed > 0 ? (
-                                <span className="text-red-500 font-semibold">
-                                  -{b.points_redeemed}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-
-                  {/* Ledger table */}
-                  <div className="px-6 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      {tCustomers('pointsHistory')}
-                    </h3>
-                  </div>
-                  {ledgerData.transactions.length === 0 ? (
-                    <p className="text-center text-gray-400 py-12">
-                      {tCustomers('noTransactions')}
-                    </p>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted sticky top-0">
-                        <tr>
-                          <th className="text-start px-6 py-2.5 text-xs font-medium text-muted-foreground">
-                            {tCustomers('columnDate')}
-                          </th>
-                          <th className="text-start px-4 py-2.5 text-xs font-medium text-muted-foreground">
-                            {tCustomers('columnDescription')}
-                          </th>
-                          <th className="text-end px-4 py-2.5 text-xs font-medium text-muted-foreground">
-                            {tCustomers('columnPoints')}
-                          </th>
-                          <th className="text-end px-6 py-2.5 text-xs font-medium text-muted-foreground">
-                            {tCustomers('columnExpires')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {ledgerData.transactions.map(
-                          (t: {
-                            id: number;
-                            type: string;
-                            amount: number;
-                            description: string;
-                            created_at: string;
-                            expires_at?: string;
-                          }) => (
-                            <tr key={t.id} className="hover:bg-muted">
-                              <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
-                                {formatDate(t.created_at)}
-                              </td>
-                              <td className="px-4 py-3 text-foreground">{t.description || '—'}</td>
-                              <td className="px-4 py-3 text-end font-semibold whitespace-nowrap">
-                                <span
-                                  className={`inline-flex items-center gap-1 ${
-                                    t.type === 'credit' ? 'text-green-600' : 'text-red-500'
-                                  }`}
-                                >
-                                  {t.type === 'credit' ? (
-                                    <TrendingUp size={12} />
-                                  ) : (
-                                    <TrendingDown size={12} />
-                                  )}
-                                  {t.type === 'credit' ? '+' : '-'}
-                                  {t.amount}
-                                </span>
-                              </td>
-                              <td className="px-6 py-3 text-end text-xs text-gray-400 whitespace-nowrap">
-                                {t.expires_at ? formatDate(t.expires_at) : '—'}
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

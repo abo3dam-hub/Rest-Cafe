@@ -429,6 +429,55 @@ async function main() {
       reservationOrderWithoutCustomer.data.order.id,
     );
 
+    // Dine-in table requirement: creation is refused without a table and
+    // with an unknown table; other order types stay table-free.
+    const dineInWithoutTable = await api(baseUrl, '/api/orders', {
+      method: 'POST',
+      headers: authHeader,
+      body: {
+        type: 'dine_in',
+        items: [{ product_id: 'prod-reservation', quantity: 1 }],
+      },
+    });
+    assertEqualOrThrow(dineInWithoutTable.status, 400, 'dine-in order without a table is refused');
+    assertIncludesOrThrow(
+      JSON.stringify(dineInWithoutTable.data),
+      'table',
+      'refusal names the missing table',
+    );
+
+    const dineInWithUnknownTable = await api(baseUrl, '/api/orders', {
+      method: 'POST',
+      headers: authHeader,
+      body: {
+        type: 'dine_in',
+        table_id: 'tbl-does-not-exist',
+        items: [{ product_id: 'prod-reservation', quantity: 1 }],
+      },
+    });
+    assertEqualOrThrow(
+      dineInWithUnknownTable.status,
+      400,
+      'dine-in order with an unknown table is refused',
+    );
+
+    const takeawayWithoutTable = await api(baseUrl, '/api/orders', {
+      method: 'POST',
+      headers: authHeader,
+      body: {
+        type: 'takeaway',
+        items: [{ product_id: 'prod-reservation', quantity: 1 }],
+      },
+    });
+    assertEqualOrThrow(
+      takeawayWithoutTable.status,
+      201,
+      'takeaway order still needs no table',
+    );
+    db.prepare("UPDATE orders SET status = 'completed' WHERE id = ?").run(
+      takeawayWithoutTable.data.order.id,
+    );
+
     await api(baseUrl, '/api/tables/tbl-reservation/status', {
       method: 'PATCH',
       headers: authHeader,

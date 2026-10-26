@@ -9,7 +9,7 @@ Module._load = function (request, parent, isMain) {
   return originalLoad.apply(this, arguments);
 };
 
-const { initTestDb, createApp, startServer, seedOwnerUser, seedCategory, seedProduct, api, assertOrThrow, assertEqualOrThrow, now } = require('./helpers/test-setup');
+const { initTestDb, createApp, startServer, seedOwnerUser, seedCategory, seedTable, seedProduct, api, assertOrThrow, assertEqualOrThrow, now } = require('./helpers/test-setup');
 const { orderRoutes } = require('../main/routes/orders');
 const { billRoutes, allocateMinorUnits, allocateTaxSnapshots, projectOrderItems } = require('../main/routes/bills');
 const { settingsRoutes } = require('../main/routes/settings');
@@ -95,6 +95,7 @@ async function main() {
 
   const { authHeader } = seedOwnerUser(db);
   seedCategory(db, 'jpy-cat', 'Tokyo Kitchen');
+  seedTable(db, 'tbl-currency', 8, 4);
   seedProduct(db, 'jpy-ramen', 'jpy-cat', 'Miso Ramen', 950);
   seedProduct(db, 'jpy-gyoza', 'jpy-cat', 'Gyoza', 450);
 
@@ -109,6 +110,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-currency',
         guest_count: 2,
         items: [
           { product_id: 'jpy-ramen', quantity: 1 },
@@ -164,6 +166,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-currency',
         guest_count: 3,
         items: [{ product_id: 'jpy-platter', quantity: 3 }],
       },
@@ -203,6 +206,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-currency',
         guest_count: 3,
         items: [{ product_id: 'jpy-sushi', quantity: 3 }],
       },
@@ -284,6 +288,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-currency',
         guest_count: 3,
         items: [{ product_id: 'kwd-meal', quantity: 3 }],
       },
@@ -344,6 +349,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-currency',
         guest_count: 2,
         items: [{ product_id: 'usd-burger', quantity: 2 }],
       },

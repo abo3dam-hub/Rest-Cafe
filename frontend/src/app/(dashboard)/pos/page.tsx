@@ -244,7 +244,6 @@ export default function POSPage() {
     autoPrintKot,
     autoPrintBill,
     billingType,
-    tablesRequired,
     kotPrintingEnabled,
     setBillingType,
     setTablesRequired,
@@ -934,7 +933,7 @@ export default function POSPage() {
   };
 
   const refreshTables = async () => {
-    if (!isRestaurant || !tablesRequired) return;
+    if (!isRestaurant) return;
     try {
       const { data } = await api.get('/tables?active=1');
       setTables(data.tables || []);
@@ -1167,7 +1166,8 @@ export default function POSPage() {
       setShowCustomerPrompt(true);
       return false;
     }
-    if (isRestaurant && cart.orderType === 'dine_in' && tablesRequired && !cart.tableId) {
+    if (isRestaurant && cart.orderType === 'dine_in' && !cart.tableId) {
+      toast.error(t('selectTableFirst'));
       setShowTablePicker(true);
       return false;
     }
@@ -2272,17 +2272,12 @@ export default function POSPage() {
         }
       },
       onToggleTables: () => {
-        if (isRestaurant && cart.orderType === 'dine_in' && tablesRequired) {
+        if (isRestaurant && cart.orderType === 'dine_in') {
           setShowTablePicker((prev) => !prev);
         }
       },
       onOpenCheckout: () => {
-        if (
-          shouldTakePaymentNow ||
-          !isRestaurant ||
-          cart.orderType !== 'dine_in' ||
-          !tablesRequired
-        ) {
+        if (shouldTakePaymentNow || !isRestaurant || cart.orderType !== 'dine_in') {
           void handlePlaceOrder();
           return;
         }

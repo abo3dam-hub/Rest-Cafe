@@ -550,6 +550,67 @@ async function main() {
   } finally {
     await new Promise<void>((resolve) => cloudServer.close(() => resolve()));
   }
+
+  // Rest&Cafe regression: the Demo setup profile used to fail for every
+  // service model with RegionalNotConfiguredError because initialize passed
+  // an empty country to the demo seed, which needs one for demo customers'
+  // phone dial code. Fresh installs now seed demo data with the product's
+  // regional default, so Demo + FineDine ("Full Service") and Demo + QSR
+  // ("Quick Service") both complete.
+  console.log('\n   Demo profile setup completes for both service models');
+  const demoPayload = (serviceModel: string) => ({
+    name: 'Demo Owner',
+    email: `demo-${serviceModel}@example.com`,
+    password: ['Str0ng', 'Pass!'].join(''),
+    business_type: 'restaurant',
+    business_name: 'Demo Cafe',
+    setup_profile: 'demo',
+    service_model: serviceModel,
+    terms_accepted: true,
+    owner_approval_pin: '5678',
+    owner_approval_pin_confirmation: '5678',
+    currency: 'SYP',
+    timezone: 'Asia/Damascus',
+    language: 'ar',
+  });
+
+  async function freshDemoSetup(serviceModel: string) {
+    closeDatabase();
+    fs.rmSync(testDir, { recursive: true, force: true });
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), `flo-first-run-demo-${serviceModel}-`));
+    initDatabase();
+    const demoApi = express();
+    demoApi.use(express.json());
+    demoApi.use('/api/auth', authRoutes);
+    const demoServer = await listen(demoApi);
+    const demoAddress = demoServer.address() as { port: number };
+    try {
+      return await request(
+        `http://127.0.0.1:${demoAddress.port}/api/auth`,
+        '/setup/initialize',
+        { method: 'POST', body: JSON.stringify(demoPayload(serviceModel)) },
+      );
+    } finally {
+      await new Promise<void>((resolve) => demoServer.close(() => resolve()));
+    }
+  }
+
+  const finedineDemo = await freshDemoSetup('finedine');
+  assert.equal(finedineDemo.status, 200, 'Demo + FineDine setup completes');
+  assert.equal(count('customers'), 3, 'demo setup seeds sample customers');
+  assert.equal(count('tables'), 4, 'FineDine demo seeds tables');
+  assert.ok(count('categories') > 0 && count('products') > 0, 'demo setup seeds a menu');
+  assert.equal(setting('service_model'), 'finedine', 'service model persists as finedine');
+  assert.equal(setting('billing_type'), 'postpaid', 'FineDine keeps postpaid billing');
+  assert.equal(setting('tables_required'), 'true', 'FineDine keeps required tables');
+  console.log('   ✓ Demo + FineDine (Full Service) setup completes with seeded tables');
+
+  const qsrDemo = await freshDemoSetup('qsr');
+  assert.equal(qsrDemo.status, 200, 'Demo + QSR setup completes');
+  assert.equal(count('customers'), 3, 'QSR demo setup seeds sample customers');
+  assert.equal(count('tables'), 0, 'QSR demo seeds no tables');
+  assert.equal(setting('billing_type'), 'prepaid', 'QSR keeps prepaid billing');
+  console.log('   ✓ Demo + QSR (Quick Service) setup completes without tables');
 }
 
 main()

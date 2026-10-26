@@ -330,12 +330,16 @@ async function main() {
   db.prepare(
     "INSERT OR REPLACE INTO products (id, name, price, stock_quantity, tax_type) VALUES (?, 'Test', 100, 10, 'exclusive')",
   ).run(prodId);
+  db.prepare(
+    "INSERT OR IGNORE INTO tables (id, number, capacity, status, created_at, updated_at) VALUES ('tbl-security', 'T1', 4, 'available', ?, ?)",
+  ).run(now(), now());
 
   const managerOrderRes = await request(app)
     .post('/api/orders/')
     .set(managerAuth)
     .send({
       type: 'dine_in',
+      table_id: 'tbl-security',
       user_id: 'security-manager',
       items: [{ product_id: prodId, quantity: 1 }],
     });
@@ -346,6 +350,7 @@ async function main() {
     .set(waiterAuth)
     .send({
       type: 'dine_in',
+      table_id: 'tbl-security',
       user_id: 'security-server',
       items: [{ product_id: prodId, quantity: 1 }],
     });
@@ -384,6 +389,7 @@ async function main() {
     .set(waiterAuth)
     .send({
       type: 'dine_in',
+      table_id: 'tbl-security',
       items: [{ product_id: prodId, quantity: 1 }],
     });
   assertEqual(noBodyUserIdRes.status, 201, 'server can create an order without sending user_id');
@@ -400,6 +406,7 @@ async function main() {
     .set(waiterAuth)
     .send({
       type: 'dine_in',
+      table_id: 'tbl-security',
       user_id: 'security-owner',
       items: [{ product_id: prodId, quantity: 1 }],
     });

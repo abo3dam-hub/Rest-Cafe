@@ -278,7 +278,12 @@ async function main() {
         `daily-sales-${businessDate}-summary.csv`,
         'summary Content-Disposition filename',
       );
-      const summaryCsv = await summaryRes.text();
+      const summaryBytes = Buffer.from(await summaryRes.arrayBuffer());
+      const summaryCsv = summaryBytes.toString('utf8');
+      assert(
+        summaryBytes[0] === 0xef && summaryBytes[1] === 0xbb && summaryBytes[2] === 0xbf,
+        'summary CSV starts with the UTF-8 BOM bytes so Excel decodes Arabic correctly',
+      );
       assertIncludes(summaryCsv, 'metric,value', 'summary CSV header');
       assertIncludes(summaryCsv, 'net_collected,30', 'summary CSV net_collected');
 
@@ -292,7 +297,12 @@ async function main() {
         `daily-sales-${businessDate}-items.csv`,
         'items Content-Disposition filename',
       );
-      const itemsCsv = await itemsRes.text();
+      const itemsBytes = Buffer.from(await itemsRes.arrayBuffer());
+      const itemsCsv = itemsBytes.toString('utf8');
+      assert(
+        itemsBytes[0] === 0xef && itemsBytes[1] === 0xbb && itemsBytes[2] === 0xbf,
+        'items CSV starts with the UTF-8 BOM bytes so Excel decodes Arabic correctly',
+      );
       assertIncludes(
         itemsCsv,
         'product_id,product_name,product_sku,quantity,gross_item_sales,item_discounts,net_item_sales,tax_amount',

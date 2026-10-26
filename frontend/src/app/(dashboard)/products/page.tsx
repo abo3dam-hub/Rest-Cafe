@@ -36,7 +36,7 @@ import {
   toVariantRows,
   type ProductVariantRow,
 } from '@/lib/product-variants';
-import TagBadge, { tagLabel } from '@/components/pos/DietaryBadge';
+import TagBadge from '@/components/pos/DietaryBadge';
 import { parseDbTimestamp } from '@/lib/utils';
 import ImageUploader from '@/components/products/ImageUploader';
 import dynamic from 'next/dynamic';
@@ -50,7 +50,6 @@ import { nameToColor } from '@/lib/image-utils';
 import { useTranslations, type AppConfig } from 'use-intl';
 import { tenantCan } from '@/lib/permissions';
 
-type PosKey = keyof AppConfig['Messages']['pos'];
 type ProductsKey = keyof AppConfig['Messages']['products'];
 
 // Loaded on demand: the menu printer pulls the thermal print kernel in, which the
@@ -58,23 +57,6 @@ type ProductsKey = keyof AppConfig['Messages']['products'];
 const PrintMenuModal = dynamic(() => import('@/components/products/PrintMenuModal'), {
   ssr: false,
 });
-
-const PRESET_TAGS: { key: string; labelKey: PosKey }[] = [
-  { key: 'veg', labelKey: 'tagVeg' },
-  { key: 'non_veg', labelKey: 'tagNonVeg' },
-  { key: 'vegan', labelKey: 'tagVegan' },
-  { key: 'egg', labelKey: 'tagEgg' },
-  { key: 'spicy', labelKey: 'tagSpicy' },
-  { key: 'contains_nuts', labelKey: 'tagContainsNuts' },
-  { key: 'gluten_free', labelKey: 'tagGlutenFree' },
-  { key: 'dairy_free', labelKey: 'tagDairyFree' },
-  { key: 'halal', labelKey: 'tagHalal' },
-  { key: 'new_arrival', labelKey: 'tagNewArrival' },
-  { key: 'bestseller', labelKey: 'tagBestseller' },
-  { key: 'organic', labelKey: 'tagOrganic' },
-  { key: 'fragrance_free', labelKey: 'tagFragranceFree' },
-  { key: 'limited', labelKey: 'tagLimited' },
-];
 
 const CATEGORY_COLORS: { key: string; labelKey: ProductsKey; bg: string; text: string }[] = [
   { key: '', labelKey: 'colorNone', bg: 'bg-muted', text: 'text-muted-foreground' },
@@ -145,12 +127,6 @@ export default function ProductsPage() {
   const tCommon = useTranslations('common');
   const tPos = useTranslations('pos');
 
-  // Translate a raw tag string: known tags go through the `pos` namespace;
-  // custom tags render a formatted name (reuses DietaryBadge's tagLabel).
-  const tagLabelText = (tag: string): string => {
-    const label = tagLabel(tag);
-    return label.startsWith('pos.') ? tPos(label.slice(4) as PosKey) : label;
-  };
   const { currentTenant } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const [products, setProducts] = useState<Product[]>([]);
@@ -1373,46 +1349,6 @@ export default function ProductsPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        {t('fieldBarcode')}
-                      </label>
-                      <input
-                        type="text"
-                        value={form.barcode}
-                        onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                        placeholder={t('fieldBarcodePlaceholder')}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none font-mono"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">{t('fieldBarcodeHint')}</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-1">
-                          {t('fieldSaleUnit')}
-                        </label>
-                        <select
-                          value={form.sale_unit}
-                          onChange={(e) => {
-                            const saleUnit = e.target.value as Product['sale_unit'];
-                            setForm({
-                              ...form,
-                              sale_unit: saleUnit,
-                              allow_fractional_quantity: saleUnit === 'each' ? false : true,
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                        >
-                          <option value="each">{t('saleUnitEach')}</option>
-                          <option value="kg">{t('saleUnitKg')}</option>
-                          <option value="g">{t('saleUnitG')}</option>
-                          <option value="lb">{t('saleUnitLb')}</option>
-                          <option value="ml">{t('saleUnitMl')}</option>
-                          <option value="cl">{t('saleUnitCl')}</option>
-                          <option value="l">{t('saleUnitL')}</option>
-                          <option value="fl oz">{t('saleUnitFlOz')}</option>
-                          <option value="oz">{t('saleUnitOz')}</option>
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-sm font-medium text-foreground mb-1">
                           {t('fieldWeightPrecision')}
@@ -1426,19 +1362,6 @@ export default function ProductsPage() {
                           className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
                         />
                       </div>
-                      <label className="flex items-center gap-2 pt-7">
-                        <input
-                          type="checkbox"
-                          checked={form.allow_fractional_quantity}
-                          onChange={(e) =>
-                            setForm({ ...form, allow_fractional_quantity: e.target.checked })
-                          }
-                          className="rounded border-gray-300 dark:border-border text-brand focus:ring-brand"
-                        />
-                        <span className="text-sm text-foreground">
-                          {t('fieldAllowFractionalQuantity')}
-                        </span>
-                      </label>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1723,161 +1646,6 @@ export default function ProductsPage() {
                         </p>
                       </div>
                     )}
-                    {loyaltyEnabled && (
-                      <div className="bg-muted p-4 rounded-xl space-y-2">
-                        <label className="block text-sm font-medium text-foreground">
-                          {t('cashbackLabel')}
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="100"
-                            value={form.cb_percent}
-                            onChange={(e) => setForm({ ...form, cb_percent: e.target.value })}
-                            placeholder={String(globalCashbackPercent)}
-                            className="w-24 px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                          />
-                          <span className="text-muted-foreground font-medium">%</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {form.cb_percent === ''
-                            ? t('cashbackUsingGlobal', { rate: globalCashbackPercent })
-                            : t('cashbackOverrideHint')}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        {t('taxRateGroupLabel')}
-                      </label>
-                      <select
-                        value={form.tax_category_id}
-                        onChange={(e) => setForm({ ...form, tax_category_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                      >
-                        <option value="">{t('taxNoTax')}</option>
-                        {taxCategories.map((tc) => (
-                          <option key={tc.id} value={tc.id}>
-                            {taxCategoryOptionLabel(tc)}
-                          </option>
-                        ))}
-                      </select>
-                      {taxCategories.length === 0 && (
-                        <p className="text-xs text-gray-400 mt-1">{t('taxNoGroupsHint')}</p>
-                      )}
-                      {taxCategories.length > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">{t('taxDefaultHint')}</p>
-                      )}
-                    </div>
-                    {form.tax_category_id ? (
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-1">
-                          {t('taxBehaviorLabel')}
-                        </label>
-                        <select
-                          value={form.tax_behavior}
-                          onChange={(e) => setForm({ ...form, tax_behavior: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                        >
-                          <option value="country_default">{t('taxCountryDefault')}</option>
-                          <option value="inclusive">{t('taxInclusive')}</option>
-                          <option value="exclusive">{t('taxExclusive')}</option>
-                          <option value="exempt">{t('taxExempt')}</option>
-                        </select>
-                        <p className="text-xs text-gray-400 mt-1">{t('taxRateHint')}</p>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 -mt-2">{t('taxNoCategory')}</p>
-                    )}
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        {t('fieldTags')}
-                      </label>
-                      {/* Selected tags */}
-                      {form.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {form.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-brand rounded-lg text-xs font-medium"
-                            >
-                              {tagLabelText(tag)}
-                              <button
-                                type="button"
-                                aria-label={tCommon('remove')}
-                                onClick={() =>
-                                  setForm((prev) => ({
-                                    ...prev,
-                                    tags: prev.tags.filter((t) => t !== tag),
-                                  }))
-                                }
-                                className="hover:text-red-500"
-                              >
-                                <X size={11} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {/* Preset tag chips */}
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {PRESET_TAGS.filter((pt) => !form.tags.includes(pt.key)).map((pt) => (
-                          <button
-                            key={pt.key}
-                            type="button"
-                            onClick={() =>
-                              setForm((prev) => ({ ...prev, tags: [...prev.tags, pt.key] }))
-                            }
-                            className="px-2 py-1 text-xs border border-border rounded-lg text-muted-foreground hover:border-brand hover:text-brand transition-colors"
-                          >
-                            + {tPos(pt.labelKey)}
-                          </button>
-                        ))}
-                      </div>
-                      {/* Custom tag input */}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={form.customTag}
-                          onChange={(e) =>
-                            setForm((prev) => ({ ...prev, customTag: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ',') {
-                              e.preventDefault();
-                              const val = form.customTag.trim().toLowerCase().replace(/\s+/g, '_');
-                              if (val && !form.tags.includes(val)) {
-                                setForm((prev) => ({
-                                  ...prev,
-                                  tags: [...prev.tags, val],
-                                  customTag: '',
-                                }));
-                              }
-                            }
-                          }}
-                          placeholder={t('tagPlaceholder')}
-                          className="flex-1 px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = form.customTag.trim().toLowerCase().replace(/\s+/g, '_');
-                            if (val && !form.tags.includes(val)) {
-                              setForm((prev) => ({
-                                ...prev,
-                                tags: [...prev.tags, val],
-                                customTag: '',
-                              }));
-                            }
-                          }}
-                          className="px-3 py-1.5 text-sm bg-muted rounded-lg hover:bg-muted text-muted-foreground"
-                        >
-                          {tCommon('add')}
-                        </button>
-                      </div>
-                    </div>
                     {isRestaurant && productAddonGroupOptions.length > 0 && (
                       <div>
                         <label className="block text-sm font-medium text-foreground mb-2">
@@ -1954,25 +1722,6 @@ export default function ProductsPage() {
                     </div>
                     {!!form.track_inventory && (
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            {t('fieldStock')}
-                            <span className="text-red-500 ms-1">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.stock_quantity}
-                            onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-brand outline-none"
-                            required
-                          />
-                          {form.has_variants && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {t('variantGovernedHint')}
-                            </p>
-                          )}
-                        </div>
                         <div>
                           <label className="block text-sm font-medium text-foreground mb-1">
                             {t('fieldLowStockThreshold')}

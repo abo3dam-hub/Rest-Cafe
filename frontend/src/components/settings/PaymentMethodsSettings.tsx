@@ -27,7 +27,6 @@ export function PaymentMethodsSettings({ isAdmin }: { isAdmin: boolean }) {
   const builtInMethods = [
     { key: 'cash', labelKey: 'methodCash' },
     { key: 'card', labelKey: 'methodCard' },
-    { key: 'wallet', labelKey: 'loyaltyWallet' },
   ] as const;
   const [methods, setMethods] = useState<CustomPaymentMethod[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});

@@ -1381,6 +1381,30 @@ router.post(
             ),
           );
       }
+      if (type === 'dine_in') {
+        // Dine-in orders must belong to a real, active table. The POS asks
+        // for the table before placing the order; enforcing the same rule
+        // at creation keeps every client honest. Existing orders are never
+        // re-validated — this only gates new creations.
+        const table =
+          typeof table_id === 'string' && table_id
+            ? getDatabase()
+                .prepare('SELECT id FROM tables WHERE id = ? AND COALESCE(is_active, 1) = 1')
+                .get(table_id)
+            : undefined;
+        if (!table) {
+          return res
+            .status(400)
+            .json(
+              structuredOperationFailure(
+                req,
+                'fc.backend.order.create.other_validation',
+                'not_applied',
+                'A valid table is required for dine-in orders',
+              ),
+            );
+        }
+      }
       if (
         guest_count !== undefined &&
         guest_count !== null &&

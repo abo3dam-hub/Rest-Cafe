@@ -181,7 +181,6 @@ export default function CartPanel({
     return () => onModalOpenChange?.(false);
   }, [priceOverrideOpen, onModalOpenChange]);
   const billingType = usePosSettingsStore((s) => s.billingType);
-  const tablesRequired = usePosSettingsStore((s) => s.tablesRequired);
   const t = useTranslations('pos');
   const tCommon = useTranslations('common');
   const tOrders = useTranslations('orders');
@@ -273,19 +272,17 @@ export default function CartPanel({
       {/* Order Type */}
       <div className="p-4 border-b border-border dark:border-border space-y-2">
         <div className="flex gap-1 bg-muted rounded-lg p-1">
-          {(['dine_in', 'takeaway', 'delivery', 'online'] as const)
+          {(['dine_in', 'takeaway', 'delivery'] as const)
             .filter((type) => isRestaurant || type !== 'dine_in')
             .map((type) => {
               const Icon = orderTypeIcons[type];
-              const showIcon = type !== 'dine_in' && type !== 'online';
+              const showIcon = type !== 'dine_in';
               const label =
                 type === 'dine_in'
                   ? t('orderTypeDineIn')
                   : type === 'takeaway'
                     ? t('orderTypeTakeaway')
-                    : type === 'delivery'
-                      ? t('orderTypeDelivery')
-                      : t('orderTypeOnline');
+                    : t('orderTypeDelivery');
               return (
                 <button
                   key={type}
@@ -307,7 +304,6 @@ export default function CartPanel({
           <div className="flex flex-wrap items-stretch gap-2">
             {isRestaurant &&
               cart.orderType === 'dine_in' &&
-              tablesRequired &&
               onShowTablePicker && (
                 <button
                   type="button"

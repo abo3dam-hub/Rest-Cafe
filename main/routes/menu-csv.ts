@@ -19,6 +19,7 @@ import {
   decodeLegacyProvenField,
   decodeQuoteV1Field,
   toQuoteV1CsvRow,
+  withUtf8Bom,
 } from '../lib/csv';
 
 const router = Router();
@@ -125,6 +126,8 @@ class CsvImportError extends Error {
 
 function parseCSV(text: string): string[][] {
   if (typeof text !== 'string') throw new CsvImportError('CSV data must be a string');
+  // Exports carry a UTF-8 BOM for Excel; never let it weld onto the first header.
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   if (Buffer.byteLength(text, 'utf8') > MAX_CSV_BYTES) {
     throw new CsvImportError(`CSV exceeds the ${MAX_CSV_BYTES}-byte size limit`);
   }
@@ -422,7 +425,7 @@ router.get(
         );
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="categories-export.csv"');
-      res.send(lines.join('\n'));
+      res.send(withUtf8Bom(lines.join('\n')));
     } catch (err: any) {
       console.error('[API] Menu CSV export failed:', err);
       res.status(500).json({ error: 'Menu CSV export failed' });
@@ -471,7 +474,7 @@ router.get(
       }
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="products-export.csv"');
-      res.send(lines.join('\n'));
+      res.send(withUtf8Bom(lines.join('\n')));
     } catch (err: any) {
       if (err instanceof RegionalNotConfiguredError)
         return res.status(409).json({ error: 'regional_not_configured' });
@@ -518,7 +521,7 @@ router.get(
       }
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="addons-export.csv"');
-      res.send(lines.join('\n'));
+      res.send(withUtf8Bom(lines.join('\n')));
     } catch (err: any) {
       if (err instanceof RegionalNotConfiguredError)
         return res.status(409).json({ error: 'regional_not_configured' });

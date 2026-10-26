@@ -28,6 +28,7 @@ const {
   startServer,
   seedOwnerUser,
   seedCategory,
+  seedTable,
   seedProduct,
   installAndActivateTestTaxPack,
   api,
@@ -128,6 +129,7 @@ async function main() {
   const db = initTestDb();
   const { userId: ownerId, authHeader } = seedOwnerUser(db);
   seedCategory(db, 'cat-charges', 'Menu');
+  seedTable(db, 'tbl-charges', 7, 4);
   seedProduct(db, 'prod-charges', 'cat-charges', 'Dish', 100, { tax_behavior: 'exempt' });
   setCurrency('USD', 'US');
 
@@ -147,7 +149,11 @@ async function main() {
   const createOrder = (type: string) =>
     api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type, items: [{ product_id: 'prod-charges', quantity: 1 }] },
+      body: {
+        type,
+        ...(type === 'dine_in' ? { table_id: 'tbl-charges' } : {}),
+        items: [{ product_id: 'prod-charges', quantity: 1 }],
+      },
       headers: authHeader,
     });
 
@@ -410,7 +416,7 @@ async function main() {
 
     const createdByOrderCreator = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-charges', quantity: 1 }] },
+      body: { type: 'dine_in', table_id: 'tbl-charges', items: [{ product_id: 'prod-charges', quantity: 1 }] },
       headers: orderCreatorAuth,
     });
     assertEqualOrThrow(createdByOrderCreator.status, 201, 'the limited server can create an order');
@@ -486,7 +492,7 @@ async function main() {
     );
     const billDiscountOrder = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-charges', quantity: 1 }] },
+      body: { type: 'dine_in', table_id: 'tbl-charges', items: [{ product_id: 'prod-charges', quantity: 1 }] },
       headers: billDiscountAuth,
     });
     assertEqualOrThrow(
@@ -515,6 +521,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         items: [
           { product_id: 'prod-charges', quantity: 1 },
           { product_id: 'prod-charges', quantity: 1 },
@@ -663,6 +670,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         items: [
           { product_id: 'prod-charges', quantity: 1 },
           { product_id: 'prod-charges', quantity: 1 },
@@ -793,7 +801,7 @@ async function main() {
     await putCharges([SERVICE_CHARGE, LATE_NIGHT]);
     const dineIn = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-charges', quantity: 1 }] },
+      body: { type: 'dine_in', table_id: 'tbl-charges', items: [{ product_id: 'prod-charges', quantity: 1 }] },
       headers: authHeader,
     });
     const dineInBill = await api(baseUrl, '/api/bills/generate', {
@@ -864,6 +872,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         opted_in_charge_ids: ['packaging_fee'],
         items: [{ product_id: 'prod-charges', quantity: 1 }],
       },
@@ -913,6 +922,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         opted_in_charge_ids: ['service_charge'],
         items: [{ product_id: 'prod-charges', quantity: 1 }],
       },
@@ -1129,6 +1139,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         service_charge: 4,
         packaging_charge: 3,
         items: [{ product_id: 'prod-charges', quantity: 1 }],
@@ -1159,6 +1170,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         service_charge: 4,
         packaging_charge: 3,
         items: [{ product_id: 'prod-charges', quantity: 1 }],
@@ -1217,6 +1229,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         waived_charge_ids: ['service_charge'],
         opted_in_charge_ids: ['nightly'],
         items: [{ product_id: 'prod-charges', quantity: 1 }],
@@ -1257,6 +1270,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         waived_charge_ids: ['waived_opt_in'],
         opted_in_charge_ids: ['waived_opt_in'],
         items: [{ product_id: 'prod-charges', quantity: 1 }],
@@ -1295,6 +1309,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-charges',
         waived_charge_ids: 'service_charge',
         items: [{ product_id: 'prod-charges', quantity: 1 }],
       },
@@ -1629,7 +1644,7 @@ async function main() {
     );
     const halfCentOrder = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-charges-half-cent', quantity: 1 }] },
+      body: { type: 'dine_in', table_id: 'tbl-charges', items: [{ product_id: 'prod-charges-half-cent', quantity: 1 }] },
       headers: authHeader,
     });
     assertEqualOrThrow(halfCentOrder.status, 201, 'order at subtotal 29725.00 is created');
@@ -1679,7 +1694,7 @@ async function main() {
     );
     const laterOrder = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-charges-half-cent', quantity: 1 }] },
+      body: { type: 'dine_in', table_id: 'tbl-charges', items: [{ product_id: 'prod-charges-half-cent', quantity: 1 }] },
       headers: authHeader,
     });
     assertEqualOrThrow(

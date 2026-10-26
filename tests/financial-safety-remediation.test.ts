@@ -60,6 +60,7 @@ const {
   now,
   seedOwnerUser,
   seedCategory,
+  seedTable,
   seedProduct,
 } = require('./helpers/test-setup');
 
@@ -83,6 +84,7 @@ async function run(): Promise<void> {
   console.log('='.repeat(70));
 
   const db = initTestDb();
+  seedTable(db, 'tbl-financial', 6, 4);
   resetBillPinRateLimit();
   resetOrderPinRateLimit();
 
@@ -156,6 +158,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-100', quantity: 1 }],
         },
         headers: cashierAuth,
@@ -292,6 +295,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-100', quantity: 1 }],
         },
         headers: cashierAuth,
@@ -340,6 +344,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-100', quantity: 1 }],
         },
         headers: cashierAuth,
@@ -396,6 +401,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-100', quantity: 1 }],
         },
         headers: cashierAuth,
@@ -430,6 +436,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-100', quantity: 1 }],
         },
         headers: cashierAuth,
@@ -493,6 +500,7 @@ async function run(): Promise<void> {
         method: 'POST',
         body: {
           type: 'dine_in',
+          table_id: 'tbl-financial',
           items: [{ product_id: 'prod-50', quantity: 1 }],
         },
         headers: cashierAuth,

@@ -148,6 +148,9 @@ async function runTests() {
   db.prepare(`INSERT INTO categories (id, name, slug, sort_order, is_active) VALUES (?, 'Coffee', 'coffee', 1, 1)`).run(catId);
 
   const prodId = 'prod-1';
+  db.prepare(
+    `INSERT OR IGNORE INTO tables (id, number, capacity, status, created_at, updated_at) VALUES ('tbl-122', 'T122', 4, 'available', ?, ?)`,
+  ).run(now(), now());
   db.prepare(`
     INSERT INTO products (id, category_id, name, price, tax_type, tax_rate, track_inventory, stock_quantity, is_active, sort_order, updated_at)
     VALUES (?, ?, 'Espresso', 3.00, 'none', 0, 0, 0, 1, 1, ?)
@@ -193,6 +196,7 @@ async function runTests() {
   // Subtotal per Espresso line = (3.00 + (1.50 * 2) + (0.50 * 3)) * 2 = (3.00 + 3.00 + 1.50) * 2 = 7.50 * 2 = 15.00
   const orderRes = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [
       {
         product_id: prodId,
@@ -244,18 +248,21 @@ async function runTests() {
   console.log('\n4. Invalid Addon Quantity Rejection');
   const invalidZero = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [{ product_id: prodId, quantity: 1, addons: [{ id: addonShotId, quantity: 0 }] }],
   });
   assertEqual(invalidZero.status, 400, 'Zero addon quantity rejected');
 
   const invalidNegative = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [{ product_id: prodId, quantity: 1, addons: [{ id: addonShotId, quantity: -2 }] }],
   });
   assertEqual(invalidNegative.status, 400, 'Negative addon quantity rejected');
 
   const invalidFractional = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [{ product_id: prodId, quantity: 1, addons: [{ id: addonShotId, quantity: 1.5 }] }],
   });
   assertEqual(invalidFractional.status, 400, 'Fractional addon quantity rejected');
@@ -273,12 +280,14 @@ async function runTests() {
 
   const invalidMultiRes = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [{ product_id: prodId, quantity: 1, addons: [{ id: disallowAddonId, addon_group_id: disallowGroupId, name: 'Single Addon', price: 0.5, quantity: 2 }] }],
   });
   assertEqual(invalidMultiRes.status, 400, 'Multi-quantity rejected when group allow_multiple_quantities is false');
 
   const invalidMaxRes = await makeRequest(app, 'POST', '/api/orders', {
     type: 'dine_in',
+    table_id: 'tbl-122',
     items: [{ product_id: prodId, quantity: 1, addons: [{ id: disallowAddonId, addon_group_id: disallowGroupId, name: 'Single Addon', price: 0.5, quantity: 3 }] }],
   });
   assertEqual(invalidMaxRes.status, 400, 'Exceeding group max_selection quantity rejected');

@@ -898,7 +898,12 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       });
 
       if (!pendingCurrencyReset) {
-        seedSetupProfile(db, normalizedSetupProfile, normalizedServiceModel, language, '');
+        // The demo seed needs a real country to derive demo customers'
+        // phone dial code. Rest&Cafe has no country profiles, so seed with
+        // the product's regional default — the same 'SY' this handler uses
+        // for business-phone normalization. Passing '' here made every
+        // demo-profile setup fail with RegionalNotConfiguredError.
+        seedSetupProfile(db, normalizedSetupProfile, normalizedServiceModel, language, 'SY');
       }
       if (pendingCurrencyReset) {
         db.prepare("DELETE FROM _flo_meta WHERE key = 'currency_reset_pending'").run();

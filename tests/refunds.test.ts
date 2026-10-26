@@ -30,6 +30,7 @@ const {
   seedOwnerUser,
   seedManagerUser,
   seedCategory,
+  seedTable,
   seedProduct,
   api,
   assert,
@@ -62,6 +63,7 @@ async function main() {
     ownerId,
   );
   seedCategory(db, 'cat-refund', 'Refund menu');
+  seedTable(db, 'tbl-refund', 5, 4);
   seedProduct(db, 'prod-refund', 'cat-refund', 'Refund item', 100);
   seedProduct(db, 'prod-refund-inv', 'cat-refund', 'Refund inventory item', 50, {
     track_inventory: true,
@@ -552,7 +554,7 @@ async function main() {
     db.prepare("UPDATE settings SET value = 'true' WHERE key = 'split_checks_enabled'").run();
     const splitOrder = await api(baseUrl, '/api/orders', {
       method: 'POST',
-      body: { type: 'dine_in', items: [{ product_id: 'prod-refund', quantity: 2 }] },
+      body: { type: 'dine_in', table_id: 'tbl-refund', items: [{ product_id: 'prod-refund', quantity: 2 }] },
       headers: ownerAuth,
     });
     const splitItem = splitOrder.data.order.items[0];
@@ -825,6 +827,7 @@ async function main() {
       method: 'POST',
       body: {
         type: 'dine_in',
+        table_id: 'tbl-refund',
         items: [
           { product_id: 'prod-refund', quantity: 1 },
           { product_id: 'prod-refund-inv', quantity: 1 },

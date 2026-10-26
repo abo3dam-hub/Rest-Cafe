@@ -1,3 +1,16 @@
+export const UTF8_BOM = '﻿';
+
+/**
+ * Prefixes a CSV download with the UTF-8 BOM. Spreadsheet applications —
+ * notably Microsoft Excel on Windows — ignore the HTTP charset of a
+ * downloaded .csv and decode it with the system ANSI code page unless the
+ * file itself starts with the BOM, which garbles Arabic (and any non-ANSI)
+ * text. The BOM is a file-level marker only: parsers must strip it.
+ */
+export function withUtf8Bom(csv: string): string {
+  return csv.startsWith(UTF8_BOM) ? csv : UTF8_BOM + csv;
+}
+
 export const FLO_CSV_ENCODING_COLUMN = 'flo_csv_encoding';
 export const FLO_CSV_ENCODING_QUOTE_V1 = 'quote-v1';
 

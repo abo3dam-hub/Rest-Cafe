@@ -100,9 +100,6 @@ export default function SetupPage() {
     business_name: '',
     instagram_handle: '',
   });
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [productUpdates, setProductUpdates] = useState(false);
-  const [marketing, setMarketing] = useState(false);
   const passwordsEntered = form.password.length > 0 && form.confirmPassword.length > 0;
   const passwordsMatch = !passwordsEntered || form.password === form.confirmPassword;
   const ownerEmail = form.email.trim().toLowerCase();
@@ -196,10 +193,6 @@ export default function SetupPage() {
       toast.error(t('errorPasswordMismatch'));
       return false;
     }
-    if (!termsAccepted) {
-      toast.error(t('errorTermsRequired'));
-      return false;
-    }
     return true;
   };
 
@@ -242,12 +235,15 @@ export default function SetupPage() {
         instagram_handle: form.instagram_handle.trim() || undefined,
         setup_profile: profile,
         service_model: serviceModel,
-        terms_accepted: termsAccepted,
+        // The form shows the terms/privacy/disclaimer notice directly above
+        // the submit button; submitting under that notice is the acceptance
+        // act the backend records.
+        terms_accepted: true,
         master_pin: masterPinAvailable ? masterPin : undefined,
         owner_approval_pin: ownerApprovalPin,
         owner_approval_pin_confirmation: ownerApprovalPinConfirm,
-        email_product_updates: productUpdates,
-        email_marketing: marketing,
+        email_product_updates: false,
+        email_marketing: false,
         ...regionalPayload,
       });
       completeSetup();
@@ -649,14 +645,7 @@ export default function SetupPage() {
                     </p>
                   </div>
 
-                  <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                      required
-                    />
+                  <p className="text-sm text-muted-foreground">
                     <span>
                       {t('termsIntro')}{' '}
                       <a
@@ -687,37 +676,14 @@ export default function SetupPage() {
                       </a>
                       .
                     </span>
-                  </label>
+                  </p>
 
-                  <div className="space-y-3 rounded-lg border border-border px-3 py-3 text-sm">
-                    <p className="font-medium text-foreground">{t('emailCommunicationTitle')}</p>
-                    <p className="text-muted-foreground">{t('emailCommunicationDescription')}</p>
-                    <label className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={productUpdates}
-                        onChange={(e) => setProductUpdates(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                      />
-                      <span>{t('productUpdatesOptional')}</span>
-                    </label>
-                    <label className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={marketing}
-                        onChange={(e) => setMarketing(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                      />
-                      <span>{t('marketingOptional')}</span>
-                    </label>
-                  </div>
 
                   <Button
                     type="submit"
                     disabled={
                       ownerEmailInvalid ||
                       !passwordsMatch ||
-                      !termsAccepted ||
                       !isPasswordValid(form.password)
                     }
                     className="w-full"

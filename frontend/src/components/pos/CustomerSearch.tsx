@@ -69,7 +69,6 @@ export default function CustomerSearch({
     initialField?: 'phone' | 'name';
   } | null>(null);
 
-  const [loyaltyPoints, setLoyaltyPoints] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const requestAbortRef = useRef<AbortController | null>(null);
   const searchRequestIdRef = useRef(0);
@@ -88,23 +87,8 @@ export default function CustomerSearch({
   const [syncedCustomerId, setSyncedCustomerId] = useState(customer?.id ?? null);
   if ((customer?.id ?? null) !== syncedCustomerId) {
     setSyncedCustomerId(customer?.id ?? null);
-    setLoyaltyPoints(null);
   }
 
-  useEffect(() => {
-    if (!customer) return;
-    const controller = new AbortController();
-    api
-      .get(`/customers/${customer.id}/wallet`, { signal: controller.signal })
-      .then((res) => setLoyaltyPoints(res.data.balance))
-      .catch((err: unknown) => {
-        if (err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError'))
-          return;
-        setLoyaltyPoints(null);
-      });
-    return () => controller.abort();
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [customer?.id]);
 
   useEffect(() => {
     if (cart.customerId && !cart.customer) {
@@ -328,12 +312,6 @@ export default function CustomerSearch({
                 <Ltr>{customer.phone}</Ltr>
               </span>
               <Pencil size={14} className="text-brand/60 dark:text-indigo-300 shrink-0" />
-              {!!loyaltyPoints && loyaltyPoints > 0 && (
-                <span className="flex items-center gap-0.5 text-xs font-medium text-brand dark:text-indigo-300 bg-card/70 rounded-full px-1.5 py-0.5 shrink-0">
-                  <Gift size={11} />
-                  {t('loyaltyPointsShort', { count: loyaltyPoints })}
-                </span>
-              )}
               {hasTags && <TagBadges counts={customer.tag_counts!} />}
             </button>
             <button
@@ -387,12 +365,6 @@ export default function CustomerSearch({
             <X size={16} />
           </button>
         </div>
-        {!!loyaltyPoints && loyaltyPoints > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-brand dark:text-indigo-300 bg-brand-light dark:bg-[var(--color-brand-light)] rounded-full px-1.5 py-0.5">
-            <Gift size={11} />
-            {t('loyaltyPointsShort', { count: loyaltyPoints })}
-          </span>
-        )}
         {hasTags && <TagBadges counts={customer.tag_counts!} />}
         {editingCustomer && (
           <EditCustomerModal
