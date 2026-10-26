@@ -22,6 +22,7 @@ import {
   Monitor,
   Boxes,
   Receipt,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslations, type AppConfig } from 'use-intl';
@@ -61,7 +62,9 @@ type NavKey = keyof AppConfig['Messages']['nav'];
 
 interface NavItem {
   href: string;
-  labelKey: NavKey;
+  // Null when the label lives outside the `nav` namespace (Reports uses the
+  // dedicated `reports` namespace: reports.title).
+  labelKey: NavKey | null;
   icon: LucideIcon;
   permission: PermissionId;
   businessTypes: string[] | null;
@@ -74,6 +77,13 @@ const ALL_NAV_ITEMS: NavItem[] = [
     labelKey: 'dashboard',
     icon: LayoutDashboard,
     permission: 'dashboard.view',
+    businessTypes: null,
+  },
+  {
+    href: '/reports',
+    labelKey: null,
+    icon: BarChart3,
+    permission: 'reports.view',
     businessTypes: null,
   },
   { href: '/pos', labelKey: 'pos', icon: ShoppingCart, permission: 'pos.use', businessTypes: null },
@@ -148,6 +158,7 @@ export default function AppSidebar() {
   const { tablesRequired, kdsEnabled, setKdsEnabled } = usePosSettingsStore();
   const { isMobile, setOpenMobile } = useSidebar();
   const t = useTranslations('nav');
+  const tReports = useTranslations('reports');
   const tCommon = useTranslations('common');
   const { confirm, ConfirmDialog } = useConfirm();
   const closeMobile = () => {
@@ -233,14 +244,15 @@ export default function AppSidebar() {
                   const [hrefPath, hrefQuery] = item.href.split('?');
                   const isActive =
                     !hrefQuery && (pathname === hrefPath || pathname?.startsWith(hrefPath + '/'));
+                  const label = item.labelKey ? t(item.labelKey) : tReports('title');
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={t(item.labelKey)}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
                         <Link href={item.href} onClick={closeMobile}>
                           <span className="relative flex size-4 shrink-0 items-center justify-center">
                             <item.icon className="size-4 shrink-0" />
                           </span>
-                          <span>{t(item.labelKey)}</span>
+                          <span>{label}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

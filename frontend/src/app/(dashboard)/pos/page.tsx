@@ -831,7 +831,11 @@ export default function POSPage() {
   );
   const { printBill, printKot } = usePrinterStore();
   const billingIsPrepaid = billingType === 'prepaid';
-  const shouldTakePaymentNow = billingIsPrepaid;
+  // Roles without payments.take (e.g. the waiter, who orders for the
+  // customer) never enter a payment flow: their orders are placed and
+  // settled later by a cashier.
+  const canTakePayments = tenantCan(currentTenant, 'payments.take');
+  const shouldTakePaymentNow = billingIsPrepaid && canTakePayments;
 
   const printKotIfEnabled = async (order: Order) => {
     // Master kot_printing_enabled check gates both manual and automatic prints.
@@ -1078,7 +1082,10 @@ export default function POSPage() {
           api.get('/products?active=1'),
         ];
 
-        if (isRestaurant && isTablesRequired) {
+        // Dine-in orders always require a table in this product, so the
+        // table list is fetched for every restaurant install — it must not
+        // be gated on the legacy tables_required setup flag.
+        if (isRestaurant) {
           requests.push(api.get('/tables?active=1'));
         }
 
@@ -1092,8 +1099,8 @@ export default function POSPage() {
           setTables([]);
         }
 
-        // 3. Fetch held orders conditionally
-        if (isTablesRequired) {
+        // 3. Fetch held orders for restaurant installs (they are table-bound)
+        if (isRestaurant) {
           await heldOrders.fetchHeldOrders();
         }
       } catch {
@@ -2092,6 +2099,24 @@ export default function POSPage() {
     }
 
     setShowTablePicker(false);
+    if (!canTakePayments) {
+      // No payment rights (e.g. waiter): an occupied table opens in
+      // add-items mode instead of the checkout/payment modal.
+      if (activeOrder) {
+        try {
+          const { data } = await api.get(`/orders/${activeOrder.id}`);
+          const fullOrder = (data?.order as Order) ?? (activeOrder as Order);
+          handleAddItemsToOrder(table, fullOrder);
+        } catch {
+          cart.setOrderType('dine_in');
+          cart.setTableId(table.id);
+        }
+      } else {
+        cart.setOrderType('dine_in');
+        cart.setTableId(table.id);
+      }
+      return;
+    }
     setCheckoutTable(table);
   };
 
@@ -2167,7 +2192,16 @@ export default function POSPage() {
   useEffect(() => {
     if (wsInitRef.current || !wsParams.table || tables.length === 0) return;
     const table = tables.find((tb) => String(tb.id) === wsParams.table);
-    if (!table) return;
+    if (!table) {
+      // The linked table no longer exists: say so and return to the map
+      // instead of stranding the user in an unbound POS.
+      wsInitRef.current = true;
+      toast.error(t('noTablesFound'));
+      router.replace(
+        wsParams.hall ? `/tables?hall=${encodeURIComponent(wsParams.hall)}` : '/tables',
+      );
+      return;
+    }
     wsInitRef.current = true;
     setWsTable(table);
     cart.setOrderType('dine_in');
@@ -2369,7 +2403,12 @@ export default function POSPage() {
         }
       },
       onOpenCheckout: () => {
-        if (shouldTakePaymentNow || !isRestaurant || cart.orderType !== 'dine_in') {
+        if (
+          shouldTakePaymentNow ||
+          !canTakePayments ||
+          !isRestaurant ||
+          cart.orderType !== 'dine_in'
+        ) {
           void handlePlaceOrder();
           return;
         }
@@ -2657,7 +2696,7 @@ export default function POSPage() {
                 {tTables('requestBill')}
               </button>
             )}
-            {wsOrder && (
+            {wsOrder && canTakePayments && (
               <button
                 type="button"
                 onClick={() => setCheckoutTable(wsTable)}

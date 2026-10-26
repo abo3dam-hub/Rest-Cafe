@@ -19,11 +19,8 @@ import api, {
 import toast from 'react-hot-toast';
 import type { Bill, Order } from '@/lib/types';
 import TaxBreakdown from '@/components/pos/TaxBreakdown';
-import {
-  SplitCheckModal,
-  MIN_CHECKS as MIN_EQUAL_SHARE_PAYERS,
-  MAX_CHECKS as MAX_EQUAL_SHARE_PAYERS,
-} from '@/components/pos/SplitCheckModal';
+import { SplitCheckModal } from '@/components/pos/SplitCheckModal';
+
 import { resolveTaxComponents } from '@/lib/printer/tax-components';
 import { useCartStore } from '@/store/cart';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -44,7 +41,6 @@ import {
   type DiscountType,
 } from '@/lib/discount-settings';
 import { createPaymentIdempotencyKey } from '@/lib/payment-idempotency';
-import { allocateEqualShares } from '@/lib/money';
 import { parseAppliedCharges, type AppliedCharge } from '@/lib/charges';
 import { useChargesStore, chargesForOrderType } from '@/store/charges';
 import { classifyOrderRequestFailure, type OperationFailureMetadata } from '@/lib/order-attempt';
@@ -78,16 +74,6 @@ type AmountTarget =
   | { kind: 'wallet' }
   | { kind: 'discount' }
   | null;
-
-// One equal share written into a tender row, and the balance and payer count it
-// was sized from so a later change can withdraw it.
-type AppliedEqualShare = {
-  index: number;
-  amountMinor: number;
-  amountInput: string;
-  balanceMinor: number;
-  payers: number;
-};
 
 // One payment request frozen at submission. The backend hashes the bill, the
 // payment lines and the customer, so a retry that changes any of them conflicts
@@ -234,21 +220,6 @@ export default function PaymentModal({
   const [splitOpenReason, setSplitOpenReason] = useState<SplitReasonKey | null>(null);
   const [splitCheckBill, setSplitCheckBill] = useState<Bill | null>(null);
   const [chargeStateUncertain, setChargeStateUncertain] = useState(false);
-  const [showEqualShare, setShowEqualShare] = useState(false);
-  // Session-only remaining payer count: reopening the dialog asks again rather
-  // than remembering who has paid.
-  const [equalSharePayers, setEqualSharePayers] = useState(() =>
-    String(
-      Math.min(
-        MAX_EQUAL_SHARE_PAYERS,
-        Math.max(MIN_EQUAL_SHARE_PAYERS, Number(bill.order?.guest_count) || MIN_EQUAL_SHARE_PAYERS),
-      ),
-    ),
-  );
-  const [equalShareNotice, setEqualShareNotice] = useState<'lastPayer' | 'invalidated' | null>(
-    null,
-  );
-  const [appliedEqualShare, setAppliedEqualShare] = useState<AppliedEqualShare | null>(null);
   useEffect(() => {
     void loadCharges();
   }, [loadCharges]);
@@ -589,34 +560,6 @@ export default function PaymentModal({
   const totalPayment = totalPaymentMinor / minorFactor;
   const remainingMinor = toMinorUnits(remaining);
 
-  // Equal shares divide the remaining authoritative balance in the tenant's
-  // smallest unit, so no share is created or lost to rounding.
-  const equalShareCount = /^\d+$/.test(equalSharePayers.trim())
-    ? Number(equalSharePayers.trim())
-    : 0;
-  const equalShareCountInRange =
-    equalShareCount >= MIN_EQUAL_SHARE_PAYERS && equalShareCount <= MAX_EQUAL_SHARE_PAYERS;
-  const equalShareShares =
-    equalShareCountInRange && equalShareCount <= remainingMinor
-      ? allocateEqualShares(remainingMinor, equalShareCount)
-      : [];
-  const equalShareError = equalShareCountInRange
-    ? equalShareCount > remainingMinor
-      ? 'tooManyPayers'
-      : null
-    : 'invalidCount';
-  const equalShareSharesDiffer =
-    equalShareShares.length > 1 &&
-    equalShareShares[0] !== equalShareShares[equalShareShares.length - 1];
-  const minorToStored = (minor: number) => minor / minorFactor;
-  // A share may only be applied over an empty entry board: the other tenders and
-  // the wallet are never overwritten.
-  const tenderHasConflict = (index: number) =>
-    walletAmt > 0 ||
-    payments.some((row, rowIndex) => rowIndex !== index && (parseFloat(row.amount) || 0) > 0);
-  const equalShareConflict =
-    walletAmt > 0 || payments.filter((row) => (parseFloat(row.amount) || 0) > 0).length > 1;
-
   const tenderLabel = (payment: Payment) => {
     const builtIn = PAYMENT_METHODS.find(
       (method) => method.key === payment.method && payment.payment_method_id === undefined,
@@ -625,77 +568,9 @@ export default function PaymentModal({
     return builtIn ? t(BUILT_IN_PAYMENT_KEYS[builtIn.key]) : custom?.name || tCommon('unknown');
   };
 
-  const applyEqualShare = (index: number) => {
-    const shareMinor = equalShareShares[0];
-    if (processing || attemptLocked || shareMinor === undefined || tenderHasConflict(index)) return;
-    const amountInput = String(toDisplayUnit(minorToStored(shareMinor)));
-    setPaymentsTouched(true);
-    setPayments((rows) =>
-      rows.map((row, rowIndex) => (rowIndex === index ? { ...row, amount: amountInput } : row)),
-    );
-    setAppliedEqualShare({
-      index,
-      amountMinor: shareMinor,
-      amountInput,
-      balanceMinor: remainingMinor,
-      payers: equalShareCount,
-    });
-    setEqualShareNotice(null);
-  };
-
-  // The payer who just paid is done, so the count drops by one. The last payer
-  // collects the balance the ordinary way instead of through the shortcut.
-  const advanceEqualShare = (applied: AppliedEqualShare) => {
-    const payersRemaining = applied.payers - 1;
-    setAppliedEqualShare(null);
-    setPayments((rows) =>
-      rows.map((row, index) =>
-        index === applied.index && row.amount === applied.amountInput
-          ? { ...row, amount: '', transaction_id: '' }
-          : row,
-      ),
-    );
-    if (payersRemaining >= MIN_EQUAL_SHARE_PAYERS) {
-      setEqualSharePayers(String(payersRemaining));
-      setEqualShareNotice(null);
-    } else {
-      setShowEqualShare(false);
-      setEqualShareNotice('lastPayer');
-    }
-  };
-
-  const attemptTotalMinor = (attempt: PendingPaymentAttempt) =>
-    attempt.lines.reduce((sum, line) => sum + toMinorUnits(Number(line.amount) || 0), 0);
-
-  // A share sized for a balance or payer count that has since moved on is
-  // withdrawn so the cashier reviews the new preview; an amount the cashier
-  // typed themselves is left alone. Reconciled during render, like the balance
-  // rescale above, so the stale share never reaches a paint.
-  if (
-    appliedEqualShare &&
-    (appliedEqualShare.balanceMinor !== remainingMinor ||
-      appliedEqualShare.payers !== equalShareCount) &&
-    !(
-      attemptLocked &&
-      pendingAttempt &&
-      attemptTotalMinor(pendingAttempt) === appliedEqualShare.amountMinor
-    )
-  ) {
-    setAppliedEqualShare(null);
-    setEqualShareNotice('invalidated');
-    setPayments((rows) =>
-      rows.map((row, index) =>
-        index === appliedEqualShare.index && row.amount === appliedEqualShare.amountInput
-          ? { ...row, amount: '' }
-          : row,
-      ),
-    );
-  }
-
   const updatePaymentAmount = (idx: number, value: string) => {
     if (attemptLocked) return;
     setPaymentsTouched(true);
-    setAppliedEqualShare((current) => (current?.index === idx ? null : current));
     setPayments((current) =>
       current.map((payment, index) => (index === idx ? { ...payment, amount: value } : payment)),
     );
@@ -725,7 +600,6 @@ export default function PaymentModal({
     const dueStored = Math.max(0, remaining - allocatedElsewhere);
     const dueDisplay = toDisplayUnit(dueStored);
     setPaymentsTouched(true);
-    setAppliedEqualShare(null);
     setPayments(
       payments.map((payment, index) =>
         index === idx ? { ...payment, amount: dueDisplay > 0 ? String(dueDisplay) : '' } : payment,
@@ -1125,14 +999,6 @@ export default function PaymentModal({
           rows.map((row) => (row.transaction_id ? { ...row, transaction_id: '' } : row)),
         );
         if (onBillUpdate) onBillUpdate({ ...bill, ...updatedBill, order: bill.order });
-        // Only a committed equal share retires its payer, and only once.
-        if (
-          updatedBill.payment_status === 'partial' &&
-          appliedEqualShare &&
-          attemptTotalMinor(attempt) === appliedEqualShare.amountMinor
-        ) {
-          advanceEqualShare(appliedEqualShare);
-        }
         if (updatedBill.payment_status === 'partial') {
           toast.success(t('paymentRecorded'));
         } else {
@@ -1816,133 +1682,6 @@ export default function PaymentModal({
           </div>
 
           <div className="space-y-4">
-            {/* Equal-share shortcut: divides the remaining balance by payer count */}
-            {remainingMinor > 0 && !justPaid && (
-              <div className="rounded-xl border border-border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEqualShare((open) => !open);
-                    setEqualShareNotice(null);
-                  }}
-                  aria-expanded={showEqualShare}
-                  className="touch-target w-full justify-between gap-3 px-3 bg-muted text-start"
-                >
-                  <span className="text-sm font-medium text-foreground">
-                    {t('splitPaymentEqually')}
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={`text-muted-foreground transition-transform ${showEqualShare ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {equalShareNotice && (
-                  <p
-                    role="status"
-                    className="border-t border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground"
-                  >
-                    {t(
-                      equalShareNotice === 'lastPayer'
-                        ? 'equalShareLastPayer'
-                        : 'equalShareInvalidated',
-                    )}
-                  </p>
-                )}
-                {showEqualShare && (
-                  <div className="space-y-2 border-t border-border bg-sky-50 p-3 dark:bg-sky-950/40">
-                    <div className="flex items-center justify-between gap-2">
-                      <label
-                        htmlFor="equal-share-payers"
-                        className="text-sm font-medium text-foreground"
-                      >
-                        {t('equalSharePayers')}
-                      </label>
-                      <input
-                        id="equal-share-payers"
-                        type="number"
-                        min={MIN_EQUAL_SHARE_PAYERS}
-                        max={MAX_EQUAL_SHARE_PAYERS}
-                        step={1}
-                        inputMode="numeric"
-                        value={equalSharePayers}
-                        disabled={processing || attemptLocked}
-                        onChange={(event) => {
-                          if (attemptLocked) return;
-                          setEqualSharePayers(event.target.value);
-                        }}
-                        className="min-h-9 w-20 rounded-lg border border-border bg-card px-2 py-1 text-end text-sm font-semibold outline-none focus:ring-2 focus:ring-brand"
-                      />
-                    </div>
-                    {equalShareError ? (
-                      <p role="alert" className="text-[11px] text-red-700 dark:text-red-300">
-                        {t(
-                          equalShareError === 'tooManyPayers'
-                            ? 'equalShareTooManyPayers'
-                            : 'equalShareInvalidCount',
-                        )}
-                      </p>
-                    ) : (
-                      <>
-                        <ul className="space-y-1 text-sm">
-                          {equalShareShares.map((shareMinor, index) => (
-                            <li key={index} className="flex items-center justify-between gap-2">
-                              <span className="text-muted-foreground">
-                                {index + 1}
-                                {index === 0 && (
-                                  <span className="ms-2 text-[11px] font-medium text-brand">
-                                    {t('equalShareNextShare')}
-                                  </span>
-                                )}
-                              </span>
-                              <span
-                                data-testid={`equal-share-share-${index}`}
-                                className="font-semibold tabular-nums text-foreground"
-                              >
-                                {currencyFmt(minorToStored(shareMinor))}
-                              </span>
-                            </li>
-                          ))}
-                          <li className="flex items-center justify-between gap-2 border-t border-border pt-1 font-semibold">
-                            <span>{t('total')}</span>
-                            <span data-testid="equal-share-total" className="tabular-nums">
-                              {currencyFmt(remaining)}
-                            </span>
-                          </li>
-                        </ul>
-                        {equalShareSharesDiffer && (
-                          <p className="text-[11px] text-muted-foreground">
-                            {t('equalShareRoundingNote')}
-                          </p>
-                        )}
-                        {equalShareConflict && (
-                          <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                            {t('equalShareConflicts')}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          {payments.map((payment, idx) => (
-                            <Button
-                              key={
-                                payment.payment_method_id === undefined
-                                  ? payment.method
-                                  : `custom:${payment.payment_method_id}`
-                              }
-                              variant="outline"
-                              size="sm"
-                              disabled={processing || attemptLocked || tenderHasConflict(idx)}
-                              onClick={() => applyEqualShare(idx)}
-                            >
-                              {t('equalShareApplyTo', { method: tenderLabel(payment) })}
-                            </Button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="space-y-2">
               {payments.map((payment, idx) => {
                 const builtIn = PAYMENT_METHODS.find(
@@ -1952,7 +1691,6 @@ export default function PaymentModal({
                 const label = tenderLabel(payment);
                 const Icon = builtIn?.icon;
                 const active = (parseFloat(payment.amount) || 0) > 0;
-                const isAppliedShare = appliedEqualShare?.index === idx;
                 return (
                   <div
                     key={
@@ -2007,11 +1745,6 @@ export default function PaymentModal({
                         autoComplete="off"
                         className="w-full min-h-11 rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
                       />
-                    )}
-                    {isAppliedShare && (
-                      <p className="px-1 text-[11px] font-medium text-brand">
-                        {t('equalShareBadge')}
-                      </p>
                     )}
                   </div>
                 );

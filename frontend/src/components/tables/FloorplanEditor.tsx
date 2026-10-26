@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import {
   ArrowRightLeft,
+  Banknote,
   ChevronRight,
   Eye,
   LayoutGrid,
@@ -230,6 +231,7 @@ export default function FloorplanEditor({
   onViewOrder,
   onMoveTable,
   onOpenWorkspace,
+  onPay,
   onRequestBill,
   onUnrequestBill,
   onMerge,
@@ -244,6 +246,7 @@ export default function FloorplanEditor({
   onViewOrder?: (tb: Table) => void;
   onMoveTable?: (tb: Table) => void;
   onOpenWorkspace?: (tb: Table) => void;
+  onPay?: (tb: Table) => void;
   onRequestBill?: (tb: Table) => void;
   onUnrequestBill?: (tb: Table) => void;
   onMerge?: (tb: Table) => void;
@@ -919,6 +922,16 @@ export default function FloorplanEditor({
         run: () => {
           setActionTable(null);
           onOpenWorkspace(tb);
+        },
+      });
+    }
+    if (shown === 'bill_requested' && onPay) {
+      actions.push({
+        label: t('payAndLeave'),
+        icon: <Banknote size={15} />,
+        run: () => {
+          setActionTable(null);
+          onPay(tb);
         },
       });
     }

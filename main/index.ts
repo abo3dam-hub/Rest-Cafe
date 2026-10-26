@@ -282,14 +282,14 @@ async function showRuntimeStuckDialog(reason: string): Promise<void> {
       `URL: ${lastWindowLoadFailure.validatedURL ?? `http://localhost:${getServerPort()}`}`,
     );
   }
-  detailLines.push(`Platform: ${process.platform} | Flo: ${app.getVersion()}`);
+  detailLines.push(`Platform: ${process.platform} | Rest&Cafe: ${app.getVersion()}`);
 
   const { response } = await dialog.showMessageBox({
     type: 'error',
-    title: 'Flo needs to restart',
+    title: 'Rest&Cafe needs to restart',
     message:
-      'Flo could not recover automatically. This usually means another program ' +
-      '(antivirus, firewall, or a leftover Flo process) is blocking its local server.\n\n' +
+      'Rest&Cafe could not recover automatically. This usually means another program ' +
+      '(antivirus, firewall, or a leftover Rest&Cafe process) is blocking its local server.\n\n' +
       'Please quit and reopen the app. If this keeps happening, sending a diagnostic ' +
       'report helps us fix it — it contains no order, customer, or business data.',
     detail: detailLines.join('\n'),
@@ -308,7 +308,7 @@ async function showRuntimeStuckDialog(reason: string): Promise<void> {
 
   await dialog.showMessageBox({
     type: 'info',
-    title: 'Flo',
+    title: 'Rest&Cafe',
     message:
       'Diagnostic captured. If sharing is enabled and this device is online, it will be sent automatically.',
     buttons: ['Quit'],
@@ -787,7 +787,7 @@ function createTray(): void {
         },
       ]);
 
-      tray.setToolTip('Flo Cafe');
+      tray.setToolTip('Rest&Cafe');
       tray.setContextMenu(linuxMenu);
       // Single-click also shows the window on Linux (no double-click standard).
       tray.on('click', () => {
@@ -814,7 +814,7 @@ function createTray(): void {
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Open Flo',
+        label: 'Open Rest&Cafe',
         click: () => {
           showMainWindow();
         },
@@ -829,7 +829,7 @@ function createTray(): void {
       },
     ]);
 
-    tray.setToolTip('Flo');
+    tray.setToolTip('Rest&Cafe');
     tray.setContextMenu(contextMenu);
     tray.on('double-click', () => {
       showMainWindow();
@@ -843,7 +843,7 @@ function startMdns(): void {
   try {
     bonjour = new Bonjour();
     bonjour.publish({
-      name: 'Flo',
+      name: 'Rest&Cafe',
       type: 'http',
       port: getServerPort(),
       host: 'flo', // resolves as flo.local on the LAN
@@ -1076,7 +1076,7 @@ function createMenu(): void {
       label: 'Window',
       submenu: [
         {
-          label: 'Flo Cafe',
+          label: 'Rest&Cafe',
           click: () => {
             if (showMainWindow()) mainWindow?.focus();
           },
@@ -1271,7 +1271,7 @@ async function initialize(): Promise<void> {
       }
       return;
     }
-    dialog.showErrorBox('Initialization Error', `Failed to start Flo: ${error}`);
+    dialog.showErrorBox('Initialization Error', `Failed to start Rest&Cafe: ${error}`);
 
     // Capture only a safe classification; exception text can contain business data.
     try {

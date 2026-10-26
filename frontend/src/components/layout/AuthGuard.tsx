@@ -62,6 +62,7 @@ export const PAGE_PERMISSIONS = [
   ['/inventory', 'inventory.view'],
   ['/expenses', 'expenses.view'],
   ['/tables', 'tables.view'],
+  ['/reports', 'reports.view'],
   ['/customers', 'customers.view'],
   ['/support', 'support.use'],
   ['/print-test', 'printers.manage'],

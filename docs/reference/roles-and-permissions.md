@@ -81,7 +81,7 @@ An owner can flip any configurable cell for a role, or for one user, from the in
 
 | Area         | Capability                                                 | Owner | Manager | Cashier | Server | Chef |
 | ------------ | ---------------------------------------------------------- | :---: | :-----: | :-----: | :----: | :--: |
-| Orders       | Use the POS terminal                                       |   ✓   |    ✓    |    ✓    |   —    |  —   |
+| Orders       | Use the POS terminal                                       |   ✓   |    ✓    |    ✓    |   ✓    |  —   |
 | Reports      | View the owner dashboard                                   |   ✓   |    —    |    —    |   —    |  —   |
 | Orders       | View and create orders                                     |   ✓   |    ✓    |    ✓    |   ✓    |  —   |
 | Orders       | Update order status                                        |   ✓   |    ✓    |    ✓    |   ✓    |  ✓   |

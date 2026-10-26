@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import type { Table, Customer, Order, OrderItem, Bill } from '@/lib/types';
 import FloorplanEditor from '@/components/tables/FloorplanEditor';
+import TableCheckoutModal from '@/components/pos/TableCheckoutModal';
+import PaymentModal from '@/components/pos/PaymentModal';
 import MoveTableModal from '@/components/tables/MoveTableModal';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
@@ -29,7 +31,7 @@ import { useCartStore } from '@/store/cart';
 import { usePrinterStore } from '@/hooks/usePrinter';
 import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
 import { tenantCan } from '@/lib/permissions';
-import { countryName } from '@/lib/countries';
+import { countryName, getCurrencySymbol, getCountryByCode } from '@/lib/countries';
 import { parsePhone, dialCodeFor } from '@/lib/phone';
 import { useTranslations, type AppConfig } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
@@ -328,6 +330,15 @@ export default function TablesPage() {
   const canReadOrders = tenantCan(currentTenant, 'orders.read');
   const canMoveTable = tenantCan(currentTenant, 'tables.orders.move');
   const canGenerateBills = tenantCan(currentTenant, 'bills.generate');
+  const canTakePayments = tenantCan(currentTenant, 'payments.take');
+  const canReadBills = tenantCan(currentTenant, 'bills.read');
+  const currency = getCurrencySymbol(
+    currentTenant?.currency || '',
+    getCountryByCode(currentTenant?.country ?? '')?.locale,
+  );
+  const [checkoutTable, setCheckoutTable] = useState<Table | null>(null);
+  const [paymentBill, setPaymentBill] = useState<Bill | null>(null);
+  const [checkoutOverridePin, setCheckoutOverridePin] = useState<string | undefined>(undefined);
   const [mergeSource, setMergeSource] = useState<Table | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Table | null>(null);
   const [merging, setMerging] = useState(false);
@@ -542,6 +553,32 @@ export default function TablesPage() {
     } finally {
       setBillBusy(false);
     }
+  };
+
+  // Pay & Leave from the table card reuses the POS checkout/payment modals:
+  // full settlement completes the order and frees the table server-side.
+  const handleCheckoutPrintBill = async (bill: Bill) => {
+    const warnings = await printBill(
+      bill,
+      {
+        business_name: currentTenant?.business_name || tCommon('businessNameFallback'),
+        currency: currentTenant?.currency || '',
+        country: currentTenant?.country || '',
+        timezone: currentTenant?.timezone || 'UTC',
+        currency_display: currentTenant?.currency_display,
+        number_digits: currentTenant?.number_digits,
+        calendar: currentTenant?.calendar,
+      },
+      { isReprint: Boolean(bill.printed_at) },
+    );
+    showPrintWarningsToast(warnings);
+  };
+
+  const refreshAfterPayment = () => {
+    setPaymentBill(null);
+    setCheckoutOverridePin(undefined);
+    fetchTables();
+    fetchOrders();
   };
 
   const handleUnrequestBill = async (tb: Table) => {
@@ -1018,6 +1055,7 @@ export default function TablesPage() {
           }
           onMoveTable={canMoveTable ? (tb) => setMovingTable(tb) : undefined}
           onOpenWorkspace={goWorkspace}
+          onPay={canTakePayments ? (tb) => setCheckoutTable(tb) : undefined}
           onRequestBill={canGenerateBills ? handleRequestBill : undefined}
           onUnrequestBill={canGenerateBills ? handleUnrequestBill : undefined}
           onMerge={canMoveTable ? (tb) => setMergeSource(tb) : undefined}
@@ -1986,6 +2024,67 @@ export default function TablesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {checkoutTable && (
+        <TableCheckoutModal
+          table={checkoutTable}
+          tables={tables}
+          currency={currency}
+          cartItemCount={cartStore.itemCount()}
+          onClose={() => {
+            setCheckoutTable(null);
+            fetchTables();
+            fetchOrders();
+          }}
+          onAddItems={(tb) => {
+            setCheckoutTable(null);
+            goWorkspace(tb);
+          }}
+          onPrintBill={handleCheckoutPrintBill}
+          canGenerateBill={canGenerateBills}
+          canReadBills={canReadBills}
+          onPayment={(bill, overridePin) => {
+            setCheckoutTable(null);
+            setPaymentBill(bill);
+            setCheckoutOverridePin(overridePin);
+          }}
+          onAddCartToOrder={(tb) => {
+            setCheckoutTable(null);
+            goWorkspace(tb);
+          }}
+          onOrderMoved={() => {
+            fetchTables();
+            fetchOrders();
+          }}
+        />
+      )}
+
+      {paymentBill && (
+        <PaymentModal
+          key={paymentBill.id}
+          bill={paymentBill}
+          currency={currency}
+          initialOverridePin={checkoutOverridePin}
+          onClose={refreshAfterPayment}
+          onPaid={refreshAfterPayment}
+          onBillUpdate={(updated) => setPaymentBill(updated)}
+          onSplit={(departingBill) => {
+            if (departingBill) {
+              setPaymentBill(null);
+              setCheckoutOverridePin(undefined);
+              void api
+                .get(`/bills/${departingBill.id}`)
+                .then(({ data }) => setPaymentBill((data?.bill as Bill) ?? departingBill))
+                .catch(() => setPaymentBill(departingBill));
+            } else {
+              refreshAfterPayment();
+              return;
+            }
+            fetchTables();
+            fetchOrders();
+          }}
+        />
       )}
 
       {mergeSource && (

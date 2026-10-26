@@ -580,6 +580,11 @@ const FR_INTENTIONAL_IDENTICAL: ReadonlySet<string> = new Set([
   'tax.type', // same word in French
   'update.downloadingBadge', // symbol + placeholder
   'whatsapp.connect.pairingPhonePlaceholder', // pure format: {dialCode}XXXXXXXXXX
+  'reports.net', // shared acronym/cognate
+  'reports.total', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function frFallbackErrors(
@@ -638,6 +643,10 @@ const TR_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditCreateOverride', // pure format with identifiers
   'tax.auditUpdateOverride', // pure format with identifiers
   'whatsapp.connect.pairingPhonePlaceholder', // pure format: {dialCode}XXXXXXXXXX
+  'reports.net', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function trFallbackErrors(
@@ -904,6 +913,14 @@ const FIL_INTENTIONAL_IDENTICAL = new Set<string>([
   'whatsapp.connect.qrMethodTitle',
   'whatsapp.sent.timeline',
   'whatsapp.tabs.inbox',
+  'reports.methodCash', // shared acronym/cognate
+  'reports.methodCard', // shared acronym/cognate
+  'reports.typeDineIn', // shared acronym/cognate
+  'reports.typeTakeaway', // shared acronym/cognate
+  'reports.typeDelivery', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function filFallbackErrors(
@@ -1030,6 +1047,10 @@ const DE_INTENTIONAL_IDENTICAL = new Set<string>([
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
   'whatsapp.sent.colStatus',
+  'reports.status', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function deFallbackErrors(
@@ -1152,6 +1173,9 @@ const IT_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride', // pure format: {entityType} {entityId}: {before} → {after}
   'update.downloadingBadge', // pure format: ↓ {percent}%
   'whatsapp.connect.pairingPhonePlaceholder', // pure format: {dialCode}XXXXXXXXXX
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function itFallbackErrors(
@@ -1177,6 +1201,7 @@ function itFallbackErrors(
 const RU_INTENTIONAL_IDENTICAL = new Set<string>([
   'common.appTitle',
   'common.brandName',
+  'common.logoAlt',
   'dashboard.exportCsv',
   'dashboard.exportXlsx',
   'dashboard.ticketMethodCount',
@@ -1211,6 +1236,9 @@ const RU_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function ruFallbackErrors(
@@ -1377,6 +1405,9 @@ const JA_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function jaFallbackErrors(
@@ -1453,6 +1484,9 @@ const ZH_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function zhFallbackErrors(
@@ -1551,6 +1585,9 @@ const KO_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function koFallbackErrors(
@@ -1671,6 +1708,11 @@ const ID_INTENTIONAL_IDENTICAL = new Set<string>([
   'update.downloadingBadge',
   'whatsapp.sent.colStatus',
   'receipt.item',
+  'reports.total', // shared acronym/cognate
+  'reports.status', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function idFallbackErrors(
@@ -1813,6 +1855,12 @@ const NL_INTENTIONAL_IDENTICAL = new Set<string>([
   'whatsapp.inbox.title',
   'whatsapp.sent.colStatus',
   'whatsapp.tabs.inbox',
+  'reports.product', // shared acronym/cognate
+  'reports.status', // shared acronym/cognate
+  'reports.statusOpen', // shared acronym/cognate
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function nlFallbackErrors(
@@ -1887,6 +1935,9 @@ const HI_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function hiFallbackErrors(
@@ -1909,6 +1960,8 @@ function hiFallbackErrors(
 /** Bengali translation safeguards. */
 const BN_INTENTIONAL_IDENTICAL = new Set<string>([
   'common.brandName', // brand
+  'common.appTitle', // brand
+  'common.logoAlt', // brand
   'auth.emailPlaceholder',
   'dashboard.exportCsv',
   'nav.pos',
@@ -1934,6 +1987,9 @@ const BN_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditCreateOverride',
   'tax.auditUpdateOverride',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function bnFallbackErrors(
@@ -2026,6 +2082,9 @@ const SQ_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditCreateOverride',
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function sqFallbackErrors(
@@ -2121,6 +2180,9 @@ const VI_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function viFallbackErrors(
@@ -2202,6 +2264,9 @@ const TH_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function thFallbackErrors(
@@ -2228,6 +2293,8 @@ function thFallbackErrors(
 /** Nepali translation safeguards. */
 const NE_INTENTIONAL_IDENTICAL = new Set<string>([
   'common.brandName', // brand
+  'common.appTitle', // brand
+  'common.logoAlt', // brand
   'auth.emailPlaceholder',
   'dashboard.exportCsv',
   'dashboard.ticketMethodCount',
@@ -2270,6 +2337,9 @@ const NE_INTENTIONAL_IDENTICAL = new Set<string>([
   'tax.auditUpdateOverride',
   'update.downloadingBadge',
   'whatsapp.connect.pairingPhonePlaceholder',
+  'reports.exportExcel', // shared acronym/cognate
+  'reports.exportCsv', // shared acronym/cognate
+  'reports.exportPdf', // shared acronym/cognate
 ]);
 
 function neFallbackErrors(
