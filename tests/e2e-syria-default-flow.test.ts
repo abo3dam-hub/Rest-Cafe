@@ -156,7 +156,7 @@ async function runSyriaOnboarding(baseUrl, db) {
   assertEqual(storedCountry.value, '', 'DB settings.country stays empty');
 
   const arabicDish = db.prepare("SELECT name FROM products WHERE id = 'prod-demo-butter-chicken'").get();
-  assertEqual(arabicDish.name, 'دجاج بالزبدة', 'demo menu is seeded in Arabic');
+  assertEqual(arabicDish.name, 'شاورما دجاج', 'demo menu is seeded in Arabic');
   const burger = db.prepare("SELECT id FROM products WHERE id = 'prod-demo-hamburguesa-clasica'").get();
   assert(!burger, 'Argentina demo menu is NOT seeded');
 
@@ -164,6 +164,9 @@ async function runSyriaOnboarding(baseUrl, db) {
   assertEqual(firstCustomer.name, 'علي حسن', 'demo customers are the Arabic sample set');
   const customerCount = db.prepare('SELECT COUNT(*) AS c FROM customers').get();
   assertEqual(customerCount.c, 3, 'demo seed creates 3 customers');
+  const demoPhones = db.prepare("SELECT phone, country_code FROM customers WHERE id LIKE 'cust-demo-%'").all() as any[];
+  assert(demoPhones.every((c: any) => /^\+9639\d{8}$/.test(c.phone)), 'demo customers carry Syrian mobile numbers');
+  assert(demoPhones.every((c: any) => c.country_code === '+963'), 'demo customers carry the +963 country code');
 
   const staffName = db.prepare("SELECT name FROM users WHERE id = 'user-demo-manager'").get();
   assertEqual(staffName.name, 'مدير تجريبي', 'demo staff localized to ar');
@@ -228,11 +231,11 @@ async function runSyriaTaxAndCustomers(baseUrl, db) {
   const cRes = await api(baseUrl + '/api', '/customers', {
     method: 'POST',
     headers: authHeader,
-    body: { name: 'زبون سوري', phone: '+963991234567', country_code: '+963' },
+    body: { name: 'زبون سوري', phone: '+963944555666', country_code: '+963' },
   });
   assertEqual(cRes.status, 201, 'customer created with a +963 number');
   assertEqual(cRes.data.customer.country_code, '+963', 'new customer has +963 stored');
-  assertEqual(cRes.data.customer.phone, '+963991234567', 'phone stored in E.164 form');
+  assertEqual(cRes.data.customer.phone, '+963944555666', 'phone stored in E.164 form');
 }
 
 async function runSyriaTranslations() {

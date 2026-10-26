@@ -91,8 +91,8 @@ export default function PrintTestPage() {
               paperSize: paperWidth === 80 ? 'thermal80' : 'thermal58',
               includeTaxId: true,
               taxRegistrationNumber: 'TAXID-0001',
-              address: '123 Main Street, Mumbai - 400001',
-              phone: '+91 9876543210',
+              address: 'Al-Hamra Street, Damascus',
+              phone: '+963 991 234 567',
             });
             toast.success(t('browserDialogOpened'));
             showPrintWarningsToast(printWarnings);
@@ -100,8 +100,8 @@ export default function PrintTestPage() {
             const printWarnings = await printTaxBill(testBill, testTenant, {
               paperWidth,
               taxRegistrationNumber: 'TAXID-0001',
-              address: '123 Main Street, Mumbai - 400001',
-              phone: '+91 9876543210',
+              address: 'Al-Hamra Street, Damascus',
+              phone: '+963 991 234 567',
             });
             toast.success(t('taxBillPrinted'));
             showPrintWarningsToast(printWarnings);
@@ -172,8 +172,8 @@ export default function PrintTestPage() {
       paperSize: printerPaperSize,
       includeTaxId: true,
       taxRegistrationNumber: 'TAXID-0001',
-      address: '123 Main Street, Mumbai - 400001',
-      phone: '+91 9876543210',
+      address: 'Al-Hamra Street, Damascus',
+      phone: '+963 991 234 567',
       languages,
     });
 

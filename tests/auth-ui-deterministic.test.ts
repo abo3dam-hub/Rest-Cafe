@@ -110,11 +110,6 @@ async function run() {
     'printers.manage',
     '/print-test requires printers.manage in PAGE_PERMISSIONS',
   );
-  assert.equal(
-    pagePermissionsByRoute.get('/order-history-demo'),
-    'dashboard.view',
-    '/order-history-demo requires dashboard.view in PAGE_PERMISSIONS',
-  );
 
   const landingRouteByPermission = new Map<string, string>(LANDING_PAGE_CANDIDATES);
   for (const [route, permission] of PAGE_PERMISSIONS) {

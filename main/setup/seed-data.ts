@@ -418,14 +418,14 @@ function seedDemoRestaurant(db: ReturnType<typeof getDatabase>, serviceModel: st
       ] as const
     : lang === 'ar'
     ? [
-        ['prod-demo-paneer-tikka', 'cat-demo-starters', 'بانير تيكا', 250, 1],
+        ['prod-demo-paneer-tikka', 'cat-demo-starters', 'فتوش', 250, 1],
         ['prod-demo-chicken-wings', 'cat-demo-starters', 'أجنحة الدجاج', 280, 2],
-        ['prod-demo-butter-chicken', 'cat-demo-main', 'دجاج بالزبدة', 320, 1],
-        ['prod-demo-dal-makhani', 'cat-demo-main', 'دال ماخاني', 220, 2],
-        ['prod-demo-jeera-rice', 'cat-demo-main', 'أرز بالكمون', 150, 3],
+        ['prod-demo-butter-chicken', 'cat-demo-main', 'شاورما دجاج', 320, 1],
+        ['prod-demo-dal-makhani', 'cat-demo-main', 'مشاوي مشكلة', 220, 2],
+        ['prod-demo-jeera-rice', 'cat-demo-main', 'رز بشعيرية', 150, 3],
         ['prod-demo-cola', 'cat-demo-beverages', 'كولا', 60, 1],
         ['prod-demo-lemon-soda', 'cat-demo-beverages', 'صودا الليمون', 70, 2],
-        ['prod-demo-gulab-jamun', 'cat-demo-desserts', 'جولاب جامون', 80, 1],
+        ['prod-demo-gulab-jamun', 'cat-demo-desserts', 'حلاوة الجبن', 80, 1],
       ] as const
     : lang === 'ur'
     ? [
@@ -527,14 +527,14 @@ function seedDemoRestaurant(db: ReturnType<typeof getDatabase>, serviceModel: st
         ['prod-demo-apple', 'cat-demo-desserts', 'स्याउ', 80, 1],
       ] as const
     : [
-        ['prod-demo-paneer-tikka', 'cat-demo-starters', 'Paneer Tikka', 250, 1],
+        ['prod-demo-paneer-tikka', 'cat-demo-starters', 'Fattoush', 250, 1],
         ['prod-demo-chicken-wings', 'cat-demo-starters', 'Chicken Wings', 280, 2],
-        ['prod-demo-butter-chicken', 'cat-demo-main', 'Butter Chicken', 320, 1],
-        ['prod-demo-dal-makhani', 'cat-demo-main', 'Dal Makhani', 220, 2],
-        ['prod-demo-jeera-rice', 'cat-demo-main', 'Jeera Rice', 150, 3],
+        ['prod-demo-butter-chicken', 'cat-demo-main', 'Chicken Shawarma', 320, 1],
+        ['prod-demo-dal-makhani', 'cat-demo-main', 'Mixed Grill', 220, 2],
+        ['prod-demo-jeera-rice', 'cat-demo-main', 'Vermicelli Rice', 150, 3],
         ['prod-demo-cola', 'cat-demo-beverages', 'Cola', 60, 1],
         ['prod-demo-lemon-soda', 'cat-demo-beverages', 'Lemon Soda', 70, 2],
-        ['prod-demo-gulab-jamun', 'cat-demo-desserts', 'Gulab Jamun', 80, 1],
+        ['prod-demo-gulab-jamun', 'cat-demo-desserts', 'Halawet El Jibn', 80, 1],
       ] as const;
   for (const [id, categoryId, name, price, sort] of products) insertProduct(db, id, categoryId, name, price, sort);
 
@@ -601,9 +601,9 @@ function seedDemoRestaurant(db: ReturnType<typeof getDatabase>, serviceModel: st
     insertCustomer(db, 'cust-demo-2', 'Siti Rahayu', '+6281234567802', dialCode, demoCountry);
     insertCustomer(db, 'cust-demo-3', 'Andi Wijaya', '+6281234567803', dialCode, demoCountry);
   } else if (lang === 'ar') {
-    insertCustomer(db, 'cust-demo-1', 'علي حسن', '+966512345678', dialCode, demoCountry);
-    insertCustomer(db, 'cust-demo-2', 'سارة أحمد', '+966512345679', dialCode, demoCountry);
-    insertCustomer(db, 'cust-demo-3', 'مريم خالد', '+966512345670', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-1', 'علي حسن', '+963991234567', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-2', 'سارة أحمد', '+963992234568', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-3', 'مريم خالد', '+963993345679', dialCode, demoCountry);
   } else if (lang === 'ur') {
     insertCustomer(db, 'cust-demo-1', 'عمر احمد', '+923001234567', dialCode, demoCountry);
     insertCustomer(db, 'cust-demo-2', 'عائشہ خان', '+923001234568', dialCode, demoCountry);
@@ -641,9 +641,9 @@ function seedDemoRestaurant(db: ReturnType<typeof getDatabase>, serviceModel: st
     insertCustomer(db, 'cust-demo-2', 'सुमन थिडी', '+9779812345679', dialCode, demoCountry);
     insertCustomer(db, 'cust-demo-3', 'प्रिया गिरी', '+9779812345680', dialCode, demoCountry);
   } else {
-    insertCustomer(db, 'cust-demo-1', 'Aarav Sharma', '+919876543210', dialCode, demoCountry);
-    insertCustomer(db, 'cust-demo-2', 'Maya Iyer', '+919876543211', dialCode, demoCountry);
-    insertCustomer(db, 'cust-demo-3', 'Kabir Khan', '+919876543212', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-1', 'Omar Haddad', '+963991234567', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-2', 'Layla Nasser', '+963992234568', dialCode, demoCountry);
+    insertCustomer(db, 'cust-demo-3', 'Karim Azar', '+963993345679', dialCode, demoCountry);
   }
 
   const managerName = lang === 'es' ? 'Gerente Demo' : lang === 'fr' ? 'Gérant Démo' : lang === 'pt' ? 'Gerente Demo'
@@ -662,9 +662,9 @@ function seedDemoRestaurant(db: ReturnType<typeof getDatabase>, serviceModel: st
     : lang === 'ko' ? '예시 셰프' : lang === 'id' ? 'Koki Demo' : lang === 'nl' ? 'Demo-kok' : lang === 'hi' ? 'डेमो शेफ'
     : lang === 'bn' ? 'শেফ ডেমো' : lang === 'sq' ? 'Shef Demo' : lang === 'vi' ? 'Đầu bếp Demo' : lang === 'ru' ? 'Демо-повар' : lang === 'th' ? 'เชฟสาธิต' : lang === 'ne' ? 'डेमो रसोइया' : 'Demo Chef';
   // Demo staff accounts are inactive with random passwords to prevent usable default credentials.
-  insertStaffUser(db, 'user-demo-manager', managerName, 'manager@flo.local', 'manager', randomBytes(32).toString('hex'), 0);
-  insertStaffUser(db, 'user-demo-cashier', cashierName, 'cashier@flo.local', 'cashier', randomBytes(32).toString('hex'), 0);
-  insertStaffUser(db, 'user-demo-chef', chefName, 'chef@flo.local', 'chef', randomBytes(32).toString('hex'), 0);
+  insertStaffUser(db, 'user-demo-manager', managerName, 'manager@restcafe.local', 'manager', randomBytes(32).toString('hex'), 0);
+  insertStaffUser(db, 'user-demo-cashier', cashierName, 'cashier@restcafe.local', 'cashier', randomBytes(32).toString('hex'), 0);
+  insertStaffUser(db, 'user-demo-chef', chefName, 'chef@restcafe.local', 'chef', randomBytes(32).toString('hex'), 0);
 }
 
 export function seedSetupProfile(db: ReturnType<typeof getDatabase>, profile: string, serviceModel: string, language?: string, country?: string): void {

@@ -7976,7 +7976,7 @@ function createSchema(): void {
       name TEXT NOT NULL,
       email TEXT,
       phone TEXT,
-      country_code TEXT DEFAULT '+91',
+      country_code TEXT DEFAULT '+963',
       address TEXT,
       notes TEXT,
       tag_counts TEXT DEFAULT NULL,

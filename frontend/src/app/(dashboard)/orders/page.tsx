@@ -1635,7 +1635,6 @@ export default function OrdersPage() {
           <option value="dine_in">{tOrders('dineIn')}</option>
           <option value="takeaway">{tOrders('takeaway')}</option>
           <option value="delivery">{tOrders('delivery')}</option>
-          <option value="online">{tOrders('online')}</option>
         </select>
 
         {/* Status filter */}

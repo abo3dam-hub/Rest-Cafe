@@ -630,7 +630,7 @@ frontend/src/
 ├── app/                        App Router routes
 │   ├── (dashboard)/            Authenticated shell: AuthGuard, title bar, sidebar, status bar
 │   │   ├── addon-groups/  customers/  dashboard/  inventory/  kds/
-│   │   ├── order-history-demo/  orders/  pos/  print-test/  products/
+│   │   ├── orders/  pos/  print-test/  products/
 │   │   ├── settings/  staff/  support/  tables/  whatsapp/
 │   ├── auth/                   login, register, recover
 │   ├── customer-display/       Customer-facing order-status board

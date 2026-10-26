@@ -32,7 +32,7 @@ export function KdsLoginForm({ conn }: { conn: UseKdsConnectionResult }) {
               value={conn.loginEmail}
               onChange={(e) => conn.setLoginEmail(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 dark:border-border bg-card rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
-              placeholder="chef@flo.local"
+              placeholder="chef@restcafe.local"
               required
             />
           </div>

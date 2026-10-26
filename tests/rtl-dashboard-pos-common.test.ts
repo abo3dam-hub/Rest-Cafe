@@ -72,7 +72,6 @@ const SCREEN_FILES = [
   'frontend/src/components/pos/EditCustomerModal.tsx',
   'frontend/src/components/pos/PrinterStatus.tsx',
   'frontend/src/components/pos/SplitCheckModal.tsx',
-  'frontend/src/components/orders/OrderHistoryGrid.tsx',
   'frontend/src/components/products/ImageUploader.tsx',
 ];
 

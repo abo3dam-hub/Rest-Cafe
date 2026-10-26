@@ -44,7 +44,7 @@ async function main() {
       .run('unrelated-demo-password', 'Unrelated', 'unrelated@test.local', managerPassword, 'cashier', now(), now());
 
     const legacyToken = jwt.sign(
-      { userId: 'user-demo-manager', email: 'manager@flo.local', role: 'manager' },
+      { userId: 'user-demo-manager', email: 'manager@restcafe.local', role: 'manager' },
       getJWTSecret(),
       { expiresIn: '1h' },
     );
@@ -88,13 +88,13 @@ async function main() {
 
       const disabledLogin = await request(baseUrl, '/login', {
         method: 'POST',
-        body: JSON.stringify({ email: 'manager@flo.local', password: 'demo12345' }),
+        body: JSON.stringify({ email: 'manager@restcafe.local', password: 'demo12345' }),
       });
       if (disabledLogin.status !== 401) throw new Error(`disabled demo login returned ${disabledLogin.status}`);
 
       const changedLogin = await request(baseUrl, '/login', {
         method: 'POST',
-        body: JSON.stringify({ email: 'cashier@flo.local', password: 'ChangedPass123!' }),
+        body: JSON.stringify({ email: 'cashier@restcafe.local', password: 'ChangedPass123!' }),
       });
       if (changedLogin.status !== 200) throw new Error(`changed demo password login returned ${changedLogin.status}`);
       const malformedPasswordChange = await request(baseUrl, '/password/change', {

@@ -96,8 +96,8 @@ function isRequestCancelled(error: unknown): boolean {
 }
 
 const CLASSIC_PREVIEW = `   STORE NAME
-   Jane Doe
-  +91 98765...
+   Omar Haddad
+  +963 9912...
 ---------------
 Invoice #: B-1
  1 Jan, 12:30pm
@@ -115,8 +115,8 @@ Cash          109
 Points Earned  10
 Pts Balance   210
 ---------------
-  123 Main St
-  Ph: 98765...`;
+  Damascus St
+  Ph: 9912...`;
 
 const COMPACT_PREVIEW = `  STORE NAME
 -----------

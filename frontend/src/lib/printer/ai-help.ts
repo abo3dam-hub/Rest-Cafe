@@ -18,11 +18,11 @@ const SUPPORT_EMAIL = 'abo3dam@gmail.com';
 async function resolveAppContext(): Promise<string> {
   try {
     const info = await window.electronAPI?.getAppInfo?.();
-    if (info && 'version' in info) return `FloCafe ${info.version} on ${info.platform}`;
+    if (info && 'version' in info) return `Rest&Cafe ${info.version} on ${info.platform}`;
   } catch {
     /* best-effort only */
   }
-  return 'FloCafe (desktop app)';
+  return 'Rest&Cafe (desktop app)';
 }
 
 /** Builds the prompt copied to the clipboard for AI hand-off on a printer failure. */
@@ -41,9 +41,9 @@ export async function buildPrinterDiagnosticPrompt(
   }
   lines.push(
     '',
-    `FloCafe's printer troubleshooting guide: ${TROUBLESHOOTING_URL}`,
+    `Rest&Cafe's printer troubleshooting guide: ${TROUBLESHOOTING_URL}`,
     '',
-    `Please help me diagnose and fix it. If it turns out to need FloCafe support directly, tell me to email ${SUPPORT_EMAIL}.`,
+    `Please help me diagnose and fix it. If it turns out to need Rest&Cafe support directly, tell me to email ${SUPPORT_EMAIL}.`,
   );
   return lines.join('\n');
 }

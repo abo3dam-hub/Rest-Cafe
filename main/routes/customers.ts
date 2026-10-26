@@ -551,7 +551,7 @@ router.post(
         if (!parsed) {
           captureCustomerValidation('fc.backend.customer.create.validation', 'phone_invalid');
           const invalidPhoneMsg =
-            'Phone number is not valid. Use international format (e.g. +919876543210).';
+            'Phone number is not valid. Use international format (e.g. +963991234567).';
           return res.status(400).json({
             error: invalidPhoneMsg,
             message: invalidPhoneMsg,
@@ -660,7 +660,7 @@ router.put(
           if (!parsed) {
             captureCustomerValidation('fc.backend.customer.update.validation', 'phone_invalid');
             return res.status(400).json({
-              error: 'Phone number is not valid. Use international format (e.g. +919876543210).',
+              error: 'Phone number is not valid. Use international format (e.g. +963991234567).',
             });
           }
           finalPhone = parsed.e164;
