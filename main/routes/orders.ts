@@ -2421,6 +2421,370 @@ router.post(
   },
 );
 
+// ── Cashier table workspace: bill requested ─────────────────────────────────
+// Owner design (2026-10-26): asking for the bill is a visible table state,
+// not just a print. The client generates + prints the bill through the
+// existing bill/print endpoints first, then stamps the request here. The
+// first stamp wins so reprints never rewrite when the bill was first asked.
+router.post(
+  '/:id/request-bill',
+  orderWriteRateLimit,
+  requirePermission('bills.generate'),
+  (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      const result = withTxn(() => {
+        const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
+        if (!order) {
+          throw Object.assign(new Error('Order not found'), { statusCode: 404 });
+        }
+        if (['completed', 'cancelled'].includes(order.status)) {
+          throw Object.assign(new Error('Cannot request a bill for a closed order'), {
+            statusCode: 400,
+          });
+        }
+        if (order.type !== 'dine_in' || !order.table_id) {
+          throw Object.assign(
+            new Error('Bill requests apply only to dine-in orders seated at a table'),
+            { statusCode: 400 },
+          );
+        }
+        const stamp = order.bill_requested_at || now();
+        if (!order.bill_requested_at) {
+          db.prepare(
+            'UPDATE orders SET bill_requested_at = ?, updated_at = ? WHERE id = ?',
+          ).run(stamp, now(), order.id);
+        }
+        db.prepare('UPDATE tables SET status = ?, updated_at = ? WHERE id = ?').run(
+          'bill_requested',
+          now(),
+          order.table_id,
+        );
+        recordOrderAudit(db, {
+          orderId: order.id,
+          actorUserId: String((req as any).user?.userId || ''),
+          action: 'bill_requested',
+          details: { bill_requested_at: stamp },
+        });
+        return {
+          order: db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id),
+          table: db.prepare('SELECT * FROM tables WHERE id = ?').get(order.table_id),
+        };
+      });
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.statusCode || 500;
+      res
+        .status(statusCode)
+        .json({ error: statusCode >= 500 ? 'Internal server error' : error.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/unrequest-bill',
+  orderWriteRateLimit,
+  requirePermission('bills.generate'),
+  (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      const result = withTxn(() => {
+        const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
+        if (!order) {
+          throw Object.assign(new Error('Order not found'), { statusCode: 404 });
+        }
+        if (!order.table_id) {
+          throw Object.assign(new Error('Order is not seated at a table'), { statusCode: 400 });
+        }
+        const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(order.table_id) as any;
+        if (table?.status === 'bill_requested') {
+          db.prepare('UPDATE tables SET status = ?, updated_at = ? WHERE id = ?').run(
+            'occupied',
+            now(),
+            order.table_id,
+          );
+        }
+        recordOrderAudit(db, {
+          orderId: order.id,
+          actorUserId: String((req as any).user?.userId || ''),
+          action: 'bill_unrequested',
+          details: {},
+        });
+        return {
+          order,
+          table: db.prepare('SELECT * FROM tables WHERE id = ?').get(order.table_id),
+        };
+      });
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.statusCode || 500;
+      res
+        .status(statusCode)
+        .json({ error: statusCode >= 500 ? 'Internal server error' : error.message });
+    }
+  },
+);
+
+// ── Cashier table workspace: merge one table's order into another's ────────
+// Owner design (2026-10-26): tables joining tables is routine. Live items
+// move to the target order, kitchen states are untouched, the source order
+// closes as cancelled with a merge reason (a separate terminal status would
+// have to be threaded through every active-order predicate in the system),
+// and both orders get audit entries. Blocked when money or a printed paper
+// bill would be orphaned: any recorded payment on either bill, a split
+// check on either order, an order-level discount on either order (re-apply
+// it on the target after merging), or a printed bill for the SOURCE order.
+router.post(
+  '/:id/merge',
+  orderWriteRateLimit,
+  requirePermission('tables.orders.move'),
+  (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      const targetOrderId = req.body?.target_order_id;
+      if (!targetOrderId) {
+        return res.status(400).json({ error: 'Target order ID is required', code: 'merge_target_required' });
+      }
+      if (String(targetOrderId) === String(req.params.id)) {
+        return res
+          .status(400)
+          .json({ error: 'Cannot merge an order into itself', code: 'merge_same_order' });
+      }
+      const result = withTxn(() => {
+        const source = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
+        if (!source) {
+          throw Object.assign(new Error('Order not found'), { statusCode: 404 });
+        }
+        const target = db.prepare('SELECT * FROM orders WHERE id = ?').get(targetOrderId) as any;
+        if (!target) {
+          throw Object.assign(new Error('Target order not found'), { statusCode: 404 });
+        }
+        const fail = (message: string, code: string) =>
+          Object.assign(new Error(message), { statusCode: 409, code });
+        if (['completed', 'cancelled'].includes(source.status) || ['completed', 'cancelled'].includes(target.status)) {
+          throw fail('Only active orders can be merged', 'merge_order_not_active');
+        }
+        if (
+          source.type !== 'dine_in' ||
+          target.type !== 'dine_in' ||
+          !source.table_id ||
+          !target.table_id
+        ) {
+          throw fail('Only dine-in orders seated at tables can be merged', 'merge_not_dine_in');
+        }
+        if (String(source.table_id) === String(target.table_id)) {
+          throw fail('Both orders are already on the same table', 'merge_same_table');
+        }
+        if ((source.discount_amount || 0) > 0 || (target.discount_amount || 0) > 0 || source.discount_type || target.discount_type) {
+          throw fail(
+            'Remove the order discount before merging; it can be applied again afterwards',
+            'merge_discount_present',
+          );
+        }
+        const splitBill = db
+          .prepare(
+            'SELECT 1 FROM bills WHERE order_id IN (?, ?) AND split_group_id IS NOT NULL LIMIT 1',
+          )
+          .get(source.id, target.id);
+        if (splitBill) {
+          throw fail('Orders with split checks cannot be merged', 'merge_split_bill');
+        }
+        const paidBill = db
+          .prepare(
+            `SELECT 1 FROM bills WHERE order_id IN (?, ?) AND (COALESCE(paid_amount, 0) > 0 OR payment_status IN ('paid', 'partial', 'partially_paid', 'refunded', 'partially_refunded')) LIMIT 1`,
+          )
+          .get(source.id, target.id);
+        if (paidBill) {
+          throw fail('An order with a recorded payment cannot be merged', 'merge_bill_paid');
+        }
+        const sourceBills = db
+          .prepare('SELECT * FROM bills WHERE order_id = ?')
+          .all(source.id) as any[];
+        if (sourceBills.some((b) => b.printed_at)) {
+          throw fail(
+            'The source order already has a printed bill and cannot be merged',
+            'merge_source_bill_printed',
+          );
+        }
+        const sourcePrintLog = db
+          .prepare(
+            'SELECT 1 FROM print_logs WHERE bill_id IN (SELECT id FROM bills WHERE order_id = ?) LIMIT 1',
+          )
+          .get(source.id);
+        if (sourcePrintLog) {
+          throw fail(
+            'The source order already has a printed bill and cannot be merged',
+            'merge_source_bill_printed',
+          );
+        }
+
+        const targetTable = db
+          .prepare('SELECT * FROM tables WHERE id = ?')
+          .get(target.table_id) as any;
+
+        const movableItems = db
+          .prepare(
+            `SELECT id FROM order_items WHERE order_id = ? AND status NOT IN ('cancelled', 'voided', 'void_adjustment', 'refunded')`,
+          )
+          .all(source.id) as Array<{ id: number }>;
+        const movedItemIds = movableItems.map((i) => i.id);
+        db.prepare(
+          `UPDATE order_items SET order_id = ?, updated_at = ? WHERE order_id = ? AND status NOT IN ('cancelled', 'voided', 'void_adjustment', 'refunded')`,
+        ).run(target.id, now(), source.id);
+
+        // Recompute the target exactly like the add-items path does, so tax,
+        // charges, discount scaling and any unpaid bill stay in agreement.
+        const settings: Record<string, string> = {};
+        db.prepare('SELECT key, value FROM settings')
+          .all()
+          .forEach((row: any) => {
+            settings[row.key] = row.value;
+          });
+        const tenantInfo = {
+          country: settings.country || '',
+          business_type: settings.business_type || 'restaurant',
+          state_code: settings.state_code || '',
+          currency: getTenantCurrency(),
+          taxes_enabled: settings.taxes_enabled === 'true',
+        };
+        const customer = target.customer_id
+          ? (db.prepare('SELECT * FROM customers WHERE id = ?').get(target.customer_id) as any)
+          : null;
+        const totals = calculateOrderTotals(db, target.id);
+        const { subtotal } = totals;
+        const currency = getTenantCurrency();
+        const decimals = getCurrencyFractionDigits(currency);
+        const newDiscountAmount = resolveOrderLevelDiscountAmount(target, subtotal, decimals);
+        const engineCharges = resolveEngineCharges(target, subtotal, newDiscountAmount);
+        const { taxRollup, total, roundOff } = recomputeOrderTotals({
+          tenantInfo,
+          chargeContext: target,
+          customer,
+          totals,
+          discountAmount: newDiscountAmount,
+          taxScaling: 'when-discounted',
+          appliedCharges: engineCharges ? engineCharges.appliedCharges : null,
+          chargeColumnOverrides: engineCharges?.chargeColumnOverrides,
+        });
+        const syncedServiceCharge = engineCharges
+          ? engineCharges.columns.service_charge
+          : target.service_charge || 0;
+        const syncedPackagingCharge = engineCharges
+          ? engineCharges.columns.packaging_charge
+          : target.packaging_charge || 0;
+        const syncedChargesJson = engineCharges
+          ? engineCharges.chargesJson
+          : (target.charges_breakdown ?? null);
+        db.prepare(
+          `UPDATE orders SET subtotal = ?, tax_amount = ?, tax_breakdown = ?, tax_snapshot = ?, discount_amount = ?, total = ?, service_charge = ?, packaging_charge = ?, charges_breakdown = ?, round_off = ?, updated_at = ? WHERE id = ?`,
+        ).run(
+          subtotal,
+          taxRollup.taxAmount,
+          JSON.stringify(taxRollup.breakdowns),
+          taxRollup.snapshotJson,
+          newDiscountAmount,
+          total,
+          syncedServiceCharge,
+          syncedPackagingCharge,
+          syncedChargesJson,
+          roundOff,
+          now(),
+          target.id,
+        );
+        const targetBill = db
+          .prepare("SELECT * FROM bills WHERE order_id = ? AND payment_status != 'paid'")
+          .get(target.id) as any;
+        if (targetBill) {
+          const pack = getActiveCountryPack(tenantInfo.country);
+          const { total: billTotal, adjustment: billRoundOff } = applyPayableRounding(
+            total,
+            pack,
+            currency,
+          );
+          const newBillBalance = Math.max(0, billTotal - (targetBill.paid_amount || 0));
+          db.prepare(
+            `UPDATE bills SET subtotal = ?, total = ?, balance = ?, tax_amount = ?, tax_breakdown = ?, tax_snapshot = ?, discount_amount = ?, service_charge = ?, packaging_charge = ?, charges_breakdown = ?, round_off = ?, updated_at = ? WHERE id = ?`,
+          ).run(
+            subtotal,
+            billTotal,
+            newBillBalance,
+            taxRollup.taxAmount,
+            JSON.stringify(taxRollup.breakdowns),
+            taxRollup.snapshotJson,
+            newDiscountAmount,
+            syncedServiceCharge,
+            syncedPackagingCharge,
+            syncedChargesJson,
+            billRoundOff,
+            now(),
+            targetBill.id,
+          );
+        }
+
+        // The source's unpaid, unprinted bills are pure derived artifacts of
+        // an order that no longer exists independently — remove them.
+        for (const bill of sourceBills) {
+          db.prepare('DELETE FROM bill_items WHERE bill_id = ?').run(bill.id);
+          db.prepare('DELETE FROM bills WHERE id = ?').run(bill.id);
+        }
+
+        const mergeReason = `دمج مع طلب ${target.order_number} (طاولة ${targetTable?.number ?? target.table_id})`;
+        db.prepare(
+          `UPDATE orders SET status = 'cancelled', cancelled_at = ?, cancellation_reason = ?, subtotal = 0, tax_amount = 0, discount_amount = 0, total = 0, updated_at = ? WHERE id = ?`,
+        ).run(now(), mergeReason, now(), source.id);
+        db.prepare('UPDATE tables SET status = ?, updated_at = ? WHERE id = ?').run(
+          'available',
+          now(),
+          source.table_id,
+        );
+
+        const actorUserId = String((req as any).user?.userId || '');
+        recordOrderAudit(db, {
+          orderId: source.id,
+          actorUserId,
+          action: 'order_merged',
+          details: {
+            target_order_id: target.id,
+            target_table_id: target.table_id,
+            moved_item_ids: movedItemIds,
+          },
+        });
+        recordOrderAudit(db, {
+          orderId: target.id,
+          actorUserId,
+          action: 'items_merged_in',
+          details: {
+            source_order_id: source.id,
+            source_table_id: source.table_id,
+            moved_item_ids: movedItemIds,
+          },
+        });
+
+        const updatedTarget = parseRowJson(
+          db.prepare('SELECT * FROM orders WHERE id = ?').get(target.id),
+        ) as any;
+        const targetItems = db
+          .prepare('SELECT * FROM order_items WHERE order_id = ?')
+          .all(target.id)
+          .map(parseItemJson);
+        return {
+          source_order: parseRowJson(db.prepare('SELECT * FROM orders WHERE id = ?').get(source.id)),
+          target_order: Object.assign({}, updatedTarget, { items: targetItems }),
+          moved_item_ids: movedItemIds,
+        };
+      });
+      notifyKdsUpdate();
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.statusCode || 500;
+      res.status(statusCode).json({
+        error: statusCode >= 500 ? 'Internal server error' : error.message,
+        ...(error.code ? { code: error.code } : {}),
+      });
+    }
+  },
+);
+
 function evaluateOrderStatusPaymentBlock(
   db: ReturnType<typeof getDatabase>,
   orderId: string | number | unknown,

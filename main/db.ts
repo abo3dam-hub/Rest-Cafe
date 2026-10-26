@@ -7700,6 +7700,20 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       addOrderItemCol('ingredient_cost_known', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    // Cashier table-map workspace (owner design, 2026-10-26): the moment a
+    // dine-in order's bill was first requested for the table. The table's
+    // visible state lives in tables.status ('bill_requested'); this stamp is
+    // the order's permanent record of when that first request happened.
+    version: 118,
+    name: 'add_order_bill_requested_at',
+    up: () => {
+      const orderColumns = getColumns(db, 'orders');
+      if (!orderColumns.includes('bill_requested_at')) {
+        db.exec('ALTER TABLE orders ADD COLUMN bill_requested_at TEXT DEFAULT NULL');
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {

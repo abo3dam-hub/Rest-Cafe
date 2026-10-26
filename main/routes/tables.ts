@@ -759,7 +759,7 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
       return res.status(400).json({ error: 'Status is required' });
     }
 
-    const validStatuses = ['available', 'occupied', 'reserved', 'cleaning', 'held'];
+    const validStatuses = ['available', 'occupied', 'reserved', 'cleaning', 'held', 'bill_requested'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Use: ${validStatuses.join(', ')}` });
     }
