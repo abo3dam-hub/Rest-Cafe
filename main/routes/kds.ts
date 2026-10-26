@@ -6,6 +6,7 @@ import { requireKdsEnabled, requireKdsEnabledOr404, isTokenRevoked, isTokenStale
 import { hasPermission, requirePermission } from '../services/authorization';
 import { parseCategoryIds } from './auth';
 import { notifyKdsUpdate } from '../services/kds';
+import { syncOrderStatusFromItems } from '../services/order-status-rollup';
 import { ROLE_ACCESS, hasRole } from '../../shared/role-permissions';
 
 const router = Router();
@@ -437,6 +438,8 @@ router.patch('/items/:id/status', requirePermission('kitchen.status.update'), re
         ? db.prepare("UPDATE order_items SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('voided', 'void_adjustment', 'completed', 'cancelled', 'refunded')").run(status, now(), req.params.id)
         : db.prepare('UPDATE order_items SET status = ?, updated_at = ? WHERE id = ? AND status = ?').run(status, now(), req.params.id, expectedStatus);
       if (updateResult.changes !== 1) throw new Error('STATUS_CONFLICT');
+
+      syncOrderStatusFromItems(db, item.order_id);
 
       return db.prepare('SELECT * FROM order_items WHERE id = ?').get(req.params.id);
     });

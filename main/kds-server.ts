@@ -30,6 +30,7 @@ import {
   projectKdsOrder,
 } from './db';
 import { setupKdsWebSocket, notifyKdsUpdate } from './services/kds';
+import { syncOrderStatusFromItems } from './services/order-status-rollup';
 import { getJWTSecret } from './security/jwt-secret';
 import { normalizeEmail, parseCategoryIds } from './routes/auth';
 import {
@@ -197,7 +198,7 @@ export function startKdsServer(): Promise<void> {
     app.get('/api/health', (_req: Request, res: Response) => {
       res.json({
         status: 'ok',
-        service: 'Flo KDS Server',
+        service: 'Rest&Cafe KDS Server',
         version: '1.0.0',
         timestamp: new Date().toISOString(),
       });
@@ -675,6 +676,10 @@ export function startKdsServer(): Promise<void> {
         if (updateResult.statusCode !== 200) {
           return res.status(updateResult.statusCode).json({ error: updateResult.error });
         }
+        const changedItem = db
+          .prepare('SELECT order_id FROM order_items WHERE id = ?')
+          .get(req.params.id) as { order_id: string } | undefined;
+        if (changedItem) syncOrderStatusFromItems(db, changedItem.order_id);
         notifyKdsUpdate();
         res.json({ success: true });
       } catch (error: any) {
@@ -786,7 +791,7 @@ export function startKdsServer(): Promise<void> {
       app.get('/', (_req: Request, res: Response) => {
         res.send(`
           <html><body style="font-family:sans-serif;padding:2rem">
-            <h2>Flo KDS – Build not found</h2>
+            <h2>Rest&Cafe KDS – Build not found</h2>
             <p>Run <code>npm run build:frontend</code> then restart the app.</p>
           </body></html>
         `);

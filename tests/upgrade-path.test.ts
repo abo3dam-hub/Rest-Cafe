@@ -325,10 +325,10 @@ function main() {
         value: string;
       }
     ).value,
-    'false',
-    'existing stores receive the opt-in split-check default during upgrade',
+    'true',
+    'existing stores receive split checks enabled during upgrade (v119 default flip)',
   );
-  console.log('   ✓ existing stores receive split checks disabled by default');
+  console.log('   ✓ existing stores receive split checks enabled by default');
   assert.equal(
     (
       db

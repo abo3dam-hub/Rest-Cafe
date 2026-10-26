@@ -892,7 +892,7 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
         onboarding_completed: 'true',
         anonymous_data_consent: 'false',
         telemetry_enabled: 'false',
-        split_checks_enabled: 'false',
+        split_checks_enabled: 'true',
         email_product_updates: email_product_updates === true ? 'true' : 'false',
         email_marketing: email_marketing === true ? 'true' : 'false',
       });

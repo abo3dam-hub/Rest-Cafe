@@ -35,11 +35,11 @@ async function main() {
   registerRoutes(app);
   const { baseUrl, server } = await startServer(app);
   try {
-    assertEqual((db.prepare("SELECT value FROM settings WHERE key = 'split_checks_enabled'").get() as any).value, 'false', 'fresh database seeds split checks disabled');
+    assertEqual((db.prepare("SELECT value FROM settings WHERE key = 'split_checks_enabled'").get() as any).value, 'true', 'fresh database seeds split checks enabled');
     db.prepare("DELETE FROM settings WHERE key = 'split_checks_enabled'").run();
     const missingSplitSetting = await api(baseUrl, '/api/settings/split_checks_enabled', { headers: authHeader });
     assertEqual(missingSplitSetting.status, 200, 'missing split-check setting reads as a safe default');
-    assertEqual(missingSplitSetting.data.setting.value, 'false', 'fallback keeps split checks disabled');
+    assertEqual(missingSplitSetting.data.setting.value, 'true', 'fallback keeps split checks enabled');
     assertEqual((db.prepare("SELECT value FROM settings WHERE key = 'printer_trim_decimals'").get() as any).value, 'false', 'fresh database seeds printer decimal trimming disabled');
     db.prepare("DELETE FROM settings WHERE key = 'printer_trim_decimals'").run();
     const missingPrinterTrimSetting = await api(baseUrl, '/api/settings/printer_trim_decimals', { headers: authHeader });

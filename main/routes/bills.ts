@@ -2783,7 +2783,7 @@ router.post(
           const splitSnapshot = checkTaxSnapshots[index];
           if (index === 0) {
             db.prepare(
-              `UPDATE bills SET split_group_id = ?, split_label = ?, subtotal = ?, tax_amount = ?, tax_breakdown = ?, tax_snapshot = ?, discount_amount = ?, delivery_charge = ?, packaging_charge = ?, service_charge = ?, charges_breakdown = ?, round_off = ?, total = ?, balance = ?, updated_at = ? WHERE id = ?`,
+              `UPDATE bills SET split_group_id = ?, split_label = ?, subtotal = ?, tax_amount = ?, tax_breakdown = ?, tax_snapshot = ?, discount_amount = ?, delivery_charge = ?, packaging_charge = ?, service_charge = ?, charges_breakdown = ?, round_off = ?, total = ?, balance = ?, printed_at = NULL, updated_at = ? WHERE id = ?`,
             ).run(
               groupId,
               check.label,

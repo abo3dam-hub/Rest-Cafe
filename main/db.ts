@@ -93,7 +93,7 @@ function createDatabaseMissingError(dbPath: string): Error & { code: string } {
   const error = new Error(
     `Database file is missing at ${dbPath}, but this install was previously initialized. ` +
       'Refusing to start with a new, empty database to avoid silently losing existing data. ' +
-      'Restore from a backup (Settings → Backup & Restore, or the backups folder) and restart Flo Cafe.',
+      'Restore from a backup (Settings → Backup & Restore, or the backups folder) and restart Rest&Cafe.',
   ) as Error & { code: string };
   error.code = 'ERR_DATABASE_MISSING';
   return error;
@@ -6146,10 +6146,11 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
     version: 60,
     name: 'seed_split_checks_disabled_setting',
     up: () => {
-      // Default split checks feature to disabled for upgrading stores.
+      // Seed the split-checks setting for upgrading stores; v119 later made
+      // the feature default-on, so the seed now inserts the current default.
       db.prepare(`
         INSERT OR IGNORE INTO settings (key, value, updated_at)
-        VALUES ('split_checks_enabled', 'false', ?)
+        VALUES ('split_checks_enabled', 'true', ?)
       `).run(now());
     },
   },
@@ -7714,6 +7715,72 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    // Split-by-item payment is a core cashier flow, not an opt-in: stores
+    // that never touched the setting still carry the old 'false' seed (v60),
+    // so flip it on. The guard keeps the UPDATE idempotent on re-runs.
+    version: 119,
+    name: 'enable_split_checks_default',
+    up: () => {
+      db.prepare(`
+        UPDATE settings
+        SET value = 'true', updated_at = ?
+        WHERE key = 'split_checks_enabled' AND value = 'false'
+      `).run(now());
+    },
+  },
+  {
+    // Installs upgraded from the pre-Syria schema carry customers.country_code
+    // with DEFAULT '+91' (the old add-column migration); fresh installs use
+    // '+963'. SQLite cannot alter a column default, so rebuild customers with
+    // only that literal swapped, preserving rows, indexes, and FTS triggers.
+    version: 120,
+    name: 'customers_country_code_default_syria',
+    up: () => {
+      const tableSql = db
+        .prepare(
+          `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'customers'`,
+        )
+        .get() as { sql: string } | undefined;
+      if (!tableSql?.sql || !tableSql.sql.includes("country_code TEXT DEFAULT '+91'")) {
+        return;
+      }
+      const dependents = db
+        .prepare(
+          `SELECT type, sql FROM sqlite_master
+           WHERE tbl_name = 'customers' AND sql IS NOT NULL AND type IN ('index', 'trigger')`,
+        )
+        .all() as { type: string; sql: string }[];
+      const columns = getColumns(db, 'customers');
+      const columnList = columns.join(', ');
+      const rebuiltSql = tableSql.sql
+        .replace('CREATE TABLE IF NOT EXISTS customers', 'CREATE TABLE customers_v120')
+        .replace('CREATE TABLE customers', 'CREATE TABLE customers_v120')
+        .replace("country_code TEXT DEFAULT '+91'", "country_code TEXT DEFAULT '+963'");
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec(rebuiltSql);
+        db.exec(
+          `INSERT INTO customers_v120 (rowid, ${columnList}) SELECT rowid, ${columnList} FROM customers`,
+        );
+        db.exec('DROP TABLE customers');
+        db.exec('ALTER TABLE customers_v120 RENAME TO customers');
+        for (const dependent of dependents) {
+          db.exec(dependent.sql);
+        }
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+      const ftsExists = db
+        .prepare(
+          `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'customers_search_fts'`,
+        )
+        .get();
+      if (ftsExists) {
+        db.exec("INSERT INTO customers_search_fts(customers_search_fts) VALUES('rebuild')");
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
@@ -7798,7 +7865,7 @@ export class SchemaVersionMismatchError extends Error {
     super(
       `Database schema (v${dbVersion}) is newer than this app version supports (v${appVersion}). ` +
         `This usually means another device or a previous update already upgraded this database. ` +
-        `Please update Flo Cafe to the latest version before continuing.`,
+        `Please update Rest&Cafe to the latest version before continuing.`,
     );
     this.name = 'SchemaVersionMismatchError';
   }

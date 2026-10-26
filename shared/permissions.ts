@@ -48,7 +48,9 @@ export const PERMISSION_DEFINITIONS = [
   {
     id: 'pos.use',
     area: 'orders',
-    defaultRoles: OWNER_MANAGER_CASHIER,
+    // The waiter's tablet runs this ordering surface for the customer;
+    // money stays gated by the separate payments.take / bills permissions.
+    defaultRoles: SALES,
     configurable: true,
     risk: 'standard',
   },

@@ -16,6 +16,7 @@ import {
   withTxn,
 } from '../db';
 import { notifyKdsUpdate } from '../services/kds';
+import { syncOrderStatusFromItems } from '../services/order-status-rollup';
 import { parseCategoryIds } from './auth';
 import { requireKdsEnabled, isTokenRevoked, isTokenStale } from '../middleware/security';
 import { hasPermission, requirePermission } from '../services/authorization';
@@ -320,6 +321,8 @@ router.patch(
                 .run(status, now(), itemId, expectedStatus);
         if (updateResult.changes !== 1)
           throw Object.assign(new Error('STATUS_CONFLICT'), { diagnosticCode: 'status_conflict' });
+
+        syncOrderStatusFromItems(db, item.order_id);
 
         const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(item.order_id) as any;
 

@@ -147,7 +147,7 @@ const OPTIONAL_SETTING_DEFAULTS: Record<string, string> = {
   receipt_logo: '',
   receipt_logo_raster: '',
   printer_trim_decimals: 'false',
-  split_checks_enabled: 'false',
+  split_checks_enabled: 'true',
   card_transaction_id_required: 'false',
   // Print language policies (#441) — inherit store language, no second
   // language. Defaults preserve pre-policy behavior for existing tenants.

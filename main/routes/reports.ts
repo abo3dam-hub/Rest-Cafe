@@ -48,6 +48,14 @@ import {
   type XReportExport,
   type ZReportExport,
 } from '../services/cash-close-export';
+import {
+  buildCashSummary,
+  buildSalesBreakdown,
+  serializeCashSummaryCsv,
+  serializeCashSummaryXlsx,
+  serializeSalesBreakdownCsv,
+  serializeSalesBreakdownXlsx,
+} from '../services/reports-period-export';
 
 const router = Router();
 
@@ -1402,6 +1410,150 @@ router.get(
       }
       console.error('[API] Daily sales export error:', error);
       res.status(statusCode || 500).json({ error: statusCode ? message : 'Internal server error' });
+    }
+  },
+);
+
+// ── Period reports for the Reports section (sales breakdown + cash) ─────────
+// The JSON endpoints and the file exports share one dataset builder per
+// report, so the screen and the exported file always carry the same figures.
+
+function periodRange(req: Request): { startDate: string; endDate: string } | null {
+  const today = reportToday();
+  const startDate = reportDate(req.query.start_date, today);
+  const endDate = reportDate(req.query.end_date, startDate);
+  if (startDate > endDate) return null;
+  return { startDate, endDate };
+}
+
+router.get('/sales/breakdown', requirePermission('reports.view'), (req: Request, res: Response) => {
+  try {
+    const range = periodRange(req);
+    if (!range) {
+      return res.status(400).json({ error: 'start_date must be on or before end_date' });
+    }
+    const db = getDatabase();
+    const [windowStart] = reportDayBounds(range.startDate);
+    const [, windowEnd] = reportDayBounds(range.endDate);
+    const dataset = buildSalesBreakdown(db, {
+      ...range,
+      windowStart,
+      windowEnd,
+      timeZone: tenantTimezone(),
+      startTime: tenantStartTime(),
+      minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
+    });
+    res.json({ salesBreakdown: dataset });
+  } catch (error: any) {
+    console.error('[API] Internal error:', error);
+    res
+      .status(error.statusCode || 500)
+      .json({ error: error.statusCode ? error.message : 'Internal server error' });
+  }
+});
+
+router.get(
+  '/sales/export',
+  requirePermission('reports.view'),
+  async (req: Request, res: Response) => {
+    try {
+      const format =
+        req.query.format === 'csv' ? 'csv' : req.query.format === 'xlsx' ? 'xlsx' : null;
+      if (!format) return res.status(400).json({ error: 'format must be xlsx or csv' });
+      const range = periodRange(req);
+      if (!range) {
+        return res.status(400).json({ error: 'start_date must be on or before end_date' });
+      }
+      const db = getDatabase();
+      const [windowStart] = reportDayBounds(range.startDate);
+      const [, windowEnd] = reportDayBounds(range.endDate);
+      const dataset = buildSalesBreakdown(db, {
+        ...range,
+        windowStart,
+        windowEnd,
+        timeZone: tenantTimezone(),
+        startTime: tenantStartTime(),
+        minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
+      });
+      const filename = `sales-report-${range.startDate}-to-${range.endDate}.${format}`;
+      if (format === 'xlsx') {
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(await serializeSalesBreakdownXlsx(dataset));
+      }
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(withUtf8Bom(serializeSalesBreakdownCsv(dataset)));
+    } catch (error: unknown) {
+      console.error('[API] Sales report export error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+router.get('/cash-summary', requirePermission('reports.view'), (req: Request, res: Response) => {
+  try {
+    const range = periodRange(req);
+    if (!range) {
+      return res.status(400).json({ error: 'start_date must be on or before end_date' });
+    }
+    const db = getDatabase();
+    const [windowStart] = reportDayBounds(range.startDate);
+    const [, windowEnd] = reportDayBounds(range.endDate);
+    const dataset = buildCashSummary(db, {
+      ...range,
+      windowStart,
+      windowEnd,
+      minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
+    });
+    res.json({ cashSummary: dataset });
+  } catch (error: any) {
+    console.error('[API] Internal error:', error);
+    res
+      .status(error.statusCode || 500)
+      .json({ error: error.statusCode ? error.message : 'Internal server error' });
+  }
+});
+
+router.get(
+  '/cash/export',
+  requirePermission('reports.view'),
+  async (req: Request, res: Response) => {
+    try {
+      const format =
+        req.query.format === 'csv' ? 'csv' : req.query.format === 'xlsx' ? 'xlsx' : null;
+      if (!format) return res.status(400).json({ error: 'format must be xlsx or csv' });
+      const range = periodRange(req);
+      if (!range) {
+        return res.status(400).json({ error: 'start_date must be on or before end_date' });
+      }
+      const db = getDatabase();
+      const [windowStart] = reportDayBounds(range.startDate);
+      const [, windowEnd] = reportDayBounds(range.endDate);
+      const dataset = buildCashSummary(db, {
+        ...range,
+        windowStart,
+        windowEnd,
+        minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
+      });
+      const filename = `cash-report-${range.startDate}-to-${range.endDate}.${format}`;
+      if (format === 'xlsx') {
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(await serializeCashSummaryXlsx(dataset));
+      }
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(withUtf8Bom(serializeCashSummaryCsv(dataset)));
+    } catch (error: unknown) {
+      console.error('[API] Cash report export error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
     }
   },
 );
