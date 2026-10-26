@@ -2204,7 +2204,7 @@
     "mobileAppHint": "계정과 페어링하려면 RevFlo 앱에 이 코드를 입력하세요.",
     "mobilePairingNeedsCloud": "먼저 위에서 클라우드 서비스를 초기화하세요. 페어링 코드는 FloAdmin에서 발급됩니다.",
     "moreApps": "더 많은 앱",
-    "moreAppsHint": "Flo POS 제품군의 동반 앱들입니다. 휴대폰으로 QR 코드를 스캔하여 다운로드하세요.",
+    "moreAppsHint": "Rest&Cafe 제품군의 동반 앱들입니다. 휴대폰으로 QR 코드를 스캔하여 다운로드하세요.",
     "name": "이름",
     "navGroupAccount": "계정",
     "navGroupCustomers": "고객",
