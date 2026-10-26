@@ -6,8 +6,7 @@
  * B) PUT /:id — COALESCE fix for image_url (clear image, don't touch image)
  * C) GET /:id/image — serve Base64, ETag, reject legacy external URLs, 404
  * D) GET / — has_image flag computed, image_url stripped from response
- * E) POST /fetch-url — CORS proxy (mocked external fetch)
- * E8) POST /fetch-url — SSRF guard rejects IPv4-embedded IPv6 literals
+ * E) POST /fetch-url — offline gate refuses every external fetch (local build)
  * F) POST / — create product with image_url validation
  * G) Transaction wrapping — product + addon groups succeed or fail together
  *
@@ -34,8 +33,6 @@ const {
 } = require('./helpers/test-setup');
 
 const { productRoutes } = require('../main/routes/products');
-const { closeHttpServer, installHttpShutdownTracking, cancelHttpShutdownWork } = require('../main/shutdown');
-const dns = require('dns');
 const https = require('https');
 const { EventEmitter } = require('events');
 
@@ -249,180 +246,90 @@ async function main() {
     assert(prodWithoutImage, 'D6: Found prod-no-img');
     assertEqual(prodWithoutImage.has_image, false, 'D7: has_image is false for product without image');
 
-    // ── E) POST /fetch-url — CORS proxy ────────────────────────────────────
-    console.log('\n─── E) POST /fetch-url (validation only) ───');
+    // ── E) POST /fetch-url — external image fetch (local build) ─────────
+    console.log('\n─── E) POST /fetch-url (offline gate) ───');
 
-    // E1: Missing URL
+    // Rest&Cafe is a local-only build that ships with offline mode on, so
+    // /fetch-url refuses every external fetch with 503 'offline_mode'
+    // before any DNS lookup or outbound connection happens. The URL-shape
+    // and SSRF guards below that gate remain in the handler but are
+    // unreachable in this build; this section pins the reachable behavior:
+    // the validation that precedes the gate, then the gate itself.
+
+    // E1: Missing URL (validated before the offline gate)
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
       body: {},
     });
     assertEqual(res.status, 400, 'E1: Missing URL rejected');
 
-    // E2: HTTP URL (not HTTPS)
+    // E2: An HTTP URL is refused by the offline gate (which precedes the
+    // scheme guard in this build)
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
       body: { url: 'http://example.com/photo.jpg' },
     });
-    assertEqual(res.status, 400, 'E2: HTTP URL rejected');
-    assertIncludes(res.data.error, 'HTTPS', 'E2: Error mentions HTTPS');
+    assertEqual(res.status, 503, 'E2: HTTP URL refused while offline');
+    assertEqual(res.data.error, 'offline_mode', 'E2: refusal is the offline gate');
 
-    // E3: Non-string URL
+    // E3: Non-string URL (validated before the offline gate)
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
       body: { url: 12345 },
     });
     assertEqual(res.status, 400, 'E3: Non-string URL rejected');
 
-    // E4: HTTPS URL to non-existent server (will fail with 502)
+    // E4: An ordinary public HTTPS image URL is refused while offline —
+    // no DNS resolution and no 502 path is ever reached
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
-      body: { url: 'https://this-domain-does-not-exist-12345.com/photo.jpg' },
+      body: { url: 'https://example.com/photo.jpg' },
     });
-    assertEqual(res.status, 502, 'E4: Non-existent server returns 502');
+    assertEqual(res.status, 503, 'E4: Public HTTPS URL refused while offline');
+    assertEqual(res.data.error, 'offline_mode', 'E4: refusal is the offline gate');
 
-    // E5: Userinfo in URL rejected
+    // E5: A userinfo URL is refused by the gate before the userinfo guard
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
       body: { url: 'https://user:pass@example.com/photo.jpg' },
     });
-    assertEqual(res.status, 400, 'E5: Userinfo URL rejected');
+    assertEqual(res.status, 503, 'E5: Userinfo URL refused while offline');
+    assertEqual(res.data.error, 'offline_mode', 'E5: refusal is the offline gate');
 
-    // E6: Non-standard port rejected
+    // E6: A non-standard-port URL is refused by the gate before the port guard
     res = await api(baseUrl, '/api/products/fetch-url', {
       method: 'POST', headers: authHeader,
       body: { url: 'https://example.com:8443/photo.jpg' },
     });
-    assertEqual(res.status, 400, 'E6: Non-standard port rejected');
+    assertEqual(res.status, 503, 'E6: Non-standard port URL refused while offline');
+    assertEqual(res.data.error, 'offline_mode', 'E6: refusal is the offline gate');
 
-    // E7: Node's automatic address-family selection requests an address list.
-    // The proxy must return its one validated, pinned IP in that shape.
-    const originalResolver = (dns.promises as any).Resolver;
-    const originalRequest = https.request;
-    let requestOptions: any;
-    let pinnedAddresses: any;
-    (dns.promises as any).Resolver = class {
-      resolve4 = async () => ['93.184.216.34'];
-      resolve6 = async () => [];
-      cancel = () => undefined;
-    };
-    https.request = (options: any, callback: (response: any) => void) => {
-      requestOptions = options;
-      options.lookup('example.com', { all: true }, (_error: unknown, addresses: unknown) => {
-        pinnedAddresses = addresses;
-      });
-      const request = new EventEmitter() as any;
-      request.end = () => {
-        const response = new EventEmitter() as any;
-        response.statusCode = 200;
-        response.headers = { 'content-type': 'image/webp', 'content-length': '4' };
-        callback(response);
-        response.emit('data', Buffer.from('test'));
-        response.emit('end');
-      };
-      request.destroy = () => undefined;
-      return request;
-    };
-    try {
-      res = await api(baseUrl, '/api/products/fetch-url', {
-        method: 'POST', headers: authHeader,
-        body: { url: 'https://example.com/photo.webp' },
-      });
-      assertEqual(res.status, 200, 'E7a: Pinned HTTPS image is fetched');
-      assertEqual(Array.isArray(pinnedAddresses), true, 'E7b: Pinned lookup returns an address list when requested');
-      assertEqual(pinnedAddresses[0].address, '93.184.216.34', 'E7c: Pinned lookup returns only validated IP');
-
-      res = await api(baseUrl, '/api/products/fetch-url', {
-        method: 'POST', headers: authHeader,
-        body: { url: 'https://93.184.216.34/photo.webp' },
-      });
-      assertEqual(res.status, 200, 'E7d: Public IP image URL is fetched');
-      assertEqual(requestOptions.hostname, '93.184.216.34', 'E7e: Public IP URL remains pinned to its literal address');
-    } finally {
-      (dns.promises as any).Resolver = originalResolver;
-      https.request = originalRequest;
-    }
-
-    // E8: The SSRF blocklist must catch the embedded IPv4 address whichever
-    // notation carries it. WHATWG URL canonicalizes a mapped literal to hex
-    // before the app sees it, so a dotted-quad-only check misses it entirely.
-    // https.request is mocked and counted so "refused" means no outbound
-    // connection was even attempted, not merely a downstream error.
-    console.log('\n─── E8) POST /fetch-url refuses IPv4-embedded IPv6 targets ───');
-    const BLOCKED_EMBEDDED_TARGETS: Array<[string, string]> = [
-      ['IPv4-mapped loopback (dotted)', 'https://[::ffff:127.0.0.1]/photo.jpg'],
-      ['IPv4-mapped loopback (hex)', 'https://[::ffff:7f00:1]/photo.jpg'],
-      ['IPv4-mapped loopback (expanded)', 'https://[0:0:0:0:0:ffff:127.0.0.1]/photo.jpg'],
-      ['IPv4-compatible loopback (hex)', 'https://[::7f00:1]/photo.jpg'],
-      ['IPv4-compatible loopback (dotted)', 'https://[::127.0.0.1]/photo.jpg'],
-      ['NAT64 loopback (hex)', 'https://[64:ff9b::7f00:1]/photo.jpg'],
-      ['NAT64 loopback (dotted)', 'https://[64:ff9b::127.0.0.1]/photo.jpg'],
-      ['IPv4-mapped private (hex)', 'https://[::ffff:a00:1]/photo.jpg'],
-      ['IPv4-mapped link-local / cloud metadata (hex)', 'https://[::ffff:a9fe:a9fe]/photo.jpg'],
-      ['IPv4-mapped link-local / cloud metadata (expanded)', 'https://[0:0:0:0:0:ffff:169.254.169.254]/photo.jpg'],
-      ['plain IPv4 loopback (control)', 'https://127.0.0.1/photo.jpg'],
-      ['plain IPv4 link-local (control)', 'https://169.254.169.254/photo.jpg'],
-    ];
+    // E7: No outbound connection is attempted for ANY target while offline,
+    // including SSRF-shaped ones (embedded IPv4, loopback, cloud metadata).
+    // https.request is mocked and counted so "refused" provably means the
+    // network was never touched.
     {
-      const originalResolverForSsrf = (dns.promises as any).Resolver;
-      const originalRequestForSsrf = https.request;
+      const originalRequest = https.request;
       let outboundAttempts = 0;
-      (dns.promises as any).Resolver = class {
-        resolve4 = async () => ['8.8.8.8'];
-        resolve6 = async () => [];
-        cancel = () => undefined;
-      };
       https.request = () => { outboundAttempts += 1; throw new Error('outbound connection must not be attempted'); };
       try {
-        for (const [label, url] of BLOCKED_EMBEDDED_TARGETS) {
-          const before = outboundAttempts;
+        const OFFLINE_TARGETS: Array<[string, string]> = [
+          ['public host', 'https://example.com/photo.webp'],
+          ['public IP literal', 'https://93.184.216.34/photo.webp'],
+          ['IPv4-mapped loopback (hex)', 'https://[::ffff:7f00:1]/photo.jpg'],
+          ['plain IPv4 loopback', 'https://127.0.0.1/photo.jpg'],
+          ['cloud metadata link-local', 'https://169.254.169.254/photo.jpg'],
+        ];
+        for (const [label, url] of OFFLINE_TARGETS) {
           const blocked = await api(baseUrl, '/api/products/fetch-url', {
             method: 'POST', headers: authHeader, body: { url },
           });
-          assertEqual(blocked.status, 400, `E8: ${label} is refused with 400`);
-          assertEqual(blocked.data.error, 'URL is not allowed', `E8: ${label} reports the SSRF guard`);
-          assertEqual(outboundAttempts, before, `E8: ${label} opens no outbound connection`);
+          assertEqual(blocked.status, 503, `E7: ${label} is refused while offline`);
+          assertEqual(blocked.data.error, 'offline_mode', `E7: ${label} reports the offline gate`);
         }
+        assertEqual(outboundAttempts, 0, 'E7: no outbound connection was attempted');
       } finally {
-        (dns.promises as any).Resolver = originalResolverForSsrf;
-        https.request = originalRequestForSsrf;
-      }
-
-      // A public address in the same notation must still be fetched, so the
-      // widened guard rejects the target rather than the syntax.
-      const originalResolverForPublic = (dns.promises as any).Resolver;
-      const originalRequestForPublic = https.request;
-      let publicHostnames: string[] = [];
-      (dns.promises as any).Resolver = class {
-        resolve4 = async () => ['8.8.8.8'];
-        resolve6 = async () => [];
-        cancel = () => undefined;
-      };
-      https.request = (options: any, callback: (response: any) => void) => {
-        publicHostnames.push(options.hostname);
-        const req = new EventEmitter() as any;
-        req.end = () => {
-          const response = new EventEmitter() as any;
-          response.statusCode = 200;
-          response.headers = { 'content-type': 'image/webp', 'content-length': '4' };
-          callback(response);
-          response.emit('data', Buffer.from('test'));
-          response.emit('end');
-        };
-        req.destroy = () => undefined;
-        return req;
-      };
-      try {
-        for (const url of ['https://[::ffff:8.8.8.8]/photo.webp', 'https://[2606:4700:4700::1111]/photo.webp']) {
-          const allowed = await api(baseUrl, '/api/products/fetch-url', {
-            method: 'POST', headers: authHeader, body: { url },
-          });
-          assertEqual(allowed.status, 200, `E8: public target ${url} still passes the SSRF guard`);
-        }
-        assertEqual(publicHostnames.length, 2, 'E8: both public targets reached the pinned fetch');
-      } finally {
-        (dns.promises as any).Resolver = originalResolverForPublic;
-        https.request = originalRequestForPublic;
+        https.request = originalRequest;
       }
     }
 
@@ -490,56 +397,18 @@ async function main() {
     const agpCount = db.prepare('SELECT COUNT(*) as count FROM addon_group_product WHERE product_id = ?').get(res.data.product.id);
     assertEqual(agpCount.count, 1, 'G1: Addon group link created');
 
-    // E8: Shutdown aborts a redirect hop that is blocked in DNS resolution.
-    const redirectResolver = (dns.promises as any).Resolver;
-    const redirectRequest = https.request;
-    let secondLookupStarted!: () => void;
-    const secondLookup = new Promise<void>((resolve) => { secondLookupStarted = resolve; });
-    let resolverCanceled = false;
-    (dns.promises as any).Resolver = class {
-      resolve4 = (hostname: string) => {
-        if (hostname === 'redirect.example') return Promise.resolve(['93.184.216.34']);
-        secondLookupStarted();
-        return new Promise<string[]>((_resolve, reject) => {
-          this.cancel = () => {
-            resolverCanceled = true;
-            const error = new Error('DNS lookup cancelled') as NodeJS.ErrnoException;
-            error.code = 'ECANCELLED';
-            reject(error);
-          };
-        });
-      };
-      resolve6 = async () => [];
-      cancel = () => { resolverCanceled = true; };
-    };
-    https.request = (_options: any, callback: (response: any) => void) => {
-      const request = new EventEmitter() as any;
-      request.end = () => {
-        const response = new EventEmitter() as any;
-        response.statusCode = 302;
-        response.headers = { location: 'https://next.example/photo.webp' };
-        callback(response);
-        response.emit('end');
-      };
-      request.destroy = () => undefined;
-      return request;
-    };
-    installHttpShutdownTracking(server);
-    try {
-      const redirectResponse = api(baseUrl, '/api/products/fetch-url', {
-        method: 'POST', headers: authHeader,
-        body: { url: 'https://redirect.example/photo.webp' },
-      });
-      await secondLookup;
-      cancelHttpShutdownWork();
-      await closeHttpServer(server, 'product redirect shutdown');
-      res = await redirectResponse;
-      assertEqual(resolverCanceled, true, 'E8: Shutdown cancels the blocked redirected DNS lookup');
-      assertEqual(res.status, 504, 'E8: Shutdown aborts a blocked redirected DNS lookup');
-    } finally {
-      (dns.promises as any).Resolver = redirectResolver;
-      https.request = redirectRequest;
-    }
+    // E8 (local build): there is no in-flight fetch for shutdown to abort.
+    // The offline gate answers fetch-url immediately, so a request issued
+    // on the way to shutdown is simply refused — no DNS lookup is ever
+    // pending. (The upstream variant of this block drove a redirect into
+    // a blocked DNS lookup and asserted shutdown cancels it; that fetch
+    // path is unreachable while offline mode is on.)
+    res = await api(baseUrl, '/api/products/fetch-url', {
+      method: 'POST', headers: authHeader,
+      body: { url: 'https://redirect.example/photo.webp' },
+    });
+    assertEqual(res.status, 503, 'E8: fetch-url answers immediately while offline');
+    assertEqual(res.data.error, 'offline_mode', 'E8: refusal is the offline gate');
 
     console.log('\n' + '='.repeat(50));
     const results = require('./helpers/test-setup').getResults();
