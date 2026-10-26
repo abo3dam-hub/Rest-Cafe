@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "এই ব্যবসায়িক দিনটি বন্ধ করার আগে খোলা শিফট #{id} ({name}) বন্ধ করুন।",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {#টি খোলা অর্ডার পরবর্তী শিফটে যাবে} other {#টি খোলা অর্ডার পরবর্তী শিফটে যাবে}}",
     "shiftCloseUnpaidWarningHint": "এই অর্ডারগুলো পরবর্তী শিফটের জন্য খোলা থাকবে। এই শিফট বন্ধ করলে শুধুমাত্র এই শিফটে ইতিমধ্যে সংগৃহীত নগদ পেমেন্টের হিসাব মেলানো হয়।",
-    "shiftCloseUnpaidMoreCount": "+আরও {count}টি খোলা অর্ডার"
+    "shiftCloseUnpaidMoreCount": "+আরও {count}টি খোলা অর্ডার",
+    "tableBillRequested": "বিলের অনুরোধ করা হয়েছে"
   },
   "printTest": {
     "amt": "এএমটি",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "গন্তব্য টেবিল নির্বাচন করুন",
     "tableMovedSuccess": "অর্ডার {from} থেকে {to}-এ স্থানান্তরিত হয়েছে",
     "tableMoveFailed": "টেবিল অর্ডার স্থানান্তর করতে ব্যর্থ হয়েছে",
-    "targetTableOccupied": "গন্তব্য টেবিলে ইতিমধ্যে একটি সক্রিয় অর্ডার রয়েছে"
+    "targetTableOccupied": "গন্তব্য টেবিলে ইতিমধ্যে একটি সক্রিয় অর্ডার রয়েছে",
+    "statusBillRequested": "বিলের অনুরোধ করা হয়েছে",
+    "backToTables": "টেবিলে ফিরে যান",
+    "newTakeawayOrder": "নতুন টেকঅ্যাওয়ে অর্ডার",
+    "newDeliveryOrder": "নতুন ডেলিভারি অর্ডার",
+    "openOrder": "অর্ডার খুলুন",
+    "requestBill": "বিলের অনুরোধ করুন",
+    "unrequestBill": "বিলের অনুরোধ বাতিল করুন",
+    "mergeWith": "এর সাথে মার্জ করুন…",
+    "mergePickTarget": "যে টেবিলে এই অর্ডারটি মার্জ করা হবে তা বেছে নিন",
+    "mergeConfirm": "অর্ডার {source}-এর আইটেমগুলি অর্ডার {target}-এ চলে যাবে এবং প্রথম অর্ডারটি বন্ধ হয়ে যাবে।",
+    "mergeSuccess": "অর্ডার মার্জ হয়েছে",
+    "mergeNoTargets": "মার্জ করার জন্য অন্য কোনো সক্রিয় অর্ডার নেই",
+    "openedFirstOrder": "প্রথম অর্ডার খোলা হয়েছে",
+    "newOrder": "নতুন অর্ডার"
   },
   "tax": {
     "actionActivate": "প্যাক সক্রিয় করা হয়েছে",

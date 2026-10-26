@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Mbyllni turnin e hapur #{id} ({name}) përpara se të mbyllni këtë ditë pune.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# porosi e hapur do të bartet} other {# porosi të hapura do të barten}}",
     "shiftCloseUnpaidWarningHint": "Këto porosi mbeten të hapura për turnin tjetër. Mbyllja e këtij turni rakordon vetëm pagesat me para në dorë të arkëtuara tashmë gjatë këtij turni.",
-    "shiftCloseUnpaidMoreCount": "+{count} porosi të tjera të hapura"
+    "shiftCloseUnpaidMoreCount": "+{count} porosi të tjera të hapura",
+    "tableBillRequested": "Fatura u kërkua"
   },
   "printTest": {
     "amt": "Shuma",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Zgjidh tavolinën e destinacionit",
     "tableMovedSuccess": "Porosia u lëviz nga {from} te {to}",
     "tableMoveFailed": "Dështoi lëvizja e porosisë së tavolinës",
-    "targetTableOccupied": "Tavolina e destinacionit tashmë ka një porosi aktive"
+    "targetTableOccupied": "Tavolina e destinacionit tashmë ka një porosi aktive",
+    "statusBillRequested": "Fatura u kërkua",
+    "backToTables": "Kthehu te tavolinat",
+    "newTakeawayOrder": "Porosi e re për marrje",
+    "newDeliveryOrder": "Porosi e re me dërgesë",
+    "openOrder": "Hap porosinë",
+    "requestBill": "Kërko faturën",
+    "unrequestBill": "Anulo kërkesën e faturës",
+    "mergeWith": "Bashko me…",
+    "mergePickTarget": "Zgjidh tavolinën në të cilën do të bashkohet kjo porosi",
+    "mergeConfirm": "Artikujt nga porosia {source} do të zhvendosen te porosia {target} dhe porosia e parë do të mbyllet.",
+    "mergeSuccess": "Porositë u bashkuan",
+    "mergeNoTargets": "Nuk ka porosi të tjera aktive për bashkim",
+    "openedFirstOrder": "Porosia e parë u hap",
+    "newOrder": "Porosi e re"
   },
   "tax": {
     "actionActivate": "Pakoja u aktivizua",

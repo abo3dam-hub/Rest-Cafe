@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Fermez le service ouvert #{id} ({name}) avant de clôturer cette journée commerciale.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# commande ouverte sera reportée} other {# commandes ouvertes seront reportées}}",
     "shiftCloseUnpaidWarningHint": "Ces commandes restent ouvertes pour le service suivant. La clôture de ce service ne rapproche que les paiements en espèces déjà encaissés pendant ce service.",
-    "shiftCloseUnpaidMoreCount": "+{count} autres commandes ouvertes"
+    "shiftCloseUnpaidMoreCount": "+{count} autres commandes ouvertes",
+    "tableBillRequested": "Addition demandée"
   },
   "printTest": {
     "amt": "Montant",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Sélectionner la table de destination",
     "tableMovedSuccess": "Commande déplacée de {from} vers {to}",
     "tableMoveFailed": "Échec du déplacement de la commande de table",
-    "targetTableOccupied": "La table de destination a déjà une commande active"
+    "targetTableOccupied": "La table de destination a déjà une commande active",
+    "statusBillRequested": "Addition demandée",
+    "backToTables": "Retour aux tables",
+    "newTakeawayOrder": "Nouvelle commande à emporter",
+    "newDeliveryOrder": "Nouvelle commande en livraison",
+    "openOrder": "Ouvrir la commande",
+    "requestBill": "Demander l'addition",
+    "unrequestBill": "Annuler la demande d'addition",
+    "mergeWith": "Fusionner avec…",
+    "mergePickTarget": "Choisissez la table dans laquelle fusionner cette commande",
+    "mergeConfirm": "Les articles de la commande {source} seront déplacés vers la commande {target} et la première commande sera fermée.",
+    "mergeSuccess": "Commandes fusionnées",
+    "mergeNoTargets": "Aucune autre commande active pour la fusion",
+    "openedFirstOrder": "Première commande ouverte",
+    "newOrder": "Nouvelle commande"
   },
   "tax": {
     "actionActivate": "Module activé",

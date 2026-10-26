@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Sluit eerst de geopende dienst #{id} ({name}) voordat u deze werkdag afsluit.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# open bestelling wordt meegenomen} other {# open bestellingen worden meegenomen}}",
     "shiftCloseUnpaidWarningHint": "Deze bestellingen blijven open voor de volgende dienst. Bij het sluiten van deze dienst worden alleen de contante betalingen verrekend die tijdens deze dienst al zijn ontvangen.",
-    "shiftCloseUnpaidMoreCount": "+{count} extra open bestellingen"
+    "shiftCloseUnpaidMoreCount": "+{count} extra open bestellingen",
+    "tableBillRequested": "Rekening aangevraagd"
   },
   "printTest": {
     "amt": "Bedrag",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Bestemmingstafel selecteren",
     "tableMovedSuccess": "Bestelling verplaatst van {from} naar {to}",
     "tableMoveFailed": "Verplaatsen van tafelbestelling mislukt",
-    "targetTableOccupied": "Bestemmingstafel heeft al een actieve bestelling"
+    "targetTableOccupied": "Bestemmingstafel heeft al een actieve bestelling",
+    "statusBillRequested": "Rekening aangevraagd",
+    "backToTables": "Terug naar tafels",
+    "newTakeawayOrder": "Nieuwe afhaalbestelling",
+    "newDeliveryOrder": "Nieuwe bezorgbestelling",
+    "openOrder": "Bestelling openen",
+    "requestBill": "Rekening aanvragen",
+    "unrequestBill": "Rekeningaanvraag ongedaan maken",
+    "mergeWith": "Samenvoegen met…",
+    "mergePickTarget": "Kies de tafel waarin deze bestelling wordt samengevoegd",
+    "mergeConfirm": "Items van bestelling {source} gaan naar bestelling {target} en de eerste bestelling wordt gesloten.",
+    "mergeSuccess": "Bestellingen samengevoegd",
+    "mergeNoTargets": "Geen andere actieve bestellingen om samen te voegen",
+    "openedFirstOrder": "Eerste bestelling geopend",
+    "newOrder": "Nieuwe bestelling"
   },
   "tax": {
     "actionActivate": "Pakket geactiveerd",

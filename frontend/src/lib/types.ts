@@ -163,7 +163,7 @@ export interface Table {
   id: string;
   name: string;
   capacity: number;
-  status: 'available' | 'occupied' | 'reserved' | 'cleaning' | 'held';
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning' | 'held' | 'bill_requested';
   kitchen_station_id: number | null;
   floor: string | null;
   section: string | null;
@@ -281,6 +281,7 @@ export interface Bill {
   round_off?: number;
   total: number;
   paid_amount: number;
+  printed_at?: string | null;
   balance: number;
   payment_status: 'unpaid' | 'partial' | 'paid' | 'refunded' | 'partially_refunded';
   payment_details:

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "أغلق الوردية المفتوحة #{id} ({name}) قبل إغلاق يوم العمل هذا.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {سيتم ترحيل طلب مفتوح واحد (#)} other {سيتم ترحيل # طلبات مفتوحة}}",
     "shiftCloseUnpaidWarningHint": "تظل هذه الطلبات مفتوحة للوردية التالية. إغلاق هذه الوردية يطابق فقط المدفوعات النقدية التي تم تحصيلها بالفعل خلال هذه الوردية.",
-    "shiftCloseUnpaidMoreCount": "+{count} طلبات مفتوحة أخرى"
+    "shiftCloseUnpaidMoreCount": "+{count} طلبات مفتوحة أخرى",
+    "tableBillRequested": "طُلب الحساب"
   },
   "printTest": {
     "amt": "المبلغ",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "حدد الطاولة الوجهة",
     "tableMovedSuccess": "تم نقل الطلب من {from} إلى {to}",
     "tableMoveFailed": "فشل نقل طلب الطاولة",
-    "targetTableOccupied": "الطاولة الوجهة تحتوي بالفعل على طلب نشط"
+    "targetTableOccupied": "الطاولة الوجهة تحتوي بالفعل على طلب نشط",
+    "statusBillRequested": "طُلب الحساب",
+    "backToTables": "عودة للطاولات",
+    "newTakeawayOrder": "طلب سفري جديد",
+    "newDeliveryOrder": "طلب توصيل جديد",
+    "openOrder": "فتح الطلب",
+    "requestBill": "طلب الحساب",
+    "unrequestBill": "التراجع عن طلب الحساب",
+    "mergeWith": "دمج مع…",
+    "mergePickTarget": "اختر الطاولة التي سيُدمج إليها هذا الطلب",
+    "mergeConfirm": "ستُنقل بنود طلب {source} إلى طلب {target} وسيُغلق الطلب الأول.",
+    "mergeSuccess": "تم الدمج بنجاح",
+    "mergeNoTargets": "لا توجد طلبات نشطة أخرى للدمج إليها",
+    "openedFirstOrder": "فُتح أول طلب",
+    "newOrder": "طلب جديد"
   },
   "tax": {
     "actionActivate": "تم تفعيل الحزمة",

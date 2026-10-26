@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "इस व्यावसायिक दिन को बंद करने से पहले खुली शिफ्ट #{id} ({name}) को बंद करें।",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# खुला ऑर्डर अगली शिफ्ट में आगे जाएगा} other {# खुले ऑर्डर अगली शिफ्ट में आगे जाएंगे}}",
     "shiftCloseUnpaidWarningHint": "ये ऑर्डर अगली शिफ्ट के लिए खुले रहते हैं। इस शिफ्ट को बंद करने पर केवल इस शिफ्ट के दौरान पहले से प्राप्त नकद भुगतानों का मिलान होता है।",
-    "shiftCloseUnpaidMoreCount": "+{count} और खुले ऑर्डर"
+    "shiftCloseUnpaidMoreCount": "+{count} और खुले ऑर्डर",
+    "tableBillRequested": "बिल का अनुरोध किया गया"
   },
   "printTest": {
     "amt": "राशि",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "गंतव्य टेबल चुनें",
     "tableMovedSuccess": "ऑर्डर {from} से {to} पर स्थानांतरित किया गया",
     "tableMoveFailed": "टेबल ऑर्डर स्थानांतरित करने में विफल",
-    "targetTableOccupied": "गंतव्य टेबल पर पहले से एक सक्रिय ऑर्डर है"
+    "targetTableOccupied": "गंतव्य टेबल पर पहले से एक सक्रिय ऑर्डर है",
+    "statusBillRequested": "बिल का अनुरोध किया गया",
+    "backToTables": "मेज़ों पर वापस",
+    "newTakeawayOrder": "नया टेकअवे ऑर्डर",
+    "newDeliveryOrder": "नया डिलीवरी ऑर्डर",
+    "openOrder": "ऑर्डर खोलें",
+    "requestBill": "बिल का अनुरोध करें",
+    "unrequestBill": "बिल अनुरोध वापस लें",
+    "mergeWith": "इसके साथ मर्ज करें…",
+    "mergePickTarget": "वह मेज़ चुनें जिसमें यह ऑर्डर मर्ज किया जाएगा",
+    "mergeConfirm": "ऑर्डर {source} के आइटम ऑर्डर {target} में चले जाएंगे और पहला ऑर्डर बंद हो जाएगा।",
+    "mergeSuccess": "ऑर्डर मर्ज हो गए",
+    "mergeNoTargets": "मर्ज करने के लिए कोई अन्य सक्रिय ऑर्डर नहीं",
+    "openedFirstOrder": "पहला ऑर्डर खोला गया",
+    "newOrder": "नया ऑर्डर"
   },
   "tax": {
     "actionActivate": "पैक सक्रिय",

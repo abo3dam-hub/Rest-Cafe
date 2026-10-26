@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "この営業日を締める前に、開始中のシフト #{id}（{name}）を閉じてください。",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 件の未会計注文が次のシフトに引き継がれます} other {# 件の未会計注文が次のシフトに引き継がれます}}",
     "shiftCloseUnpaidWarningHint": "これらの注文は次のシフトに引き継がれます。このシフトの精算では、このシフト中に受け取った現金支払いのみを集計します。",
-    "shiftCloseUnpaidMoreCount": "他 +{count} 件の未会計注文"
+    "shiftCloseUnpaidMoreCount": "他 +{count} 件の未会計注文",
+    "tableBillRequested": "会計がリクエストされました"
   },
   "printTest": {
     "amt": "金額",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "移動先のテーブルを選択",
     "tableMovedSuccess": "注文が {from} から {to} に移動しました",
     "tableMoveFailed": "テーブル注文の移動に失敗しました",
-    "targetTableOccupied": "移動先のテーブルにはすでにアクティブな注文があります"
+    "targetTableOccupied": "移動先のテーブルにはすでにアクティブな注文があります",
+    "statusBillRequested": "会計がリクエストされました",
+    "backToTables": "テーブルに戻る",
+    "newTakeawayOrder": "新しいテイクアウト注文",
+    "newDeliveryOrder": "新しいデリバリー注文",
+    "openOrder": "注文を開く",
+    "requestBill": "会計をリクエスト",
+    "unrequestBill": "会計リクエストを取り消す",
+    "mergeWith": "次と統合…",
+    "mergePickTarget": "この注文を統合するテーブルを選択",
+    "mergeConfirm": "注文 {source} の商品は注文 {target} に移動し、最初の注文は閉じられます。",
+    "mergeSuccess": "注文を統合しました",
+    "mergeNoTargets": "統合できる他のアクティブな注文はありません",
+    "openedFirstOrder": "最初の注文が開かれました",
+    "newOrder": "新しい注文"
   },
   "tax": {
     "actionActivate": "パックを有効化",

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Tutup shift terbuka #{id} ({name}) sebelum menutup hari kerja ini.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# pesanan terbuka akan dilanjutkan ke shift berikutnya} other {# pesanan terbuka akan dilanjutkan ke shift berikutnya}}",
     "shiftCloseUnpaidWarningHint": "Pesanan ini tetap terbuka untuk shift berikutnya. Menutup shift ini hanya mencocokkan pembayaran tunai yang sudah diterima selama shift ini.",
-    "shiftCloseUnpaidMoreCount": "+{count} pesanan terbuka lainnya"
+    "shiftCloseUnpaidMoreCount": "+{count} pesanan terbuka lainnya",
+    "tableBillRequested": "Tagihan diminta"
   },
   "printTest": {
     "amt": "Jml",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Pilih meja tujuan",
     "tableMovedSuccess": "Pesanan dipindahkan dari {from} ke {to}",
     "tableMoveFailed": "Gagal memindahkan pesanan meja",
-    "targetTableOccupied": "Meja tujuan sudah memiliki pesanan aktif"
+    "targetTableOccupied": "Meja tujuan sudah memiliki pesanan aktif",
+    "statusBillRequested": "Tagihan diminta",
+    "backToTables": "Kembali ke meja",
+    "newTakeawayOrder": "Pesanan bawa pulang baru",
+    "newDeliveryOrder": "Pesanan antar baru",
+    "openOrder": "Buka pesanan",
+    "requestBill": "Minta tagihan",
+    "unrequestBill": "Batalkan permintaan tagihan",
+    "mergeWith": "Gabungkan dengan…",
+    "mergePickTarget": "Pilih meja tempat pesanan ini akan digabungkan",
+    "mergeConfirm": "Item dari pesanan {source} akan dipindahkan ke pesanan {target} dan pesanan pertama akan ditutup.",
+    "mergeSuccess": "Pesanan digabungkan",
+    "mergeNoTargets": "Tidak ada pesanan aktif lain untuk digabungkan",
+    "openedFirstOrder": "Pesanan pertama dibuka",
+    "newOrder": "Pesanan baru"
   },
   "tax": {
     "actionActivate": "Paket diaktifkan",

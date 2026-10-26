@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Close open shift #{id} ({name}) before closing this business day.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# open order will carry over} other {# open orders will carry over}}",
     "shiftCloseUnpaidWarningHint": "These orders stay open for the next shift. Closing this shift only reconciles cash payments already collected during this shift.",
-    "shiftCloseUnpaidMoreCount": "+{count} more open orders"
+    "shiftCloseUnpaidMoreCount": "+{count} more open orders",
+    "tableBillRequested": "Bill requested"
   },
   "printTest": {
     "amt": "Amt",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Select destination table",
     "tableMovedSuccess": "Order moved from {from} to {to}",
     "tableMoveFailed": "Failed to move table order",
-    "targetTableOccupied": "Destination table already has an active order"
+    "targetTableOccupied": "Destination table already has an active order",
+    "statusBillRequested": "Bill requested",
+    "backToTables": "Back to tables",
+    "newTakeawayOrder": "New takeaway order",
+    "newDeliveryOrder": "New delivery order",
+    "openOrder": "Open order",
+    "requestBill": "Request bill",
+    "unrequestBill": "Undo bill request",
+    "mergeWith": "Merge with…",
+    "mergePickTarget": "Choose the table this order will merge into",
+    "mergeConfirm": "Items from order {source} will move to order {target} and the first order will close.",
+    "mergeSuccess": "Orders merged",
+    "mergeNoTargets": "No other active orders to merge into",
+    "openedFirstOrder": "First order opened",
+    "newOrder": "New order"
   },
   "tax": {
     "actionActivate": "Pack activated",

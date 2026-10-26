@@ -189,6 +189,7 @@ export const TABLE_STATUS_LABEL_KEYS = {
   reserved: 'statusReserved',
   held: 'statusHeld',
   cleaning: 'statusCleaning',
+  bill_requested: 'statusBillRequested',
 } as const satisfies Record<Table['status'], TablesKey>;
 
 /** Tenant/business status → label. */

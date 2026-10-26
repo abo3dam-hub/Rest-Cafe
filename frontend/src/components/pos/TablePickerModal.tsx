@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 import type { Table } from '@/lib/types';
 import { useHeldOrdersStore } from '@/store/held-orders';
 import { useTranslations, type AppConfig } from 'use-intl';
-import { TableTurnoverBadge } from '@/components/tables/TableTurnoverBadge';
 
 interface Props {
   tables: Table[];
@@ -23,26 +22,33 @@ const statusStyles: Record<string, { border: string; badge: string; badgeKey: Po
   available: { border: 'border-border hover:border-brand/40', badge: '', badgeKey: null },
   occupied: { border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40', badge: 'bg-orange-500', badgeKey: 'tableOccupied' },
   reserved: { border: 'border-yellow-300 dark:border-yellow-800/40 bg-yellow-50 dark:bg-yellow-950/40', badge: 'bg-yellow-500', badgeKey: 'tableReserved' },
-  cleaning: { border: 'border-gray-300 dark:border-border bg-muted', badge: 'bg-gray-500', badgeKey: 'tableCleaning' },
+  cleaning: { border: 'border-border hover:border-brand/40', badge: '', badgeKey: null },
   held: { border: 'border-blue-400 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-950/40', badge: 'bg-blue-500', badgeKey: 'tableHeld' },
+  bill_requested: { border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40', badge: 'bg-orange-500', badgeKey: 'tableBillRequested' },
 };
+
+// 'cleaning' never surfaces (owner decision): such a table behaves as available.
+const shownStatus = (table: Table): Table['status'] =>
+  table.status === 'cleaning' ? 'available' : table.status;
 
 export default function TablePickerModal({
   tables, selectedTableId, onSelectAvailable, onSelectOccupied, onSelectHeld, onPlaceOrder, onHoldTable, onClose,
 }: Props) {
   const heldOrders = useHeldOrdersStore();
   const t = useTranslations('pos');
+  const tTables = useTranslations('tables');
 
   const handleClick = (table: Table) => {
     if (heldOrders.hasHeldOrder(table.id)) {
       onSelectHeld(table.id);
       return;
     }
-    if (table.status === 'occupied') {
+    const shown = shownStatus(table);
+    if (shown === 'occupied' || shown === 'bill_requested') {
       onSelectOccupied(table);
       return;
     }
-    if (table.status === 'available' || table.status === 'reserved') {
+    if (shown === 'available' || shown === 'reserved') {
       const customer = table.status === 'reserved' && table.reservation_customer_id
         ? { id: table.reservation_customer_id, name: table.reservation_customer_name ?? '', phone: table.reservation_customer_phone ?? '' }
         : null;
@@ -65,21 +71,20 @@ export default function TablePickerModal({
           {tables.map((table) => {
             const isHeld = heldOrders.hasHeldOrder(table.id);
             const isSelected = selectedTableId === table.id;
-            const style = statusStyles[table.status] || statusStyles.available;
-            const isDisabled = table.status === 'cleaning';
+            const shown = shownStatus(table);
+            const style = statusStyles[shown] || statusStyles.available;
 
             return (
               <button
                 key={table.id}
-                onClick={() => !isDisabled && handleClick(table)}
-                disabled={isDisabled}
-                className={`min-h-28 p-4 rounded-xl border-2 text-center transition-colors relative ${
+                onClick={() => handleClick(table)}
+                className={`min-h-28 p-4 rounded-xl border-2 text-center transition-colors relative cursor-pointer ${
                   isSelected
                     ? 'border-brand bg-brand-light'
                     : isHeld
                       ? 'border-blue-400 bg-blue-50'
                       : style.border
-                } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                }`}
               >
                 {isHeld && (
                   <span className="absolute -top-2 -end-2 bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
@@ -93,13 +98,19 @@ export default function TablePickerModal({
                 )}
                 <p className="font-bold text-foreground">{table.name}</p>
                 <p className="text-xs text-muted-foreground">{t('tableSeats', { count: table.capacity })}</p>
-                {table.status === 'occupied' && (table.current_order || table.activeOrder) && (
+                {(shown === 'occupied' || shown === 'bill_requested') && (table.current_order || table.activeOrder) && (
                   <p className="text-xs text-orange-600 font-medium mt-1">
                     #{(table.current_order || table.activeOrder)?.order_number}
                   </p>
                 )}
-                {table.status === 'occupied' && table.seated_at && (
-                  <div className="mt-1"><TableTurnoverBadge seatedAt={table.seated_at} /></div>
+                {(shown === 'occupied' || shown === 'bill_requested') && table.seated_at && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {tTables('openedFirstOrder')} ·{' '}
+                    {new Date(table.seated_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
                 )}
               </button>
             );

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Schließen Sie die offene Schicht #{id} ({name}), bevor Sie diesen Geschäftstag abschließen.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# offene Bestellung wird übertragen} other {# offene Bestellungen werden übertragen}}",
     "shiftCloseUnpaidWarningHint": "Diese Bestellungen bleiben für die nächste Schicht geöffnet. Beim Schließen dieser Schicht werden nur die in dieser Schicht bereits kassierten Barzahlungen abgestimmt.",
-    "shiftCloseUnpaidMoreCount": "+{count} weitere offene Bestellungen"
+    "shiftCloseUnpaidMoreCount": "+{count} weitere offene Bestellungen",
+    "tableBillRequested": "Rechnung angefordert"
   },
   "printTest": {
     "amt": "Betrag",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Ziel-Tisch auswählen",
     "tableMovedSuccess": "Bestellung von {from} nach {to} verschoben",
     "tableMoveFailed": "Fehler beim Verschieben der Tischbestellung",
-    "targetTableOccupied": "Ziel-Tisch hat bereits eine aktive Bestellung"
+    "targetTableOccupied": "Ziel-Tisch hat bereits eine aktive Bestellung",
+    "statusBillRequested": "Rechnung angefordert",
+    "backToTables": "Zurück zu den Tischen",
+    "newTakeawayOrder": "Neue Bestellung zum Mitnehmen",
+    "newDeliveryOrder": "Neue Lieferbestellung",
+    "openOrder": "Bestellung öffnen",
+    "requestBill": "Rechnung anfordern",
+    "unrequestBill": "Rechnungsanforderung rückgängig",
+    "mergeWith": "Zusammenführen mit…",
+    "mergePickTarget": "Wählen Sie den Tisch, in den diese Bestellung übernommen wird",
+    "mergeConfirm": "Positionen von Bestellung {source} werden in Bestellung {target} verschoben und die erste Bestellung wird geschlossen.",
+    "mergeSuccess": "Bestellungen zusammengeführt",
+    "mergeNoTargets": "Keine anderen aktiven Bestellungen zum Zusammenführen",
+    "openedFirstOrder": "Erste Bestellung geöffnet",
+    "newOrder": "Neue Bestellung"
   },
   "tax": {
     "actionActivate": "Steuerpaket aktiviert",

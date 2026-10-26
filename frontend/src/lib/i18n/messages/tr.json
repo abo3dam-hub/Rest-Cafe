@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Bu iş gününü kapatmadan önce açık vardiya #{id} ({name}) kaydını kapatın.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# açık sipariş sonraki vardiyaya devredilecek} other {# açık sipariş sonraki vardiyaya devredilecek}}",
     "shiftCloseUnpaidWarningHint": "Bu siparişler bir sonraki vardiya için açık kalır. Bu vardiyayı kapatmak yalnızca bu vardiya sırasında tahsil edilmiş nakit ödemeleri mutabakatlandırır.",
-    "shiftCloseUnpaidMoreCount": "+{count} açık sipariş daha"
+    "shiftCloseUnpaidMoreCount": "+{count} açık sipariş daha",
+    "tableBillRequested": "Hesap istendi"
   },
   "printTest": {
     "amt": "Tutar",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Hedef masayı seçin",
     "tableMovedSuccess": "Sipariş {from} masasından {to} masasına taşındı",
     "tableMoveFailed": "Masa siparişi taşınamadı",
-    "targetTableOccupied": "Hedef masada zaten aktif bir sipariş var"
+    "targetTableOccupied": "Hedef masada zaten aktif bir sipariş var",
+    "statusBillRequested": "Hesap istendi",
+    "backToTables": "Masalara dön",
+    "newTakeawayOrder": "Yeni paket siparişi",
+    "newDeliveryOrder": "Yeni teslimat siparişi",
+    "openOrder": "Siparişi aç",
+    "requestBill": "Hesap iste",
+    "unrequestBill": "Hesap isteğini geri al",
+    "mergeWith": "Şununla birleştir…",
+    "mergePickTarget": "Bu siparişin birleştirileceği masayı seçin",
+    "mergeConfirm": "{source} siparişinin ürünleri {target} siparişine taşınacak ve ilk sipariş kapatılacaktır.",
+    "mergeSuccess": "Siparişler birleştirildi",
+    "mergeNoTargets": "Birleştirilecek başka aktif sipariş yok",
+    "openedFirstOrder": "İlk sipariş açıldı",
+    "newOrder": "Yeni sipariş"
   },
   "tax": {
     "actionActivate": "Vergi paketi etkinleştirildi",

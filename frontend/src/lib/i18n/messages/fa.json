@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "پیش از بستن این روز کاری، شیفت باز #{id} ({name}) را ببندید.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# سفارش باز به شیفت بعد منتقل می‌شود} other {# سفارش باز به شیفت بعد منتقل می‌شوند}}",
     "shiftCloseUnpaidWarningHint": "این سفارش‌ها برای شیفت بعدی باز می‌مانند. بستن این شیفت فقط پرداخت‌های نقدی دریافت‌شده در همین شیفت را تسویه می‌کند.",
-    "shiftCloseUnpaidMoreCount": "+{count} سفارش باز دیگر"
+    "shiftCloseUnpaidMoreCount": "+{count} سفارش باز دیگر",
+    "tableBillRequested": "صورتحساب درخواست شد"
   },
   "printTest": {
     "amt": "مبلغ",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "انتخاب میز مقصد",
     "tableMovedSuccess": "سفارش از {from} به {to} منتقل شد",
     "tableMoveFailed": "انتقال سفارش میز انجام نشد",
-    "targetTableOccupied": "میز مقصد در حال حاضر سفارش فعال دارد"
+    "targetTableOccupied": "میز مقصد در حال حاضر سفارش فعال دارد",
+    "statusBillRequested": "صورتحساب درخواست شد",
+    "backToTables": "بازگشت به میزها",
+    "newTakeawayOrder": "سفارش بیرون‌بر جدید",
+    "newDeliveryOrder": "سفارش تحویل جدید",
+    "openOrder": "باز کردن سفارش",
+    "requestBill": "درخواست صورتحساب",
+    "unrequestBill": "لغو درخواست صورتحساب",
+    "mergeWith": "ادغام با…",
+    "mergePickTarget": "میزی را که این سفارش در آن ادغام می‌شود انتخاب کنید",
+    "mergeConfirm": "اقلام سفارش {source} به سفارش {target} منتقل می‌شود و سفارش اول بسته خواهد شد.",
+    "mergeSuccess": "سفارش‌ها ادغام شدند",
+    "mergeNoTargets": "سفارش فعال دیگری برای ادغام وجود ندارد",
+    "openedFirstOrder": "اولین سفارش باز شد",
+    "newOrder": "سفارش جدید"
   },
   "tax": {
     "actionActivate": "بسته فعال شد",

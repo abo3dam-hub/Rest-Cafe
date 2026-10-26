@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Chiudi il turno aperto #{id} ({name}) prima di chiudere questa giornata lavorativa.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# ordine aperto verrà trasferito} other {# ordini aperti verranno trasferiti}}",
     "shiftCloseUnpaidWarningHint": "Questi ordini restano aperti per il turno successivo. La chiusura di questo turno riconcilia solo i pagamenti in contanti già incassati durante questo turno.",
-    "shiftCloseUnpaidMoreCount": "+{count} altri ordini aperti"
+    "shiftCloseUnpaidMoreCount": "+{count} altri ordini aperti",
+    "tableBillRequested": "Conto richiesto"
   },
   "printTest": {
     "amt": "Importo",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Seleziona tavolo di destinazione",
     "tableMovedSuccess": "Ordine spostato da {from} a {to}",
     "tableMoveFailed": "Impossibile spostare l'ordine del tavolo",
-    "targetTableOccupied": "Il tavolo di destinazione ha già un ordine attivo"
+    "targetTableOccupied": "Il tavolo di destinazione ha già un ordine attivo",
+    "statusBillRequested": "Conto richiesto",
+    "backToTables": "Torna ai tavoli",
+    "newTakeawayOrder": "Nuovo ordine da asporto",
+    "newDeliveryOrder": "Nuovo ordine con consegna",
+    "openOrder": "Apri ordine",
+    "requestBill": "Richiedi conto",
+    "unrequestBill": "Annulla richiesta conto",
+    "mergeWith": "Unisci a…",
+    "mergePickTarget": "Scegli il tavolo in cui unire questo ordine",
+    "mergeConfirm": "Gli articoli dell'ordine {source} passeranno all'ordine {target} e il primo ordine verrà chiuso.",
+    "mergeSuccess": "Ordini uniti",
+    "mergeNoTargets": "Nessun altro ordine attivo da unire",
+    "openedFirstOrder": "Primo ordine aperto",
+    "newOrder": "Nuovo ordine"
   },
   "tax": {
     "actionActivate": "Pack attivato",

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Cierra el turno abierto #{id} ({name}) antes de cerrar este día comercial.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# pedido abierto pasará al siguiente turno} other {# pedidos abiertos pasarán al siguiente turno}}",
     "shiftCloseUnpaidWarningHint": "Estos pedidos permanecen abiertos para el siguiente turno. Al cerrar este turno solo se concilian los pagos en efectivo ya cobrados durante este turno.",
-    "shiftCloseUnpaidMoreCount": "+{count} pedidos abiertos más"
+    "shiftCloseUnpaidMoreCount": "+{count} pedidos abiertos más",
+    "tableBillRequested": "Cuenta solicitada"
   },
   "printTest": {
     "amt": "Total",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Seleccionar mesa de destino",
     "tableMovedSuccess": "Pedido movido de {from} a {to}",
     "tableMoveFailed": "Error al mover el pedido de la mesa",
-    "targetTableOccupied": "La mesa de destino ya tiene un pedido activo"
+    "targetTableOccupied": "La mesa de destino ya tiene un pedido activo",
+    "statusBillRequested": "Cuenta solicitada",
+    "backToTables": "Volver a las mesas",
+    "newTakeawayOrder": "Nuevo pedido para llevar",
+    "newDeliveryOrder": "Nuevo pedido a domicilio",
+    "openOrder": "Abrir pedido",
+    "requestBill": "Solicitar cuenta",
+    "unrequestBill": "Deshacer solicitud de cuenta",
+    "mergeWith": "Fusionar con…",
+    "mergePickTarget": "Elige la mesa en la que se fusionará este pedido",
+    "mergeConfirm": "Los artículos del pedido {source} pasarán al pedido {target} y el primer pedido se cerrará.",
+    "mergeSuccess": "Pedidos fusionados",
+    "mergeNoTargets": "No hay otros pedidos activos para fusionar",
+    "openedFirstOrder": "Primer pedido abierto",
+    "newOrder": "Nuevo pedido"
   },
   "tax": {
     "actionActivate": "Paquete activado",

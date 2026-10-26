@@ -20,11 +20,14 @@ import {
   Trash2,
   Eye,
 } from 'lucide-react';
-import type { Table, Customer, Order, OrderItem } from '@/lib/types';
+import type { Table, Customer, Order, OrderItem, Bill } from '@/lib/types';
 import FloorplanEditor from '@/components/tables/FloorplanEditor';
 import MoveTableModal from '@/components/tables/MoveTableModal';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
+import { useCartStore } from '@/store/cart';
+import { usePrinterStore } from '@/hooks/usePrinter';
+import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
 import { tenantCan } from '@/lib/permissions';
 import { countryName } from '@/lib/countries';
 import { parsePhone, dialCodeFor } from '@/lib/phone';
@@ -35,7 +38,6 @@ import {
   ITEM_STATUS_LABEL_KEYS,
   TABLE_STATUS_LABEL_KEYS,
 } from '@/lib/i18n-enums';
-import { TableTurnoverBadge } from '@/components/tables/TableTurnoverBadge';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 
 const statusColors: Record<string, string> = {
@@ -44,7 +46,13 @@ const statusColors: Record<string, string> = {
   reserved: 'bg-yellow-500',
   cleaning: 'bg-gray-500',
   held: 'bg-blue-500',
+  bill_requested: 'bg-orange-500',
 };
+
+// 'cleaning' never surfaces in the UI (owner decision): a table stored as
+// cleaning is displayed and treated as available.
+const displayTableStatus = (status: Table['status']): Table['status'] =>
+  status === 'cleaning' ? 'available' : status;
 
 type OrdersKey = keyof AppConfig['Messages']['orders'];
 
@@ -314,9 +322,16 @@ export default function TablesPage() {
   const tOrders = useTranslations('orders');
   const fmt = useFormatCurrency();
   const { currentTenant } = useAuthStore();
+  const cartStore = useCartStore();
+  const { printBill } = usePrinterStore();
   const canManageTables = tenantCan(currentTenant, 'tables.manage');
   const canReadOrders = tenantCan(currentTenant, 'orders.read');
   const canMoveTable = tenantCan(currentTenant, 'tables.orders.move');
+  const canGenerateBills = tenantCan(currentTenant, 'bills.generate');
+  const [mergeSource, setMergeSource] = useState<Table | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<Table | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [billBusy, setBillBusy] = useState(false);
   const [tables, setTables] = useState<Table[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -325,9 +340,12 @@ export default function TablesPage() {
   const [movingTable, setMovingTable] = useState<Table | null>(null);
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [reservingTable, setReservingTable] = useState<Table | null>(null);
-  // List is the default view (table management + Add table); the floor
-  // plan editor is the second view for visual layout work.
-  const [view, setView] = useState<'plan' | 'list'>('list');
+  // The map is the home screen for floor roles (cashier/server); everyone
+  // else keeps the management list as the default view.
+  const [view, setView] = useState<'plan' | 'list'>(() => {
+    const role = useAuthStore.getState().currentTenant?.role;
+    return role === 'cashier' || role === 'server' ? 'plan' : 'list';
+  });
   const [layoutMode, setLayoutMode] = useState(false);
   const [form, setForm] = useState({ name: '', capacity: '4', floor: 'الصالة الرئيسية', section: '' });
   const [newFloorMode, setNewFloorMode] = useState(false);
@@ -431,6 +449,126 @@ export default function TablesPage() {
     if (existing) existing.push(order);
     else ordersByTable.set(tableKey, [order]);
   }
+
+  // Restore the hall the cashier was on when returning from a table
+  // workspace (the back button carries it in the query string).
+  useEffect(() => {
+    const hall = new URLSearchParams(window.location.search).get('hall');
+    if (hall) setSelectedFloor(hall);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeOrderFor = (tb: Table): Order | null => {
+    const list = ordersByTable.get(String(tb.id));
+    return list && list.length > 0 ? list[0] : null;
+  };
+
+  const workspaceUrl = (tb: Table, orderId?: number) =>
+    `/pos?table=${encodeURIComponent(String(tb.id))}&hall=${encodeURIComponent(tb.floor || '')}${
+      orderId ? `&order=${orderId}` : ''
+    }`;
+
+  const goWorkspace = (tb: Table) => {
+    const order = activeOrderFor(tb);
+    if (!order) cartStore.setTableId(String(tb.id));
+    router.push(workspaceUrl(tb, order?.id));
+  };
+
+  const goNewOrder = (tb: Table) => {
+    cartStore.setOrderType('dine_in');
+    cartStore.setTableId(String(tb.id));
+    router.push(workspaceUrl(tb));
+  };
+
+  const goQuickOrder = (type: 'takeaway' | 'delivery') => {
+    cartStore.setOrderType(type);
+    router.push('/pos');
+  };
+
+  const handleRequestBill = async (tb: Table) => {
+    const order = activeOrderFor(tb);
+    if (!order || billBusy) return;
+    setBillBusy(true);
+    try {
+      const { data } = await api.post('/bills/generate', { order_id: order.id });
+      const bill = data.bill as Bill;
+      const isReprint = Boolean(bill.printed_at);
+      const warnings = await printBill(
+        bill,
+        {
+          business_name: currentTenant?.business_name || tCommon('businessNameFallback'),
+          currency: currentTenant?.currency || '',
+          country: currentTenant?.country || '',
+          timezone: currentTenant?.timezone || 'UTC',
+          currency_display: currentTenant?.currency_display,
+          number_digits: currentTenant?.number_digits,
+          calendar: currentTenant?.calendar,
+        },
+        { isReprint },
+      );
+      showPrintWarningsToast(warnings);
+      try {
+        await api.post(`/bills/${bill.id}/print`, {
+          print_type: isReprint ? 'reprint' : 'receipt',
+        });
+      } catch {
+        /* best-effort history tracking */
+      }
+      await api.post(`/orders/${order.id}/request-bill`, {});
+      toast.success(tTables('statusBillRequested'));
+      fetchTables();
+      fetchOrders();
+    } catch {
+      toast.error(tTables('updateStatusFailed'));
+    } finally {
+      setBillBusy(false);
+    }
+  };
+
+  const handleUnrequestBill = async (tb: Table) => {
+    const order = activeOrderFor(tb);
+    if (!order) return;
+    try {
+      await api.post(`/orders/${order.id}/unrequest-bill`, {});
+      fetchTables();
+      fetchOrders();
+    } catch {
+      toast.error(tTables('updateStatusFailed'));
+    }
+  };
+
+  const mergeTargets = mergeSource
+    ? tables.filter(
+        (tb) =>
+          tb.id !== mergeSource.id &&
+          Boolean(activeOrderFor(tb)) &&
+          (displayTableStatus(tb.status) === 'occupied' ||
+            displayTableStatus(tb.status) === 'bill_requested'),
+      )
+    : [];
+
+  const confirmMerge = async () => {
+    if (!mergeSource || !mergeTarget || merging) return;
+    const sourceOrder = activeOrderFor(mergeSource);
+    const targetOrder = activeOrderFor(mergeTarget);
+    if (!sourceOrder || !targetOrder) return;
+    setMerging(true);
+    try {
+      await api.post(`/orders/${sourceOrder.id}/merge`, { target_order_id: targetOrder.id });
+      toast.success(tTables('mergeSuccess'));
+      setMergeSource(null);
+      setMergeTarget(null);
+      fetchTables();
+      fetchOrders();
+    } catch (error: unknown) {
+      const serverMessage = (
+        error as { response?: { data?: { error?: string } } }
+      )?.response?.data?.error;
+      toast.error(serverMessage || tTables('updateStatusFailed'));
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const namedFloors = [
     ...new Set(tables.map((table) => table.floor?.trim()).filter((f): f is string => Boolean(f))),
@@ -768,6 +906,20 @@ export default function TablesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-foreground">{tTables('title')}</h1>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="border-cyan-700 text-cyan-800 hover:bg-cyan-50 dark:border-cyan-500 dark:text-cyan-300 dark:hover:bg-cyan-950/40"
+            onClick={() => goQuickOrder('takeaway')}
+          >
+            {tTables('newTakeawayOrder')}
+          </Button>
+          <Button
+            variant="outline"
+            className="border-amber-600 text-amber-700 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-300 dark:hover:bg-amber-950/40"
+            onClick={() => goQuickOrder('delivery')}
+          >
+            {tTables('newDeliveryOrder')}
+          </Button>
           <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
             <button
               onClick={() => {
@@ -846,6 +998,11 @@ export default function TablesPage() {
               : undefined
           }
           onMoveTable={canMoveTable ? (tb) => setMovingTable(tb) : undefined}
+          onOpenWorkspace={goWorkspace}
+          onRequestBill={canGenerateBills ? handleRequestBill : undefined}
+          onUnrequestBill={canGenerateBills ? handleUnrequestBill : undefined}
+          onMerge={canMoveTable ? (tb) => setMergeSource(tb) : undefined}
+          onNewOrder={goNewOrder}
         />
       </div>
 
@@ -1010,14 +1167,17 @@ export default function TablesPage() {
                     const tableOrders = ordersByTable.get(table.id) || [];
                     const hasOrders = displaysOrderDetails && tableOrders.length > 0;
                     const canViewTableOrder = canReadOrders && hasOrders;
-                    const canMoveThisTable = canMoveTable && table.status === 'occupied';
+                    const shownStatus = displayTableStatus(table.status);
+                    const canMoveThisTable =
+                      canMoveTable && (shownStatus === 'occupied' || shownStatus === 'bill_requested');
                     const canMarkAvailable =
                       canManageTables &&
                       (table.status === 'occupied' ||
                         table.status === 'reserved' ||
-                        table.status === 'cleaning');
+                        table.status === 'cleaning' ||
+                        table.status === 'bill_requested');
                     const canReserveTable =
-                      canManageTables && Boolean(table.is_active) && table.status === 'available';
+                      canManageTables && Boolean(table.is_active) && shownStatus === 'available';
                     const showFooter =
                       canViewTableOrder || canMoveThisTable || canMarkAvailable || canReserveTable;
 
@@ -1039,14 +1199,21 @@ export default function TablesPage() {
                             {locationBadge(table, hideFloorInBadge)}
                           </div>
                           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                            {table.status === 'occupied' && table.seated_at && (
-                              <TableTurnoverBadge seatedAt={table.seated_at} />
-                            )}
+                            {(shownStatus === 'occupied' || shownStatus === 'bill_requested') &&
+                              table.seated_at && (
+                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                                  {tTables('openedFirstOrder')} ·{' '}
+                                  {new Date(table.seated_at).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              )}
                             <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted text-foreground">
                               <span
-                                className={`w-2 h-2 rounded-full ${statusColors[table.status]}`}
+                                className={`w-2 h-2 rounded-full ${statusColors[shownStatus]}`}
                               />
-                              {tTables(TABLE_STATUS_LABEL_KEYS[table.status])}
+                              {tTables(TABLE_STATUS_LABEL_KEYS[shownStatus])}
                             </span>
                             {canManageTables && (
                               <div className="flex items-center gap-2">
@@ -1798,6 +1965,87 @@ export default function TablesPage() {
                 {floorActionSaving ? tCommon('saving') : tTables('deleteFloorConfirm')}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {mergeSource && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+          onClick={() => {
+            setMergeSource(null);
+            setMergeTarget(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={tTables('mergeWith')}
+          >
+            <h2 className="text-base font-bold text-foreground">
+              {tTables('mergeWith')} · {mergeSource.name}
+            </h2>
+            {!mergeTarget ? (
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">{tTables('mergePickTarget')}</p>
+                <div className="mt-4 space-y-2">
+                  {mergeTargets.length === 0 && (
+                    <p className="text-sm text-muted-foreground">{tTables('mergeNoTargets')}</p>
+                  )}
+                  {mergeTargets.map((tb) => {
+                    const o = activeOrderFor(tb);
+                    return (
+                      <button
+                        key={tb.id}
+                        type="button"
+                        onClick={() => setMergeTarget(tb)}
+                        className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground hover:bg-accent"
+                      >
+                        <span>
+                          {tb.name} · #{o?.order_number}
+                        </span>
+                        <span className="font-bold">{fmt(o?.total ?? 0)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {tTables('mergeConfirm', {
+                    source: `#${activeOrderFor(mergeSource)?.order_number ?? ''} (${mergeSource.name})`,
+                    target: `#${activeOrderFor(mergeTarget)?.order_number ?? ''} (${mergeTarget.name})`,
+                  })}
+                </p>
+                <div className="mt-5 flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setMergeTarget(null)}
+                    disabled={merging}
+                  >
+                    {tCommon('back')}
+                  </Button>
+                  <Button className="flex-1" onClick={confirmMerge} disabled={merging}>
+                    {merging ? tCommon('saving') : tTables('mergeWith')}
+                  </Button>
+                </div>
+              </>
+            )}
+            <Button
+              variant="ghost"
+              className="mt-3 w-full"
+              onClick={() => {
+                setMergeSource(null);
+                setMergeTarget(null);
+              }}
+              disabled={merging}
+            >
+              {tCommon('cancel')}
+            </Button>
           </div>
         </div>
       )}

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Isara muna ang bukas na shift #{id} ({name}) bago isara ang araw ng negosyong ito.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# bukas na order ang ililipat sa susunod na shift} other {# bukas na mga order ang ililipat sa susunod na shift}}",
     "shiftCloseUnpaidWarningHint": "Mananatiling bukas ang mga order na ito para sa susunod na shift. Ang pagsasara ng shift na ito ay nagtutugma lamang sa mga bayad na cash na nakolekta na sa shift na ito.",
-    "shiftCloseUnpaidMoreCount": "+{count} pang bukas na order"
+    "shiftCloseUnpaidMoreCount": "+{count} pang bukas na order",
+    "tableBillRequested": "Hiniling ang bill"
   },
   "printTest": {
     "amt": "Halaga",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Pumili ng pupuntahang mesa",
     "tableMovedSuccess": "Nailipat ang order mula {from} patungong {to}",
     "tableMoveFailed": "Nabigong ilipat ang order sa mesa",
-    "targetTableOccupied": "May aktibong order na ang pupuntahang mesa"
+    "targetTableOccupied": "May aktibong order na ang pupuntahang mesa",
+    "statusBillRequested": "Hiniling ang bill",
+    "backToTables": "Bumalik sa mga mesa",
+    "newTakeawayOrder": "Bagong takeaway order",
+    "newDeliveryOrder": "Bagong delivery order",
+    "openOrder": "Buksan ang order",
+    "requestBill": "Humiling ng bill",
+    "unrequestBill": "Bawiin ang kahilingan sa bill",
+    "mergeWith": "Isama sa…",
+    "mergePickTarget": "Piliin ang mesa kung saan isasama ang order na ito",
+    "mergeConfirm": "Ang mga item mula sa order {source} ay lilipat sa order {target} at ang unang order ay isasara.",
+    "mergeSuccess": "Pinagsama ang mga order",
+    "mergeNoTargets": "Walang ibang aktibong order na pagasamahin",
+    "openedFirstOrder": "Binuksan ang unang order",
+    "newOrder": "Bagong order"
   },
   "tax": {
     "actionActivate": "Na-activate ang pack",

@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "यो व्यावसायिक दिन बन्द गर्नुअघि खुला सिफ्ट #{id} ({name}) बन्द गर्नुहोस्।",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# खुला अर्डर अर्को सिफ्टमा सर्नेछ} other {# खुला अर्डरहरू अर्को सिफ्टमा सर्नेछन्}}",
     "shiftCloseUnpaidWarningHint": "यी अर्डरहरू अर्को सिफ्टका लागि खुला नै रहन्छन्। यो सिफ्ट बन्द गर्दा यस सिफ्टमा पहिले नै संकलन गरिएका नगद भुक्तानी मात्र मिलान गरिन्छ।",
-    "shiftCloseUnpaidMoreCount": "+थप {count} खुला अर्डरहरू"
+    "shiftCloseUnpaidMoreCount": "+थप {count} खुला अर्डरहरू",
+    "tableBillRequested": "बिल अनुरोध गरियो"
   },
   "printTest": {
     "amt": "रकम",
@@ -2977,7 +2978,21 @@
     "selectDestinationTable": "गन्तव्य टेबल चयन गर्नुहोस्",
     "tableMovedSuccess": "अर्डर {from} बाट {to} मा सारियो",
     "tableMoveFailed": "टेबल अर्डर सार्न असफल भयो",
-    "targetTableOccupied": "गन्तव्य टेबलमा पहिले नै सक्रिय अर्डर छ"
+    "targetTableOccupied": "गन्तव्य टेबलमा पहिले नै सक्रिय अर्डर छ",
+    "statusBillRequested": "बिल अनुरोध गरियो",
+    "backToTables": "टेबलहरूमा फर्कनुहोस्",
+    "newTakeawayOrder": "नयाँ टेकअवे अर्डर",
+    "newDeliveryOrder": "नयाँ डेलिभरी अर्डर",
+    "openOrder": "अर्डर खोल्नुहोस्",
+    "requestBill": "बिल अनुरोध गर्नुहोस्",
+    "unrequestBill": "बिल अनुरोध रद्द गर्नुहोस्",
+    "mergeWith": "यससँग मर्ज गर्नुहोस्…",
+    "mergePickTarget": "यो अर्डर मर्ज गरिने टेबल छान्नुहोस्",
+    "mergeConfirm": "अर्डर {source} का आइटमहरू अर्डर {target} मा सर्नेछन् र पहिलो अर्डर बन्द हुनेछ।",
+    "mergeSuccess": "अर्डरहरू मर्ज गरियो",
+    "mergeNoTargets": "मर्ज गर्न अन्य कुनै सक्रिय अर्डर छैन",
+    "openedFirstOrder": "पहिलो अर्डर खोलियो",
+    "newOrder": "नयाँ अर्डर"
   },
   "tax": {
     "actionActivate": "प्याक सक्रिय गरियो",

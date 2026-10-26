@@ -16,7 +16,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Sparkles,
+  Receipt,
   Table2,
   Trash2,
   Users,
@@ -24,8 +24,15 @@ import {
 import type { Order, Table } from '@/lib/types';
 import { useTranslations } from 'use-intl';
 import { TABLE_STATUS_LABEL_KEYS } from '@/lib/i18n';
-import { TableTurnoverBadge } from '@/components/tables/TableTurnoverBadge';
+import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { Ltr } from '@/components/layout/Ltr';
+
+const formatClock = (iso: string): string => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 type XY = { x: number; y: number } | null;
 
@@ -35,6 +42,7 @@ const statusRing: Record<Table['status'], string> = {
   reserved: 'border-amber-500',
   cleaning: 'border-gray-400',
   held: 'border-sky-500',
+  bill_requested: 'border-orange-500',
 };
 
 const statusText: Record<Table['status'], string> = {
@@ -43,6 +51,7 @@ const statusText: Record<Table['status'], string> = {
   reserved: 'text-amber-600',
   cleaning: 'text-gray-500',
   held: 'text-sky-600',
+  bill_requested: 'text-orange-600',
 };
 
 const statusDot: Record<Table['status'], string> = {
@@ -51,9 +60,17 @@ const statusDot: Record<Table['status'], string> = {
   reserved: 'bg-amber-500',
   cleaning: 'bg-gray-400',
   held: 'bg-sky-500',
+  bill_requested: 'bg-orange-500',
 };
 
-const LEGEND: Table['status'][] = ['available', 'occupied', 'reserved', 'cleaning', 'held'];
+// 'cleaning' is retired from the user experience (owner decision): it stays
+// in storage and in these maps for completeness, but it never appears in the
+// legend, in status actions, or as a label — a table stored as cleaning is
+// presented and treated as available.
+const LEGEND: Table['status'][] = ['available', 'occupied', 'bill_requested', 'reserved', 'held'];
+
+const displayStatus = (tb: Table): Table['status'] =>
+  tb.status === 'cleaning' ? 'available' : tb.status;
 
 const ALL_FLOORS = '__all__';
 
@@ -212,6 +229,11 @@ export default function FloorplanEditor({
   onReserve,
   onViewOrder,
   onMoveTable,
+  onOpenWorkspace,
+  onRequestBill,
+  onUnrequestBill,
+  onMerge,
+  onNewOrder,
 }: {
   mode: 'edit' | 'service';
   canManage?: boolean;
@@ -221,10 +243,17 @@ export default function FloorplanEditor({
   onReserve?: (tb: Table) => void;
   onViewOrder?: (tb: Table) => void;
   onMoveTable?: (tb: Table) => void;
+  onOpenWorkspace?: (tb: Table) => void;
+  onRequestBill?: (tb: Table) => void;
+  onUnrequestBill?: (tb: Table) => void;
+  onMerge?: (tb: Table) => void;
+  onNewOrder?: (tb: Table) => void;
 }) {
   const edit = mode === 'edit' && canManage;
   const t = useTranslations('tables');
   const tCommon = useTranslations('common');
+  const tOrders = useTranslations('orders');
+  const fmt = useFormatCurrency();
   const canvasRef = useRef<HTMLDivElement>(null);
   const trayRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragCtx | null>(null);
@@ -241,6 +270,7 @@ export default function FloorplanEditor({
   const [floorForm, setFloorForm] = useState({ name: '', tableName: '', capacity: '4' });
   const [floorFormSaving, setFloorFormSaving] = useState(false);
   const [actionTable, setActionTable] = useState<Table | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   // Floor management state — Issue #646.
   const [floorMenuFor, setFloorMenuFor] = useState<string | null>(null);
   const [floorRenameOpen, setFloorRenameOpen] = useState<{ from: string; to: string } | null>(null);
@@ -520,7 +550,10 @@ export default function FloorplanEditor({
   };
 
   const canOpenActionSheet = (tb: Table) =>
-    canManage || (tb.status === 'occupied' && (!!onViewOrder || !!onMoveTable));
+    canManage ||
+    (!!onOpenWorkspace || !!onRequestBill || !!onMerge || !!onNewOrder
+      ? Boolean(tb.is_active)
+      : tb.status === 'occupied' && (!!onViewOrder || !!onMoveTable));
   const openActionSheet = (tb: Table) => {
     if (canOpenActionSheet(tb)) setActionTable(tb);
   };
@@ -751,9 +784,21 @@ export default function FloorplanEditor({
   }) => {
     const { w, h, round } = shapeFor(tb.capacity, scale);
     const chairs = chairPoints(tb.capacity, w, h, round);
+    const shown = displayStatus(tb);
     const reservedName = tb.status === 'reserved' ? tb.reservation_customer_name : null;
     const activeOrder = activeOrderOf(tb);
     const seatedAt = tb.seated_at || activeOrder?.created_at;
+    const showHint =
+      hoverId === tb.id &&
+      !edit &&
+      (shown === 'occupied' || shown === 'bill_requested') &&
+      Boolean(activeOrder);
+    const hintItems = activeOrder?.items ?? [];
+    const hintCounts = {
+      pending: hintItems.filter((i) => i.status === 'pending').length,
+      preparing: hintItems.filter((i) => i.status === 'preparing').length,
+      ready: hintItems.filter((i) => i.status === 'ready').length,
+    };
 
     return (
       <div className="relative" data-seats={tb.capacity} style={{ width: w, height: h }}>
@@ -769,7 +814,7 @@ export default function FloorplanEditor({
         <div
           className={`flex h-full w-full flex-col items-center justify-center gap-0.5 bg-card px-1 ${
             round ? 'rounded-full' : 'rounded-xl'
-          } border-[3px] ${statusRing[tb.status]} ${dragging ? 'shadow-2xl' : 'shadow-md'}`}
+          } border-[3px] ${statusRing[shown]} ${dragging ? 'shadow-2xl' : 'shadow-md'}`}
         >
           <span
             className={`max-w-full truncate font-bold leading-tight text-foreground ${scale < 1 ? 'text-[9px]' : 'text-[13px]'}`}
@@ -779,14 +824,14 @@ export default function FloorplanEditor({
           {scale >= 1 && (
             <>
               <span
-                className={`text-[9px] font-semibold uppercase tracking-wide ${statusText[tb.status]}`}
+                className={`text-[9px] font-semibold uppercase tracking-wide ${statusText[shown]}`}
               >
-                {t(TABLE_STATUS_LABEL_KEYS[tb.status])}
+                {t(TABLE_STATUS_LABEL_KEYS[shown])}
               </span>
-              {tb.status === 'occupied' && seatedAt && (
-                <div className="max-w-full truncate">
-                  <TableTurnoverBadge seatedAt={seatedAt} />
-                </div>
+              {(shown === 'occupied' || shown === 'bill_requested') && seatedAt && (
+                <span className="max-w-full truncate text-[9px] font-medium text-muted-foreground">
+                  {t('openedFirstOrder')} · <Ltr>{formatClock(seatedAt)}</Ltr>
+                </span>
               )}
               {activeOrder && (
                 <span className="max-w-full truncate text-[9px] font-semibold text-muted-foreground">
@@ -804,6 +849,51 @@ export default function FloorplanEditor({
             </>
           )}
         </div>
+        {showHint && activeOrder && (
+          <div className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-2 w-60 -translate-x-1/2 rtl:translate-x-1/2 rounded-xl bg-neutral-900 p-3 text-start text-white shadow-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold">
+                {tb.name}
+              </span>
+              <span className="text-xs font-semibold text-amber-400">
+                <Ltr>#{activeOrder.order_number}</Ltr>
+              </span>
+            </div>
+            <div className="mt-1.5 space-y-1 text-xs text-neutral-300">
+              <p>
+                {t('openedFirstOrder')} · <Ltr>{formatClock(activeOrder.created_at)}</Ltr>
+              </p>
+              {typeof activeOrder.guest_count === 'number' && activeOrder.guest_count > 0 && (
+                <p>
+                  {tOrders('guestCount')}: <Ltr>{activeOrder.guest_count}</Ltr>
+                </p>
+              )}
+            </div>
+            {hintItems.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {hintCounts.pending > 0 && (
+                  <span className="rounded-full bg-neutral-700 px-2 py-0.5 text-[10px] font-semibold">
+                    {tOrders('itemStatusPending')} · <Ltr>{hintCounts.pending}</Ltr>
+                  </span>
+                )}
+                {hintCounts.preparing > 0 && (
+                  <span className="rounded-full bg-neutral-700 px-2 py-0.5 text-[10px] font-semibold">
+                    {tOrders('itemStatusPreparing')} · <Ltr>{hintCounts.preparing}</Ltr>
+                  </span>
+                )}
+                {hintCounts.ready > 0 && (
+                  <span className="rounded-full bg-emerald-800 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
+                    {tOrders('itemStatusReady')} · <Ltr>{hintCounts.ready}</Ltr>
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-between border-t border-neutral-700 pt-2 text-sm">
+              <span className="text-neutral-300">{tCommon('total')}</span>
+              <span className="font-bold text-amber-400">{fmt(activeOrder.total ?? 0)}</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -821,6 +911,57 @@ export default function FloorplanEditor({
 
   const sheetActionsFor = (tb: Table) => {
     const actions: Array<{ label: string; icon: React.ReactNode; run: () => void }> = [];
+    const shown = displayStatus(tb);
+    if ((shown === 'occupied' || shown === 'bill_requested') && onOpenWorkspace) {
+      actions.push({
+        label: t('openOrder'),
+        icon: <Eye size={15} />,
+        run: () => {
+          setActionTable(null);
+          onOpenWorkspace(tb);
+        },
+      });
+    }
+    if (shown === 'occupied' && onRequestBill) {
+      actions.push({
+        label: t('requestBill'),
+        icon: <Receipt size={15} />,
+        run: () => {
+          setActionTable(null);
+          onRequestBill(tb);
+        },
+      });
+    }
+    if (shown === 'bill_requested' && onUnrequestBill) {
+      actions.push({
+        label: t('unrequestBill'),
+        icon: <Receipt size={15} />,
+        run: () => {
+          setActionTable(null);
+          onUnrequestBill(tb);
+        },
+      });
+    }
+    if ((shown === 'occupied' || shown === 'bill_requested') && onMerge) {
+      actions.push({
+        label: t('mergeWith'),
+        icon: <ArrowRightLeft size={15} />,
+        run: () => {
+          setActionTable(null);
+          onMerge(tb);
+        },
+      });
+    }
+    if ((shown === 'available' || shown === 'reserved') && onNewOrder) {
+      actions.push({
+        label: t('newOrder'),
+        icon: <Plus size={15} />,
+        run: () => {
+          setActionTable(null);
+          onNewOrder(tb);
+        },
+      });
+    }
     if (tb.status === 'occupied' && onViewOrder) {
       actions.push({
         label: t('viewOrder'),
@@ -842,7 +983,7 @@ export default function FloorplanEditor({
       });
     }
     if (canManage) {
-      if (tb.status === 'available') {
+      if (shown === 'available') {
         actions.push({
           label: t('reserveTable'),
           icon: <Users size={15} />,
@@ -850,11 +991,6 @@ export default function FloorplanEditor({
             setActionTable(null);
             onReserve?.(tb);
           },
-        });
-        actions.push({
-          label: t('markCleaning'),
-          icon: <Sparkles size={15} />,
-          run: () => setTableStatus(tb, 'cleaning'),
         });
       }
       if (tb.status !== 'available' && tb.status !== 'occupied') {
@@ -896,9 +1032,11 @@ export default function FloorplanEditor({
         role={interactive ? 'button' : undefined}
         tabIndex={interactive ? 0 : undefined}
         data-testid={`floorplan-chip-${tb.name}`}
-        aria-label={`${tb.name} — ${t(TABLE_STATUS_LABEL_KEYS[tb.status])}. ${t('floorplanAriaHint')}`}
+        aria-label={`${tb.name} — ${t(TABLE_STATUS_LABEL_KEYS[displayStatus(tb)])}. ${t('floorplanAriaHint')}`}
         aria-keyshortcuts={interactive ? 'Enter ArrowUp ArrowDown ArrowLeft ArrowRight' : undefined}
         title={interactive ? t('floorplanEditHint') : undefined}
+        onMouseEnter={() => setHoverId(tb.id)}
+        onMouseLeave={() => setHoverId((cur) => (cur === tb.id ? null : cur))}
         onPointerDown={startDrag(tb)}
         onPointerMove={onDragMove}
         onPointerUp={endDrag}
@@ -1299,11 +1437,11 @@ export default function FloorplanEditor({
                   onClick={!edit && canOpenActionSheet(tb) ? () => openActionSheet(tb) : undefined}
                   onKeyDown={edit || canOpenActionSheet(tb) ? onChipKeyDown(tb, true) : undefined}
                   className={`flex select-none items-center gap-2.5 rounded-xl border-2 bg-card px-3 py-2 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                    statusRing[tb.status]
+                    statusRing[displayStatus(tb)]
                   } ${edit ? 'cursor-grab touch-none' : canOpenActionSheet(tb) ? 'cursor-pointer' : 'cursor-default'} ${dragId === tb.id ? 'opacity-40' : ''}`}
                 >
                   <span
-                    className={`h-7 w-7 rounded-lg border-2 ${statusRing[tb.status]} ${tb.capacity <= 2 ? 'rounded-full' : ''}`}
+                    className={`h-7 w-7 rounded-lg border-2 ${statusRing[displayStatus(tb)]} ${tb.capacity <= 2 ? 'rounded-full' : ''}`}
                   />
                   <span className="text-sm font-bold text-foreground">
                     <Ltr>{tb.name}</Ltr>
@@ -1329,28 +1467,72 @@ export default function FloorplanEditor({
             aria-label={actionTable.name}
           >
             <div className="mb-4 flex items-center gap-3">
-              <span className={`h-3 w-3 rounded-full ${statusDot[actionTable.status]}`} />
+              <span className={`h-3 w-3 rounded-full ${statusDot[displayStatus(actionTable)]}`} />
               <div>
                 <p className="text-base font-bold text-foreground">
                   <Ltr>{actionTable.name}</Ltr>
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p
-                    className={`text-xs font-semibold uppercase tracking-wide ${statusText[actionTable.status]}`}
+                    className={`text-xs font-semibold uppercase tracking-wide ${statusText[displayStatus(actionTable)]}`}
                   >
-                    {t(TABLE_STATUS_LABEL_KEYS[actionTable.status])} · {seats(actionTable.capacity)}
+                    {t(TABLE_STATUS_LABEL_KEYS[displayStatus(actionTable)])} ·{' '}
+                    {seats(actionTable.capacity)}
                   </p>
-                  {actionTable.status === 'occupied' &&
+                  {(displayStatus(actionTable) === 'occupied' ||
+                    displayStatus(actionTable) === 'bill_requested') &&
                     (actionTable.seated_at || activeOrderOf(actionTable)?.created_at) && (
-                      <TableTurnoverBadge
-                        seatedAt={
-                          (actionTable.seated_at || activeOrderOf(actionTable)?.created_at)!
-                        }
-                      />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('openedFirstOrder')} ·{' '}
+                        <Ltr>
+                          {formatClock(
+                            (actionTable.seated_at || activeOrderOf(actionTable)?.created_at)!,
+                          )}
+                        </Ltr>
+                      </span>
                     )}
                 </div>
               </div>
             </div>
+            {(() => {
+              const sheetOrder = activeOrderOf(actionTable);
+              if (!sheetOrder) return null;
+              const items = sheetOrder.items ?? [];
+              const counts = {
+                pending: items.filter((i) => i.status === 'pending').length,
+                preparing: items.filter((i) => i.status === 'preparing').length,
+                ready: items.filter((i) => i.status === 'ready').length,
+              };
+              return (
+                <div className="mb-4 rounded-xl border border-border bg-muted/40 p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-foreground">
+                      <Ltr>#{sheetOrder.order_number}</Ltr>
+                    </span>
+                    <span className="font-bold text-foreground">{fmt(sheetOrder.total ?? 0)}</span>
+                  </div>
+                  {items.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {counts.pending > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                          {tOrders('itemStatusPending')} · <Ltr>{counts.pending}</Ltr>
+                        </span>
+                      )}
+                      {counts.preparing > 0 && (
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">
+                          {tOrders('itemStatusPreparing')} · <Ltr>{counts.preparing}</Ltr>
+                        </span>
+                      )}
+                      {counts.ready > 0 && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          {tOrders('itemStatusReady')} · <Ltr>{counts.ready}</Ltr>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="space-y-2">
               {sheetActionsFor(actionTable).map((a) => (
                 <button

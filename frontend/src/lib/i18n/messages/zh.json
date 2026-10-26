@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "请在日结此营业日之前先关闭未关班次 #{id}（{name}）。",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 笔未结订单将结转至下一班次} other {# 笔未结订单将结转至下一班次}}",
     "shiftCloseUnpaidWarningHint": "这些订单将保持开启并交接给下一班次。关闭本班次仅核对本班次期间已收取的现金付款。",
-    "shiftCloseUnpaidMoreCount": "另有 +{count} 笔未结订单"
+    "shiftCloseUnpaidMoreCount": "另有 +{count} 笔未结订单",
+    "tableBillRequested": "已请求账单"
   },
   "printTest": {
     "amt": "金额",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "选择目标桌位",
     "tableMovedSuccess": "订单已从 {from} 移至 {to}",
     "tableMoveFailed": "移动桌位订单失败",
-    "targetTableOccupied": "目标桌位已有进行中的订单"
+    "targetTableOccupied": "目标桌位已有进行中的订单",
+    "statusBillRequested": "已请求账单",
+    "backToTables": "返回桌台",
+    "newTakeawayOrder": "新的外带订单",
+    "newDeliveryOrder": "新的外送订单",
+    "openOrder": "打开订单",
+    "requestBill": "请求账单",
+    "unrequestBill": "撤销账单请求",
+    "mergeWith": "合并到…",
+    "mergePickTarget": "选择要将此订单合并到的桌台",
+    "mergeConfirm": "订单 {source} 的项目将移至订单 {target}，第一个订单将关闭。",
+    "mergeSuccess": "订单已合并",
+    "mergeNoTargets": "没有其他可合并的活动订单",
+    "openedFirstOrder": "第一个订单已打开",
+    "newOrder": "新订单"
   },
   "tax": {
     "actionActivate": "税务包已激活",

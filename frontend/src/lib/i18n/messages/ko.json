@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "이 영업일을 마감하기 전에 열려 있는 교대근무 #{id}({name})를 마감하세요.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {미결제 주문 #건이 다음 교대근무로 이월됩니다} other {미결제 주문 #건이 다음 교대근무로 이월됩니다}}",
     "shiftCloseUnpaidWarningHint": "이 주문들은 다음 교대근무를 위해 열린 상태로 유지됩니다. 이번 교대근무 마감은 이번 교대근무 중에 이미 수납된 현금 결제만 정산합니다.",
-    "shiftCloseUnpaidMoreCount": "+{count}건의 미결제 주문 더보기"
+    "shiftCloseUnpaidMoreCount": "+{count}건의 미결제 주문 더보기",
+    "tableBillRequested": "계산서 요청됨"
   },
   "printTest": {
     "amt": "금액",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "이동할 대상 테이블 선택",
     "tableMovedSuccess": "주문이 {from} 에서 {to} (으)로 이동되었습니다",
     "tableMoveFailed": "테이블 주문 이동 실패",
-    "targetTableOccupied": "대상 테이블에 이미 활성 주문이 있습니다"
+    "targetTableOccupied": "대상 테이블에 이미 활성 주문이 있습니다",
+    "statusBillRequested": "계산서 요청됨",
+    "backToTables": "테이블로 돌아가기",
+    "newTakeawayOrder": "새 포장 주문",
+    "newDeliveryOrder": "새 배달 주문",
+    "openOrder": "주문 열기",
+    "requestBill": "계산서 요청",
+    "unrequestBill": "계산서 요청 취소",
+    "mergeWith": "다음과 병합…",
+    "mergePickTarget": "이 주문을 병합할 테이블을 선택하세요",
+    "mergeConfirm": "주문 {source}의 항목이 주문 {target}(으)로 이동하고 첫 번째 주문이 종료됩니다.",
+    "mergeSuccess": "주문이 병합되었습니다",
+    "mergeNoTargets": "병합할 다른 활성 주문이 없습니다",
+    "openedFirstOrder": "첫 주문이 열렸습니다",
+    "newOrder": "새 주문"
   },
   "tax": {
     "actionActivate": "세금 팩이 활성화되었습니다",

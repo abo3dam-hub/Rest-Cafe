@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "請在日結此營業日之前先關閉未關班次 #{id}（{name}）。",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 筆未結訂單將結轉至下一班次} other {# 筆未結訂單將結轉至下一班次}}",
     "shiftCloseUnpaidWarningHint": "這些訂單將保持開啟並交接給下一班次。關閉本班次僅核對本班次期間已收取的現金付款。",
-    "shiftCloseUnpaidMoreCount": "另有 +{count} 筆未結訂單"
+    "shiftCloseUnpaidMoreCount": "另有 +{count} 筆未結訂單",
+    "tableBillRequested": "已請求帳單"
   },
   "printTest": {
     "amt": "金額",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "選擇目標桌位",
     "tableMovedSuccess": "訂單已從 {from} 移至 {to}",
     "tableMoveFailed": "移動桌位訂單失敗",
-    "targetTableOccupied": "目標桌位已有進行中的訂單"
+    "targetTableOccupied": "目標桌位已有進行中的訂單",
+    "statusBillRequested": "已請求帳單",
+    "backToTables": "返回桌台",
+    "newTakeawayOrder": "新的外帶訂單",
+    "newDeliveryOrder": "新的外送訂單",
+    "openOrder": "打開訂單",
+    "requestBill": "請求帳單",
+    "unrequestBill": "撤銷帳單請求",
+    "mergeWith": "合併到…",
+    "mergePickTarget": "選擇要將此訂單合併到的桌台",
+    "mergeConfirm": "訂單 {source} 的項目將移至訂單 {target}，第一個訂單將關閉。",
+    "mergeSuccess": "訂單已合併",
+    "mergeNoTargets": "沒有其他可合併的活動訂單",
+    "openedFirstOrder": "第一個訂單已打開",
+    "newOrder": "新訂單"
   },
   "tax": {
     "actionActivate": "稅務包已啟用",

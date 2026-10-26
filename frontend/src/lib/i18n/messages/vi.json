@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Hãy đóng ca đang mở #{id} ({name}) trước khi chốt ngày kinh doanh này.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# đơn đang mở sẽ chuyển sang ca tiếp theo} other {# đơn đang mở sẽ chuyển sang ca tiếp theo}}",
     "shiftCloseUnpaidWarningHint": "Các đơn này vẫn mở cho ca tiếp theo. Việc đóng ca này chỉ đối soát các khoản tiền mặt đã thu trong ca này.",
-    "shiftCloseUnpaidMoreCount": "+{count} đơn đang mở khác"
+    "shiftCloseUnpaidMoreCount": "+{count} đơn đang mở khác",
+    "tableBillRequested": "Đã yêu cầu hóa đơn"
   },
   "printTest": {
     "amt": "Số tiền",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Chọn bàn đích",
     "tableMovedSuccess": "Đã chuyển đơn hàng từ {from} sang {to}",
     "tableMoveFailed": "Không thể chuyển đơn hàng bàn",
-    "targetTableOccupied": "Bàn đích đã có đơn hàng đang hoạt động"
+    "targetTableOccupied": "Bàn đích đã có đơn hàng đang hoạt động",
+    "statusBillRequested": "Đã yêu cầu hóa đơn",
+    "backToTables": "Quay lại danh sách bàn",
+    "newTakeawayOrder": "Đơn mang về mới",
+    "newDeliveryOrder": "Đơn giao hàng mới",
+    "openOrder": "Mở đơn",
+    "requestBill": "Yêu cầu hóa đơn",
+    "unrequestBill": "Hủy yêu cầu hóa đơn",
+    "mergeWith": "Gộp với…",
+    "mergePickTarget": "Chọn bàn để gộp đơn này vào",
+    "mergeConfirm": "Các món từ đơn {source} sẽ chuyển sang đơn {target} và đơn đầu tiên sẽ đóng.",
+    "mergeSuccess": "Đã gộp đơn",
+    "mergeNoTargets": "Không có đơn đang hoạt động khác để gộp",
+    "openedFirstOrder": "Đơn đầu tiên đã mở",
+    "newOrder": "Đơn mới"
   },
   "tax": {
     "actionActivate": "Đã kích hoạt gói",

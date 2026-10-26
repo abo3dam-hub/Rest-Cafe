@@ -1198,7 +1198,8 @@
     "dayCloseBlockedByOpenShiftHint": "Закройте открытую смену #{id} ({name}) перед закрытием этого операционного дня.",
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# открытый заказ перейдет в следующую смену} other {# открытых заказов перейдут в следующую смену}}",
     "shiftCloseUnpaidWarningHint": "Эти заказы остаются открытыми для следующей смены. Закрытие этой смены сверяет только наличные платежи, уже принятые в течение этой смены.",
-    "shiftCloseUnpaidMoreCount": "+ещё {count} открытых заказов"
+    "shiftCloseUnpaidMoreCount": "+ещё {count} открытых заказов",
+    "tableBillRequested": "Счёт запрошен"
   },
   "printTest": {
     "amt": "Сумма",
@@ -2990,7 +2991,21 @@
     "selectDestinationTable": "Выберите стол назначения",
     "tableMovedSuccess": "Заказ перенесен с {from} на {to}",
     "tableMoveFailed": "Не удалось перенести заказ стола",
-    "targetTableOccupied": "За столом назначения уже есть активный заказ"
+    "targetTableOccupied": "За столом назначения уже есть активный заказ",
+    "statusBillRequested": "Счёт запрошен",
+    "backToTables": "Назад к столам",
+    "newTakeawayOrder": "Новый заказ на вынос",
+    "newDeliveryOrder": "Новый заказ на доставку",
+    "openOrder": "Открыть заказ",
+    "requestBill": "Запросить счёт",
+    "unrequestBill": "Отменить запрос счёта",
+    "mergeWith": "Объединить с…",
+    "mergePickTarget": "Выберите стол, в который будет объединён этот заказ",
+    "mergeConfirm": "Позиции из заказа {source} будут перемещены в заказ {target}, а первый заказ будет закрыт.",
+    "mergeSuccess": "Заказы объединены",
+    "mergeNoTargets": "Нет других активных заказов для объединения",
+    "openedFirstOrder": "Первый заказ открыт",
+    "newOrder": "Новый заказ"
   },
   "tax": {
     "actionActivate": "Пакет активирован",
