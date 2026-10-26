@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useTranslations, useLocale, type AppConfig } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
+import { getLandingPage } from '@/components/layout/AuthGuard';
 import { CashCloseModal } from '@/components/dashboard/CashCloseModal';
 import { useCashClose } from '@/hooks/useCashClose';
 import toast from 'react-hot-toast';
@@ -307,7 +308,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (currentTenant && !isOwner) {
-      router.replace('/pos');
+      router.replace(getLandingPage(currentTenant));
     }
   }, [currentTenant, isOwner, router]);
 

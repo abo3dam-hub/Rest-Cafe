@@ -27,6 +27,14 @@ export const LANDING_PAGE_CANDIDATES = [
 ] as const;
 
 export function getLandingPage(tenant?: Tenant | null): string {
+  // Floor roles work from the table map (owner decision, 2026-10-26): the
+  // cashier and the waiter land on the tables, not the dashboard or POS.
+  if (
+    (tenant?.role === 'cashier' || tenant?.role === 'server') &&
+    tenantCan(tenant, 'tables.view')
+  ) {
+    return '/tables';
+  }
   return (
     LANDING_PAGE_CANDIDATES.find(([permission]) => tenantCan(tenant, permission))?.[1] ??
     '/auth/login'

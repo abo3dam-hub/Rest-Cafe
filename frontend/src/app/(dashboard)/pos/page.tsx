@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
@@ -235,6 +236,7 @@ const parsePrepaidPaymentRequest = (serialized: string): PrepaidPaymentRequest |
 };
 
 export default function POSPage() {
+  const router = useRouter();
   const { currentTenant, user } = useAuthStore();
   const isRestaurant = (currentTenant?.business_type ?? 'restaurant') === 'restaurant';
   const cart = useCartStore();
@@ -254,6 +256,7 @@ export default function POSPage() {
   const tExpenses = useTranslations('expenses');
   const tCommon = useTranslations('common');
   const tSupport = useTranslations('support');
+  const tTables = useTranslations('tables');
   const currencyFmt = useFormatCurrency();
   const { confirm, ConfirmDialog, isConfirmOpen } = useConfirm();
   const cashDrawer = useCashDrawerMovements();
@@ -293,6 +296,21 @@ export default function POSPage() {
   const [cardTransactionIdRequired, setCardTransactionIdRequired] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  // Cashier table workspace: POS opened from the table map carries the
+  // table (and its active order) in the query string.
+  const [wsParams] = useState(() => {
+    if (typeof window === 'undefined') return { table: '', hall: '', order: '' };
+    const q = new URLSearchParams(window.location.search);
+    return {
+      table: q.get('table') || '',
+      hall: q.get('hall') || '',
+      order: q.get('order') || '',
+    };
+  });
+  const [wsTable, setWsTable] = useState<Table | null>(null);
+  const [wsOrder, setWsOrder] = useState<Order | null>(null);
+  const [wsBillBusy, setWsBillBusy] = useState(false);
+  const wsInitRef = useRef(false);
   const [supportError, setSupportError] = useState<{
     title: string;
     subject: string;
@@ -2143,6 +2161,80 @@ export default function POSPage() {
     });
   };
 
+  // Workspace entry: bind the cart to the table from the map, and when the
+  // table already has an active order, switch the cart into append mode on
+  // that order through the same path the table checkout modal uses.
+  useEffect(() => {
+    if (wsInitRef.current || !wsParams.table || tables.length === 0) return;
+    const table = tables.find((tb) => String(tb.id) === wsParams.table);
+    if (!table) return;
+    wsInitRef.current = true;
+    setWsTable(table);
+    cart.setOrderType('dine_in');
+    cart.setTableId(table.id);
+    if (wsParams.order) {
+      void (async () => {
+        try {
+          const { data } = await api.get(`/orders/${wsParams.order}`);
+          const order = data.order as Order;
+          setWsOrder(order);
+          handleAddItemsToOrder(table, order);
+        } catch {
+          toast.error(t('loadOrderFailed'));
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tables, wsParams]);
+
+  const handleWsRequestBill = async () => {
+    if (!wsOrder || !wsTable || wsBillBusy) return;
+    setWsBillBusy(true);
+    try {
+      const { data } = await api.post('/bills/generate', { order_id: wsOrder.id });
+      const bill = data.bill as Bill;
+      const isReprint = Boolean(bill.printed_at);
+      const warnings = await printBill(
+        bill,
+        {
+          business_name: currentTenant?.business_name || tCommon('businessNameFallback'),
+          currency: currentTenant?.currency || '',
+          country: currentTenant?.country || '',
+          timezone: currentTenant?.timezone || 'UTC',
+          currency_display: currentTenant?.currency_display,
+          number_digits: currentTenant?.number_digits,
+          calendar: currentTenant?.calendar,
+        },
+        { isReprint },
+      );
+      showPrintWarningsToast(warnings);
+      try {
+        await api.post(`/bills/${bill.id}/print`, {
+          print_type: isReprint ? 'reprint' : 'receipt',
+        });
+      } catch {
+        /* best-effort history tracking */
+      }
+      await api.post(`/orders/${wsOrder.id}/request-bill`, {});
+      toast.success(tTables('statusBillRequested'));
+      setWsTable((cur) => (cur ? { ...cur, status: 'bill_requested' } : cur));
+      await refreshTables();
+    } catch {
+      toast.error(t('printingFailed'));
+    } finally {
+      setWsBillBusy(false);
+    }
+  };
+
+  const goWsTable = (tb: Table) => {
+    const active = tb.current_order || tb.activeOrder || null;
+    cart.clearCart();
+    const url = `/pos?table=${encodeURIComponent(String(tb.id))}&hall=${encodeURIComponent(tb.floor || '')}${
+      active ? `&order=${active.id}` : ''
+    }`;
+    window.location.assign(url);
+  };
+
   // Add cart items directly to existing order
   const handleAddCartToOrder = async (table: Table, order: Order) => {
     if (cart.items.length === 0) {
@@ -2526,8 +2618,103 @@ export default function POSPage() {
         onCustomerModalOpenChange={setTopbarCustomerModalOpen}
       />
 
+      {wsTable && (
+        <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+          <span className="text-lg font-extrabold text-foreground">{wsTable.name}</span>
+          {wsOrder && (
+            <span className="text-sm text-muted-foreground">
+              <Ltr>#{wsOrder.order_number}</Ltr> · {tTables('openedFirstOrder')}{' '}
+              <Ltr>
+                {new Date(wsOrder.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Ltr>{' '}
+              · <span className="font-bold text-foreground">{currencyFmt(wsOrder.total ?? 0)}</span>
+            </span>
+          )}
+          <div className="ms-auto flex flex-wrap gap-2">
+            {wsOrder && (
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/tables?hall=${encodeURIComponent(wsParams.hall)}&mergeFrom=${wsOrder.id}`,
+                  )
+                }
+                className="h-10 rounded-lg border border-border bg-card px-3.5 text-sm font-bold text-foreground hover:bg-accent"
+              >
+                {tTables('mergeWith')}
+              </button>
+            )}
+            {wsOrder && wsTable.status !== 'bill_requested' && (
+              <button
+                type="button"
+                onClick={handleWsRequestBill}
+                disabled={wsBillBusy}
+                className="h-10 rounded-lg border border-amber-600 bg-amber-50 px-3.5 text-sm font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-300"
+              >
+                {tTables('requestBill')}
+              </button>
+            )}
+            {wsOrder && (
+              <button
+                type="button"
+                onClick={() => setCheckoutTable(wsTable)}
+                className="h-10 rounded-lg bg-neutral-900 px-3.5 text-sm font-bold text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900"
+              >
+                {tCommon('total')} · {currencyFmt(wsOrder.total ?? 0)}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden p-4 gap-4">
+        {wsParams.table && (
+          <div className="hidden md:flex md:w-[148px] md:shrink-0 flex-col gap-2 rounded-2xl bg-neutral-800 p-2.5">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/tables?hall=${encodeURIComponent(wsParams.hall)}`)
+              }
+              className="flex h-[52px] items-center justify-center rounded-xl bg-amber-500 text-[15px] font-extrabold text-neutral-900 hover:bg-amber-400"
+            >
+              {tTables('backToTables')}
+            </button>
+            <p className="text-center text-[11px] font-medium text-neutral-400">
+              {wsParams.hall || tTables('title')}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 overflow-y-auto">
+              {(tables.filter((tb) => (tb.floor || '') === wsParams.hall).length > 0
+                ? tables.filter((tb) => (tb.floor || '') === wsParams.hall)
+                : tables
+              ).map((tb) => {
+                const st = tb.status === 'cleaning' ? 'available' : tb.status;
+                const selected = String(tb.id) === wsParams.table;
+                return (
+                  <button
+                    key={tb.id}
+                    type="button"
+                    onClick={() => goWsTable(tb)}
+                    className={`flex h-11 items-center justify-center rounded-lg border-2 text-[13px] font-extrabold ${
+                      st === 'occupied'
+                        ? 'border-blue-500 bg-blue-950 text-blue-200'
+                        : st === 'bill_requested'
+                          ? 'border-orange-500 bg-orange-950 text-orange-200'
+                          : st === 'reserved'
+                            ? 'border-violet-500 bg-violet-950 text-violet-200'
+                            : 'border-transparent bg-neutral-700 text-neutral-300'
+                    } ${selected ? 'outline outline-2 outline-amber-400' : ''}`}
+                  >
+                    {tb.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* Product Grid — full width on mobile, flex-1 on desktop */}
         <div className="flex-1 min-w-0 h-full flex flex-col">
           <ProductGrid

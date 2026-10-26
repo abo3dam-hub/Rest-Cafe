@@ -458,6 +458,21 @@ export default function TablesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Arriving from a workspace with ?mergeFrom=<orderId> opens the merge
+  // picker for that order's table as soon as the data is in.
+  const mergeFromHandledRef = useRef(false);
+  useEffect(() => {
+    if (mergeFromHandledRef.current || tables.length === 0 || orders.length === 0) return;
+    const mergeFrom = new URLSearchParams(window.location.search).get('mergeFrom');
+    if (!mergeFrom) return;
+    mergeFromHandledRef.current = true;
+    const source = tables.find(
+      (tb) => String(ordersByTable.get(String(tb.id))?.[0]?.id ?? '') === mergeFrom,
+    );
+    if (source) setMergeSource(source);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tables, orders]);
+
   const activeOrderFor = (tb: Table): Order | null => {
     const list = ordersByTable.get(String(tb.id));
     return list && list.length > 0 ? list[0] : null;
@@ -470,11 +485,15 @@ export default function TablesPage() {
 
   const goWorkspace = (tb: Table) => {
     const order = activeOrderFor(tb);
+    // A cart left over from a different table must never leak into this
+    // table's workspace.
+    if (String(cartStore.tableId ?? '') !== String(tb.id)) cartStore.clearCart();
     if (!order) cartStore.setTableId(String(tb.id));
     router.push(workspaceUrl(tb, order?.id));
   };
 
   const goNewOrder = (tb: Table) => {
+    if (String(cartStore.tableId ?? '') !== String(tb.id)) cartStore.clearCart();
     cartStore.setOrderType('dine_in');
     cartStore.setTableId(String(tb.id));
     router.push(workspaceUrl(tb));
