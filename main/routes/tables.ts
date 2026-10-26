@@ -170,11 +170,11 @@ router.patch('/floors/:name', requirePermission('tables.manage'), (req: Request,
   try {
     const oldName = String(req.params.name || '');
     if (!oldName) {
-      return res.status(400).json({ code: 'FLOOR_NAME_REQUIRED', error: 'Floor name is required' });
+      return res.status(400).json({ code: 'FLOOR_NAME_REQUIRED', error: 'Hall name is required' });
     }
     const newName = normalizeOptionalTableLabel(req.body?.newName);
     if (newName === undefined || newName === null || !newName) {
-      return res.status(400).json({ code: 'FLOOR_NAME_REQUIRED', error: 'Floor name is required' });
+      return res.status(400).json({ code: 'FLOOR_NAME_REQUIRED', error: 'Hall name is required' });
     }
     if (newName === oldName) {
       return res.json({ floor: newName, affected: 0 });
@@ -206,7 +206,7 @@ router.delete(
       if (!name) {
         return res
           .status(400)
-          .json({ code: 'FLOOR_NAME_REQUIRED', error: 'Floor name is required' });
+          .json({ code: 'FLOOR_NAME_REQUIRED', error: 'Hall name is required' });
       }
 
       const db = getDatabase();
@@ -251,7 +251,7 @@ router.post('/', requirePermission('tables.manage'), (req: Request, res: Respons
     if (normalizedFloor === undefined || normalizedSection === undefined) {
       return res
         .status(400)
-        .json({ code: 'TABLE_LOCATION_INVALID', error: 'Floor and section must be text values' });
+        .json({ code: 'TABLE_LOCATION_INVALID', error: 'Hall and section must be text values' });
     }
     const normalizedX = normalizePositionCoord(position_x);
     const normalizedY = normalizePositionCoord(position_y);
@@ -365,6 +365,103 @@ router.patch('/positions', requirePermission('tables.manage'), (req: Request, re
   }
 });
 
+/** Maximum tables a single bulk-create request may create. */
+const MAX_BULK_TABLES = 200;
+
+/**
+ * Bulk-create tables from a numeric range (owner-approved shape: range +
+ * optional prefix, one shared capacity/hall/section). Numbers that already
+ * exist — active or deactivated — are skipped and reported, never an error,
+ * so owners can extend an existing numbering run in one pass.
+ */
+router.post('/bulk', requirePermission('tables.manage'), (req: Request, res: Response) => {
+  try {
+    const { prefix, from, to, capacity, floor, section, kitchen_station_id } = req.body ?? {};
+
+    const fromNumber = normalizeTableCapacity(from);
+    const toNumber = normalizeTableCapacity(to);
+    if (fromNumber === null || toNumber === null || fromNumber > toNumber) {
+      return res.status(400).json({
+        code: 'TABLE_RANGE_INVALID',
+        error: 'Range must be positive whole numbers with from <= to',
+      });
+    }
+    const count = toNumber - fromNumber + 1;
+    if (count > MAX_BULK_TABLES) {
+      return res.status(400).json({
+        code: 'TABLE_RANGE_TOO_LARGE',
+        error: `A single batch can create at most ${MAX_BULK_TABLES} tables`,
+      });
+    }
+    const normalizedPrefix =
+      prefix === undefined || prefix === null
+        ? ''
+        : typeof prefix === 'string'
+          ? prefix.trim()
+          : undefined;
+    if (normalizedPrefix === undefined || normalizedPrefix.length > 20) {
+      return res.status(400).json({
+        code: 'TABLE_PREFIX_INVALID',
+        error: 'Prefix must be text of at most 20 characters',
+      });
+    }
+    const normalizedCapacity = capacity === undefined ? 4 : normalizeTableCapacity(capacity);
+    if (normalizedCapacity === null) {
+      return res.status(400).json({
+        code: 'TABLE_CAPACITY_INVALID',
+        error: 'Capacity must be a positive whole number',
+      });
+    }
+    const normalizedFloor = normalizeOptionalTableLabel(floor);
+    const normalizedSection = normalizeOptionalTableLabel(section);
+    if (normalizedFloor === undefined || normalizedSection === undefined) {
+      return res
+        .status(400)
+        .json({ code: 'TABLE_LOCATION_INVALID', error: 'Hall and section must be text values' });
+    }
+
+    const db = getDatabase();
+    const created: any[] = [];
+    const skipped: string[] = [];
+    withTxn(() => {
+      const exists = db.prepare('SELECT id FROM tables WHERE number = ?');
+      const insert = db.prepare(`
+        INSERT INTO tables (id, number, capacity, floor, section, position_x, position_y, kitchen_station_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+      `);
+      const ts = now();
+      for (let n = fromNumber; n <= toNumber; n++) {
+        const name = `${normalizedPrefix}${n}`;
+        if (exists.get(name)) {
+          skipped.push(name);
+          continue;
+        }
+        const tableId = `tbl-${randomUUID().slice(0, 8)}`;
+        insert.run(
+          tableId,
+          name,
+          normalizedCapacity,
+          normalizedFloor,
+          normalizedSection,
+          kitchen_station_id || null,
+          ts,
+          ts,
+        );
+        created.push(db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId));
+      }
+    });
+
+    res.status(201).json({
+      tables: created.map((table) => tableShape(db, table)),
+      created_count: created.length,
+      skipped,
+    });
+  } catch (error: any) {
+    console.error('[API] Bulk table create failed:', error);
+    res.status(500).json({ error: 'Failed to create tables' });
+  }
+});
+
 router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Response) => {
   try {
     const { number, name, capacity, floor, section, position_x, position_y, kitchen_station_id } =
@@ -407,7 +504,7 @@ router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Respo
     if (normalizedFloor === undefined || normalizedSection === undefined) {
       return res
         .status(400)
-        .json({ code: 'TABLE_LOCATION_INVALID', error: 'Floor and section must be text values' });
+        .json({ code: 'TABLE_LOCATION_INVALID', error: 'Hall and section must be text values' });
     }
 
     if (hasTableNumber) {

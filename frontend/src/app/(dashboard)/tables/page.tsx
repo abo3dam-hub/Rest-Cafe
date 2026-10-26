@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import {
   Plus,
+  Layers,
   X,
   Search,
   UserPlus,
@@ -328,13 +329,19 @@ export default function TablesPage() {
   // plan editor is the second view for visual layout work.
   const [view, setView] = useState<'plan' | 'list'>('list');
   const [layoutMode, setLayoutMode] = useState(false);
-  const [form, setForm] = useState({ name: '', capacity: '4', floor: 'Ground', section: '' });
+  const [form, setForm] = useState({ name: '', capacity: '4', floor: 'الصالة الرئيسية', section: '' });
   const [newFloorMode, setNewFloorMode] = useState(false);
   const [newFloorInput, setNewFloorInput] = useState('');
   const [floorMenuFor, setFloorMenuFor] = useState<string | null>(null);
   const [floorFormOpen, setFloorFormOpen] = useState(false);
   const [floorForm, setFloorForm] = useState({ name: '', tableName: '', capacity: '4' });
   const [floorFormSaving, setFloorFormSaving] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState({ prefix: '', from: '', to: '', capacity: '4', floor: '', section: '' });
+  const [bulkNewFloorMode, setBulkNewFloorMode] = useState(false);
+  const [bulkNewFloorInput, setBulkNewFloorInput] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ created: number; skipped: string[] } | null>(null);
   const [floorRenameOpen, setFloorRenameOpen] = useState<{ from: string; to: string } | null>(null);
   const [floorDeleteTarget, setFloorDeleteTarget] = useState<string | null>(null);
   const [floorActionSaving, setFloorActionSaving] = useState(false);
@@ -450,7 +457,7 @@ export default function TablesPage() {
   const defaultFloorForCreate = () => {
     if (floorFilter === '__unassigned__') return '';
     if (floorFilter !== 'all') return floorFilter;
-    return namedFloors[0] ?? 'Ground';
+    return namedFloors[0] ?? 'الصالة الرئيسية';
   };
 
   const suggestTableName = () => {
@@ -466,7 +473,7 @@ export default function TablesPage() {
     setEditingTable(null);
     setNewFloorMode(false);
     setNewFloorInput('');
-    setForm({ name: '', capacity: '4', floor: namedFloors[0] ?? 'Ground', section: '' });
+    setForm({ name: '', capacity: '4', floor: namedFloors[0] ?? 'الصالة الرئيسية', section: '' });
   };
 
   const openCreate = (explicitFloor?: string) => {
@@ -476,6 +483,66 @@ export default function TablesPage() {
     setNewFloorInput('');
     setForm({ name: '', capacity: '4', floor, section: '' });
     setShowForm(true);
+  };
+
+  const openBulk = () => {
+    const from = suggestTableName();
+    setBulkForm({
+      prefix: '',
+      from,
+      to: String(Number(from) + 39),
+      capacity: '4',
+      floor: defaultFloorForCreate(),
+      section: '',
+    });
+    setBulkNewFloorMode(false);
+    setBulkNewFloorInput('');
+    setBulkResult(null);
+    setBulkOpen(true);
+  };
+
+  const bulkFromNum = Number(bulkForm.from);
+  const bulkToNum = Number(bulkForm.to);
+  const bulkRangeValid =
+    Number.isInteger(bulkFromNum) && Number.isInteger(bulkToNum) && bulkFromNum >= 1 && bulkToNum >= bulkFromNum;
+  const bulkCount = bulkRangeValid ? bulkToNum - bulkFromNum + 1 : 0;
+
+  const handleBulkCreate = async () => {
+    if (!bulkRangeValid) {
+      toast.error(tTables('bulkRangeInvalid'));
+      return;
+    }
+    if (bulkCount > 200) {
+      toast.error(tTables('bulkRangeTooLarge'));
+      return;
+    }
+    const capacity = Number(bulkForm.capacity);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      toast.error(tTables('tableCapacityInvalid'));
+      return;
+    }
+    const resolvedFloor = (bulkNewFloorMode ? bulkNewFloorInput : bulkForm.floor).trim();
+    if (bulkNewFloorMode && !resolvedFloor) {
+      toast.error(tTables('tableLocationInvalid'));
+      return;
+    }
+    setBulkSaving(true);
+    try {
+      const { data } = await api.post('/tables/bulk', {
+        prefix: bulkForm.prefix.trim(),
+        from: bulkFromNum,
+        to: bulkToNum,
+        capacity,
+        floor: resolvedFloor || null,
+        section: bulkForm.section.trim() || null,
+      });
+      setBulkResult({ created: data.created_count ?? 0, skipped: data.skipped ?? [] });
+      fetchTables();
+    } catch {
+      toast.error(tTables('bulkFailed'));
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   const openEdit = (table: Table) => {
@@ -658,7 +725,7 @@ export default function TablesPage() {
         ? tables.filter((table) => !table.floor?.trim())
         : tables.filter((table) => table.floor?.trim() === floorFilter);
 
-  const baseSelectableFloors = namedFloors.length === 0 ? ['Ground'] : namedFloors;
+  const baseSelectableFloors = namedFloors.length === 0 ? ['الصالة الرئيسية'] : namedFloors;
   const selectableFloors =
     form.floor && !baseSelectableFloors.includes(form.floor)
       ? [...baseSelectableFloors, form.floor]
@@ -753,6 +820,11 @@ export default function TablesPage() {
           {view === 'list' && canManageTables && (
             <Button onClick={() => openCreate()}>
               <Plus size={16} className="me-1" /> {tTables('addTable')}
+            </Button>
+          )}
+          {view === 'list' && canManageTables && (
+            <Button variant="outline" onClick={() => openBulk()}>
+              <Layers size={16} className="me-1" /> {tTables('bulkAdd')}
             </Button>
           )}
         </div>
@@ -1347,6 +1419,188 @@ export default function TablesPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {bulkOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => !bulkSaving && setBulkOpen(false)}
+        >
+          <div
+            className="bg-card text-foreground rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4">{tTables('bulkAddTitle')}</h3>
+            {bulkResult ? (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground">
+                  {tTables('bulkCreatedReport', { count: bulkResult.created })}
+                </p>
+                {bulkResult.skipped.length > 0 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    {tTables('bulkSkippedReport', {
+                      count: bulkResult.skipped.length,
+                      names: bulkResult.skipped.join(', '),
+                    })}
+                  </p>
+                )}
+                <Button className="w-full" onClick={() => setBulkOpen(false)}>
+                  {tCommon('close')}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="bulk-prefix" className="block text-sm font-medium text-foreground mb-1">
+                    {tTables('bulkPrefix')}
+                  </label>
+                  <input
+                    id="bulk-prefix"
+                    type="text"
+                    value={bulkForm.prefix}
+                    onChange={(e) => setBulkForm({ ...bulkForm, prefix: e.target.value })}
+                    placeholder={tTables('bulkPrefixPlaceholder')}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="bulk-from" className="block text-sm font-medium text-foreground mb-1">
+                      {tTables('bulkFrom')}
+                    </label>
+                    <input
+                      id="bulk-from"
+                      type="number"
+                      min={1}
+                      value={bulkForm.from}
+                      onChange={(e) => setBulkForm({ ...bulkForm, from: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="bulk-to" className="block text-sm font-medium text-foreground mb-1">
+                      {tTables('bulkTo')}
+                    </label>
+                    <input
+                      id="bulk-to"
+                      type="number"
+                      min={1}
+                      value={bulkForm.to}
+                      onChange={(e) => setBulkForm({ ...bulkForm, to: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="bulk-capacity" className="block text-sm font-medium text-foreground mb-1">
+                    {tTables('capacity')}
+                  </label>
+                  <input
+                    id="bulk-capacity"
+                    type="number"
+                    min={1}
+                    value={bulkForm.capacity}
+                    onChange={(e) => setBulkForm({ ...bulkForm, capacity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bulk-floor" className="block text-sm font-medium text-foreground mb-1">
+                    {tTables('floor')}
+                  </label>
+                  {bulkNewFloorMode ? (
+                    <div className="flex gap-2">
+                      <input
+                        id="bulk-floor"
+                        type="text"
+                        value={bulkNewFloorInput}
+                        onChange={(e) => setBulkNewFloorInput(e.target.value)}
+                        placeholder={tTables('floorName')}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkNewFloorMode(false);
+                          setBulkNewFloorInput('');
+                        }}
+                        aria-label={tTables('cancel')}
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      id="bulk-floor"
+                      value={bulkForm.floor}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setBulkNewFloorMode(true);
+                          setBulkNewFloorInput('');
+                        } else {
+                          setBulkForm({ ...bulkForm, floor: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                    >
+                      <option value="">{tTables('floorplanUnassigned')}</option>
+                      {selectableFloors.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                      <option value="__new__">+ {tTables('newFloor')}</option>
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="bulk-section" className="block text-sm font-medium text-foreground mb-1">
+                    {tTables('section')}
+                  </label>
+                  <input
+                    id="bulk-section"
+                    type="text"
+                    value={bulkForm.section}
+                    onChange={(e) => setBulkForm({ ...bulkForm, section: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-border bg-card rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                {bulkRangeValid && bulkCount <= 200 && (
+                  <p className="text-sm text-muted-foreground">
+                    {tTables('bulkPreview', {
+                      count: bulkCount,
+                      first: `${bulkForm.prefix.trim()}${bulkFromNum}`,
+                      last: `${bulkForm.prefix.trim()}${bulkToNum}`,
+                    })}
+                  </p>
+                )}
+                {bulkRangeValid && bulkCount > 200 && (
+                  <p className="text-sm text-red-500">{tTables('bulkRangeTooLarge')}</p>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setBulkOpen(false)}
+                    disabled={bulkSaving}
+                    className="flex-1"
+                  >
+                    {tTables('cancel')}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleBulkCreate}
+                    disabled={!bulkRangeValid || bulkCount > 200 || bulkSaving}
+                    className="flex-1"
+                  >
+                    {bulkSaving ? tCommon('saving') : tTables('bulkCreate')}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
