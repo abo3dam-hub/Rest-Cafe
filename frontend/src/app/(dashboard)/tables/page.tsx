@@ -456,7 +456,9 @@ export default function TablesPage() {
         .finally(() => setLoading(false));
     };
     load();
-    const interval = setInterval(load, 10000);
+    const interval = setInterval(() => {
+      if (!document.hidden) load();
+    }, 10000);
     return () => clearInterval(interval);
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutMode]);
@@ -482,7 +484,9 @@ export default function TablesPage() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchOrders();
+    }, 10000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
@@ -533,9 +537,13 @@ export default function TablesPage() {
   const goWorkspace = (tb: Table) => {
     const order = activeOrderFor(tb);
     // A cart left over from a different table must never leak into this
-    // table's workspace.
-    if (String(cartStore.tableId ?? '') !== String(tb.id)) cartStore.clearCart();
-    if (!order) cartStore.setTableId(String(tb.id));
+    // table's workspace. Bind the cart to this table in both cases (new
+    // order and add-items): the add-items submit must never depend solely
+    // on the POS re-deriving the binding from the URL.
+    if (String(cartStore.tableId ?? '') !== String(tb.id)) {
+      cartStore.clearCart();
+      cartStore.setTableId(String(tb.id));
+    }
     router.push(workspaceUrl(tb, order?.id));
   };
 

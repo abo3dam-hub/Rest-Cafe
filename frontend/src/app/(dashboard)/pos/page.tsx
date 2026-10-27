@@ -400,7 +400,7 @@ export default function POSPage() {
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   // Cashier table workspace: POS opened from the table map carries the
   // table (and its active order) in the query string.
-  const [wsParams] = useState(() => {
+  const [wsParams, setWsParams] = useState(() => {
     if (typeof window === 'undefined') return { table: '', hall: '', order: '' };
     const q = new URLSearchParams(window.location.search);
     return {
@@ -409,6 +409,18 @@ export default function POSPage() {
       order: q.get('order') || '',
     };
   });
+  // The one-shot capture above can run before the router has applied the
+  // workspace URL (prerender/hydration in the static export); if it came up
+  // empty, re-read the query once the real URL is visible so the workspace
+  // binding is never silently lost.
+  useEffect(() => {
+    if (wsParams.table || typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    const table = q.get('table') || '';
+    if (table) {
+      setWsParams({ table, hall: q.get('hall') || '', order: q.get('order') || '' });
+    }
+  }, [wsParams.table]);
   const [wsTable, setWsTable] = useState<Table | null>(null);
   const [wsOrder, setWsOrder] = useState<Order | null>(null);
   const [wsBillBusy, setWsBillBusy] = useState(false);
@@ -437,6 +449,9 @@ export default function POSPage() {
   const postpaidAttemptKeyRef = useRef<string | null>(null);
   const postpaidAttemptWasLegacyRef = useRef(false);
   const addItemsAttemptRef = useRef<AppendAttempt | null>(null);
+  // Counts support dialogs raised during a submit so the waiter auto-return
+  // to the map never unmounts one (see the end of handlePlaceOrder).
+  const supportErrorCountRef = useRef(0);
   const appendRecoveryStartedUsersRef = useRef<Set<string>>(new Set());
   const appendAttemptStorageRef = useRef<AppendAttemptStorage | null>(null);
 
@@ -662,6 +677,7 @@ export default function POSPage() {
         : undefined;
     const ticketCorrelationId = correlationId || createOperationReference() || '';
     const clientTicketId = createOperationReference() || '';
+    supportErrorCountRef.current += 1;
     setSupportError({
       title: entry.title,
       subject: 'Rest&Cafe order problem',
@@ -938,6 +954,9 @@ export default function POSPage() {
   // settled later by a cashier.
   const canTakePayments = tenantCan(currentTenant, 'payments.take');
   const shouldTakePaymentNow = billingIsPrepaid && canTakePayments;
+  // The waiter's home screen is the table map: a successfully placed order
+  // returns them straight to it (see the end of handlePlaceOrder).
+  const isServerRole = currentTenant?.role === 'server';
 
   const printKotIfEnabled = async (order: Order) => {
     // Master kot_printing_enabled check gates both manual and automatic prints.
@@ -1293,7 +1312,9 @@ export default function POSPage() {
       setShowCustomerPrompt(true);
       return false;
     }
-    if (isRestaurant && cart.orderType === 'dine_in' && !cart.tableId) {
+    // Append mode needs no cart table: the submit target is the bound
+    // existing order (pendingOrder), whose own table is the binding.
+    if (isRestaurant && cart.orderType === 'dine_in' && !cart.tableId && !pendingOrder) {
       toast.error(t('selectTableFirst'));
       setShowTablePicker(true);
       return false;
@@ -1350,6 +1371,7 @@ export default function POSPage() {
 
     // Postpaid store / unpaid order → place order, kitchen gets the ticket, payment collected later
     setSubmitting(true);
+    const supportErrorsAtStart = supportErrorCountRef.current;
     let failureOperation = pendingOrder ? 'order.append' : 'order.create';
     let failureStage = 'submission';
     let failureCorrelationId: string | null = null;
@@ -1600,6 +1622,16 @@ export default function POSPage() {
       await refreshTables();
 
       await printKotIfEnabled(orderForKot);
+
+      // Success only (errors land in the catch): the waiter works from the
+      // table map, so a placed order — new or add-items — returns them to
+      // it immediately. Other roles stay on the POS. Skipped when this
+      // submit raised a support dialog (e.g. a cleanup failure on a placed
+      // order) so the dialog is never unmounted unseen.
+      if (isServerRole && supportErrorCountRef.current === supportErrorsAtStart) {
+        router.replace('/tables');
+        return;
+      }
     } catch (error) {
       if (error instanceof OrderAttemptStorageError)
         reportOrderStorageFailure(
