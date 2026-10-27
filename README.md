@@ -62,13 +62,13 @@ the desktop app locally:
   <tr>
     <td width="50%" valign="top">
       <h3>High-Speed Counter POS</h3>
-      <p>Fast, touch-optimized checkout built for busy café rushes. Filter menu categories with a tap, adjust item quantities on the fly, and accept cash or card payments with zero lag.</p>
+      <p>Fast, touch-optimized checkout built for busy café rushes. Filter menu categories with a tap, pin the staples (water, coffee, arguileh) to the front, shrink the item cards to fit more on screen, mark an item sold out in one tap, and take cash payments with zero lag.</p>
       <p><a href="docs/README.md">Documentation &rarr;</a></p>
     </td>
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/pos-checkout.gif" type="image/gif">
-        <img src="docs/assets/showcase/pos-checkout.poster.jpg" alt="FloCafe counter POS checkout flow with cart item selection and cash payment confirmation" width="100%">
+        <img src="docs/assets/showcase/pos-checkout.poster.jpg" alt="Rest&Cafe counter POS checkout flow with cart item selection and cash payment confirmation" width="100%">
       </picture>
     </td>
   </tr>
@@ -80,7 +80,7 @@ the desktop app locally:
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/addon-modifiers.gif" type="image/gif">
-        <img src="docs/assets/showcase/addon-modifiers.poster.jpg" alt="FloCafe modal modifier selector choosing oat milk and espresso shots" width="100%">
+        <img src="docs/assets/showcase/addon-modifiers.poster.jpg" alt="Rest&Cafe modal modifier selector choosing oat milk and espresso shots" width="100%">
       </picture>
     </td>
   </tr>
@@ -93,19 +93,19 @@ the desktop app locally:
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/kds-kanban.gif" type="image/gif">
-        <img src="docs/assets/showcase/kds-kanban.poster.jpg" alt="FloCafe standalone Kitchen Display System Kanban board tracking tickets across prep stages" width="100%">
+        <img src="docs/assets/showcase/kds-kanban.poster.jpg" alt="Rest&Cafe standalone Kitchen Display System Kanban board tracking tickets across prep stages" width="100%">
       </picture>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>Visual Tables &amp; Floor Plan</h3>
-      <p>See your entire dining area at a glance. Track occupied and open tables, check how long guests have been seated to optimize turnaround, and view checks instantly.</p>
+      <p>See your entire dining area at a glance. Track occupied and open tables, see when each party was seated, take reservations with a customer name and arrival time, and view checks instantly.</p>
     </td>
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/floorplan-tables.gif" type="image/gif">
-        <img src="docs/assets/showcase/floorplan-tables.poster.jpg" alt="FloCafe interactive floor plan and table turnover monitoring" width="100%">
+        <img src="docs/assets/showcase/floorplan-tables.poster.jpg" alt="Rest&Cafe interactive floor plan and table turnover monitoring" width="100%">
       </picture>
     </td>
   </tr>
@@ -117,19 +117,19 @@ the desktop app locally:
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/server-app.gif" type="image/gif">
-        <img src="docs/assets/showcase/server-app.poster.jpg" alt="FloCafe handheld mobile waiter app taking orders table-side" width="100%">
+        <img src="docs/assets/showcase/server-app.poster.jpg" alt="Rest&Cafe handheld mobile waiter app taking orders table-side" width="100%">
       </picture>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>Split Payments &amp; Multi-Tender</h3>
-      <p>Split bills equally across guests or accept multiple payment types on a single ticket. Handle partial cash, card, and loyalty point redemptions with automatic change calculations.</p>
+      <p>Split a bill by item — a leaving guest pays exactly what he ordered — or accept multiple payment types on a single ticket, with automatic change calculations.</p>
     </td>
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/split-payments.gif" type="image/gif">
-        <img src="docs/assets/showcase/split-payments.poster.jpg" alt="FloCafe equal share split payment calculator dividing check across diners" width="100%">
+        <img src="docs/assets/showcase/split-payments.poster.jpg" alt="Rest&Cafe equal share split payment calculator dividing check across diners" width="100%">
       </picture>
     </td>
   </tr>
@@ -141,7 +141,7 @@ the desktop app locally:
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/recipe-inventory.gif" type="image/gif">
-        <img src="docs/assets/showcase/recipe-inventory.poster.jpg" alt="FloCafe inventory management with supplies, recipe portions, and stock movement logs" width="100%">
+        <img src="docs/assets/showcase/recipe-inventory.poster.jpg" alt="Rest&Cafe inventory management with supplies, recipe portions, and stock movement logs" width="100%">
       </picture>
     </td>
   </tr>
@@ -154,7 +154,7 @@ the desktop app locally:
     <td width="50%">
       <picture>
         <source srcset="docs/assets/showcase/thermal-printing.gif" type="image/gif">
-        <img src="docs/assets/showcase/thermal-printing.poster.jpg" alt="FloCafe thermal printer test interface for 58mm and 80mm receipts and KOT tickets" width="100%">
+        <img src="docs/assets/showcase/thermal-printing.poster.jpg" alt="Rest&Cafe thermal printer test interface for 58mm and 80mm receipts and KOT tickets" width="100%">
       </picture>
     </td>
   </tr>
@@ -164,13 +164,14 @@ the desktop app locally:
 
 - **Offline-first architecture:** Local SQLite storage with auto-migrating schema and fail-closed safety.
 - **Granular roles & permissions:** Owner, Manager, Cashier, Server, and Chef roles with context-aware access policies.
-- **Multi-language support:** 25 localized languages with full bidirectional RTL rendering (Arabic, Persian, Urdu).
-- **131 Country profiles:** 109 world currencies with localized phone parsing, number formatting, and timezone handling.
-- **Country tax packs:** Signed regional tax pack integration and manual rule engine.
+- **Multi-language support:** 24 localized languages with full bidirectional RTL rendering (Arabic, Persian, Urdu), and a self-hosted Arabic typeface (IBM Plex Sans Arabic) so Arabic never depends on whatever font the PC happens to have.
+- **Manual tax rules:** One generic local tax pack; rates are owner-configured and tax can be off or manual.
 - **Automated database backups:** Pre-migration automatic snapshots and manual exports, stored locally.
-- **Customer loyalty & CRM:** Customer directory, purchase histories, and point redemption.
+- **Customer CRM:** Customer directory and purchase histories.
 - **Cash drawer management:** Cash pulse on checkout and end-of-shift cash drawer reconciliations.
-- **Daily sales & accounting export:** Audit-ready CSV/Excel reporting with financial reconciliation identities.
+- **Reports & accounting export:** Daily, sales, cash-session, and dish-profitability reports (per-dish margin and menu-engineering classes) with audit-ready CSV/Excel export and financial reconciliation identities.
+- **Sold-out that is never forgotten:** A one-tap «sold out» state on any item, a permanent count badge on the POS, and a start-of-day reminder listing anything still sold out from yesterday.
+- **New-order sound alerts:** A generated chime plus a visual pill on the kitchen display and the cashier screen whenever a new order lands.
 
 ## Project status
 
@@ -181,7 +182,7 @@ Rest&Cafe is in active development for its first restaurant deployment. Core cus
 Core POS operation and local data are offline-first. Order entry, billing, KDS coordination, and receipt printing do not depend on internet access or external cloud services.
 
 - **Data location:** The SQLite database and local backups reside in the operating system user-data directory, separate from installed application binaries. Standard in-place application updates do not remove them. As a best practice, create a manual backup before reinstalling, moving to a new machine, or changing distribution channels.
-- **Pre-migration backups:** FloCafe automatically creates a timestamped database backup before running schema migrations.
+- **Pre-migration backups:** Rest&Cafe automatically creates a timestamped database backup before running schema migrations.
 - **Optional network features:** None outbound. The app serves the POS, the kitchen display, and the Server App on the local network only. Cloud sync, telemetry, WhatsApp, and Google Drive were removed from this fork in code.
 
 ## Languages and regional support
@@ -236,8 +237,8 @@ downloads one — the only bundled pack is the empty generic framework.
 Setting up a local development environment requires Node.js 22 or later:
 
 ```sh
-git clone https://github.com/FreeOpenSourcePOS/FloCafe.git
-cd FloCafe
+git clone https://github.com/abo3dam-hub/Rest-Cafe.git
+cd Rest-Cafe
 npm install
 npm run dev
 ```
@@ -266,16 +267,16 @@ Contributions are welcome. Please check [CONTRIBUTING.md](CONTRIBUTING.md) befor
 - **Small bug fixes, documentation improvements, and focused tests** can be started freely.
 - **New features, database schema changes, and architectural refactors** require maintainer discussion and approval before implementation.
 
-If FloCafe is useful to you, consider starring the repository.
+If Rest&Cafe is useful to you, consider starring the repository.
 
 ## Help and documentation
 
 - **Documentation index:** [docs/README.md](docs/README.md)
 - **Printer guide & troubleshooting:** [docs/printers.md](docs/printers.md)
 - **Internationalization & translations:** [docs/architecture/internationalization.md](docs/architecture/internationalization.md)
-- **Bug reports & feature proposals:** [GitHub Issues](https://github.com/FreeOpenSourcePOS/FloCafe/issues)
-- **General questions & ideas:** [GitHub Discussions](https://github.com/FreeOpenSourcePOS/FloCafe/discussions)
+- **Bug reports & feature proposals:** [GitHub Issues](https://github.com/abo3dam-hub/Rest-Cafe/issues)
+- **General questions & ideas:** [GitHub Discussions](https://github.com/abo3dam-hub/Rest-Cafe/discussions)
 
 ## License
 
-FloCafe is open-source software licensed under the [MIT License](LICENSE).
+Rest&Cafe is open-source software licensed under the [MIT License](LICENSE).
