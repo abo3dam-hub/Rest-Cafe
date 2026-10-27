@@ -1738,7 +1738,8 @@
     "classStar": "स्टार",
     "classPuzzle": "पहेली",
     "classPlowhorse": "मेहनती घोड़ा",
-    "classDog": "कमज़ोर"
+    "classDog": "कमज़ोर",
+    "dailyCollections": "दैनिक संग्रह"
   },
   "serverApp": {
     "addToOrder": "ऑर्डर में जोड़ें",

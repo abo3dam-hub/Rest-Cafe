@@ -1738,7 +1738,8 @@
     "classStar": "তারকা",
     "classPuzzle": "ধাঁধা",
     "classPlowhorse": "পরিশ্রমী ঘোড়া",
-    "classDog": "দুর্বল"
+    "classDog": "দুর্বল",
+    "dailyCollections": "দৈনিক সংগ্রহ"
   },
   "serverApp": {
     "addToOrder": "অর্ডার যোগ করুন",

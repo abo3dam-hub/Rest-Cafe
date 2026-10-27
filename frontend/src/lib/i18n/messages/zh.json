@@ -1738,7 +1738,8 @@
     "classStar": "明星",
     "classPuzzle": "谜题",
     "classPlowhorse": "老黄牛",
-    "classDog": "弱势"
+    "classDog": "弱势",
+    "dailyCollections": "每日收款"
   },
   "serverApp": {
     "addToOrder": "加入订单",

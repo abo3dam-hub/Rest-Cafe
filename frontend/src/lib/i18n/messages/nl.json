@@ -1738,7 +1738,8 @@
     "classStar": "Ster",
     "classPuzzle": "Puzzel",
     "classPlowhorse": "Werkpaard",
-    "classDog": "Zwak"
+    "classDog": "Zwak",
+    "dailyCollections": "Dagelijkse ontvangsten"
   },
   "serverApp": {
     "addToOrder": "Toevoegen aan bestelling",

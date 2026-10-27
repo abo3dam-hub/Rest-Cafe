@@ -1738,7 +1738,8 @@
     "classStar": "Vedette",
     "classPuzzle": "Énigme",
     "classPlowhorse": "Cheval de trait",
-    "classDog": "Faible"
+    "classDog": "Faible",
+    "dailyCollections": "Encaissements quotidiens"
   },
   "serverApp": {
     "addToOrder": "Ajouter à la commande",

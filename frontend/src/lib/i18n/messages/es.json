@@ -1738,7 +1738,8 @@
     "classStar": "Estrella",
     "classPuzzle": "Enigma",
     "classPlowhorse": "Caballo de batalla",
-    "classDog": "Débil"
+    "classDog": "Débil",
+    "dailyCollections": "Cobros diarios"
   },
   "serverApp": {
     "addToOrder": "Agregar al pedido",

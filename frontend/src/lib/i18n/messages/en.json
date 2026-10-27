@@ -1710,7 +1710,8 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Failed to load reports",
-    "noData": "No data for this period"
+    "noData": "No data for this period",
+    "dailyCollections": "Daily collections"
   },
   "receipt": {
     "amount": "Amount",

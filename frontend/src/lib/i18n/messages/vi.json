@@ -1738,7 +1738,8 @@
     "classStar": "Ngôi sao",
     "classPuzzle": "Câu đố",
     "classPlowhorse": "Ngựa thồ",
-    "classDog": "Yếu"
+    "classDog": "Yếu",
+    "dailyCollections": "Thu tiền hằng ngày"
   },
   "serverApp": {
     "addToOrder": "Thêm vào đơn hàng",

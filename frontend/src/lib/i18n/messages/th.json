@@ -1738,7 +1738,8 @@
     "classStar": "ดาวเด่น",
     "classPuzzle": "ปริศนา",
     "classPlowhorse": "ม้างาน",
-    "classDog": "อ่อนแอ"
+    "classDog": "อ่อนแอ",
+    "dailyCollections": "ยอดเก็บเงินรายวัน"
   },
   "serverApp": {
     "addToOrder": "เพิ่มเข้าคำสั่งซื้อ",

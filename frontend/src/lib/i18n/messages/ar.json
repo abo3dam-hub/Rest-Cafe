@@ -1710,7 +1710,8 @@
     "exportCsv": "ملف CSV",
     "exportPdf": "ملف PDF",
     "loadFailed": "فشل تحميل التقارير",
-    "noData": "لا بيانات في هذه الفترة"
+    "noData": "لا بيانات في هذه الفترة",
+    "dailyCollections": "التحصيل اليومي"
   },
   "receipt": {
     "amount": "المبلغ",

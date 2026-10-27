@@ -1738,7 +1738,8 @@
     "classStar": "ستاره",
     "classPuzzle": "معما",
     "classPlowhorse": "اسب کاری",
-    "classDog": "ضعیف"
+    "classDog": "ضعیف",
+    "dailyCollections": "دریافتی‌های روزانه"
   },
   "serverApp": {
     "addToOrder": "افزودن به سفارش",
