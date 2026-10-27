@@ -28,6 +28,17 @@ function kdsReconnectDelay(attempt: number): number {
   return Math.min(KDS_RECONNECT_MAX_MS, KDS_RECONNECT_BASE_MS * 2 ** attempt);
 }
 
+// Socket liveness bounds. Protocol-level pings never reach JS, so an idle
+// socket can be a zombie (device sleep, dropped NAT mapping) while still
+// looking open; the server answers app-level {type:'ping'} with a pong,
+// which gives the client a frame it can actually observe.
+const KDS_PING_IDLE_MS = 20_000;
+const KDS_FRAME_STALE_MS = 45_000;
+const KDS_WATCHDOG_TICK_MS = 10_000;
+// Per-request ceiling for KDS REST calls so a half-open connection can
+// never latch the poll's in-flight guard onto a promise that never settles.
+const KDS_REST_REQUEST_TIMEOUT_MS = 10_000;
+
 // 'voided' is a locked terminal status excluded from sequential status progressions.
 export type KitchenStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'voided';
 export type ConnectionMode = 'websocket' | 'rest' | null;
@@ -256,6 +267,7 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
   const [rememberMe, setRememberMe] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const lastFrameAtRef = useRef(0);
   const restIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const restInitialFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restRequestSequenceRef = useRef(0);
@@ -317,7 +329,9 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
       const requestSequence = ++restRequestSequenceRef.current;
       restInFlightRequestRef.current = requestSequence;
       try {
-        const { data } = await api.get(`${ordersPath}?status=pending,preparing,ready,served`);
+        const { data } = await api.get(`${ordersPath}?status=pending,preparing,ready,served`, {
+          timeout: KDS_REST_REQUEST_TIMEOUT_MS,
+        });
         if (
           generation !== sessionGenerationRef.current ||
           requestSequence !== restRequestSequenceRef.current ||
@@ -527,6 +541,7 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
         }
         setConnectionMode('websocket');
         setConnected(false);
+        lastFrameAtRef.current = Date.now();
         ws.send(JSON.stringify({ type: 'auth', token }));
         authTimeout = setTimeout(() => {
           if (wsRef.current !== ws || generation !== sessionGenerationRef.current) return;
@@ -578,6 +593,7 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
 
       ws.onmessage = (event) => {
         if (wsRef.current !== ws || generation !== sessionGenerationRef.current) return;
+        lastFrameAtRef.current = Date.now();
         try {
           const msg: WsMessage = JSON.parse(event.data);
           if (msg.type === 'auth_success' && msg.user) {
@@ -688,11 +704,15 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
       setLoading(true);
 
       try {
-        const { data } = await api.post(loginPath, {
-          email: loginEmail,
-          password: loginPassword,
-          rememberMe,
-        });
+        const { data } = await api.post(
+          loginPath,
+          {
+            email: loginEmail,
+            password: loginPassword,
+            rememberMe,
+          },
+          { timeout: KDS_REST_REQUEST_TIMEOUT_MS },
+        );
 
         if (generation !== sessionGenerationRef.current) return;
         const token = data.access_token ?? data.token;
@@ -763,7 +783,7 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
     }
     const generation = sessionGenerationRef.current;
     api
-      .get(mePath)
+      .get(mePath, { timeout: KDS_REST_REQUEST_TIMEOUT_MS })
       .then(({ data }) => {
         if (
           generation !== sessionGenerationRef.current ||
@@ -833,6 +853,38 @@ export function useKdsConnection(options: UseKdsConnectionOptions): UseKdsConnec
     }
     return () => stopRestPolling();
   }, [connectionMode, user, startRestPolling, stopRestPolling, enabled]);
+
+  // Socket liveness watchdog: closing a stale socket hands control to the
+  // REST fallback and the reconnect timer in onclose, so the board can
+  // never sit frozen on a dead connection until a manual refresh.
+  useEffect(() => {
+    if (!enabled || !user || typeof document === 'undefined') return;
+    const checkLiveness = () => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const idleMs = Date.now() - lastFrameAtRef.current;
+      if (idleMs > KDS_FRAME_STALE_MS) {
+        ws.close();
+        return;
+      }
+      if (idleMs > KDS_PING_IDLE_MS) {
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } catch {
+          ws.close();
+        }
+      }
+    };
+    const interval = setInterval(checkLiveness, KDS_WATCHDOG_TICK_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') checkLiveness();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [enabled, user]);
 
   return {
     user,

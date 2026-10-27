@@ -16,14 +16,40 @@ function useKdsEnabledCheck(): boolean | null {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
-    api.get('/settings/kds_enabled')
-      .then((res) => {
-        if (cancelled) return;
-        const value = res.data?.setting?.value;
-        setEnabled(value === 'true' ? true : value === 'false' ? false : null);
-      })
-      .catch(() => { if (!cancelled) setEnabled(null); });
-    return () => { cancelled = true; };
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    // Retry while the answer is unknown so a transient failure (API still
+    // starting) cannot strand the board on the loading spinner forever.
+    const retryWhileUnknown = () => {
+      if (attempts < 12) {
+        attempts += 1;
+        retryTimer = setTimeout(run, 5000);
+      }
+    };
+    const run = () => {
+      api
+        .get('/settings/kds_enabled')
+        .then((res) => {
+          if (cancelled) return;
+          const value = res.data?.setting?.value;
+          if (value === 'true') setEnabled(true);
+          else if (value === 'false') setEnabled(false);
+          else {
+            setEnabled(null);
+            retryWhileUnknown();
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setEnabled(null);
+          retryWhileUnknown();
+        });
+    };
+    run();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
   return enabled;
 }

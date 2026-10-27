@@ -15,13 +15,38 @@ function useKdsEnabledCheck(baseUrl: string): boolean | null {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let cancelled = false;
-    fetch(`${baseUrl}/api/kds/info`, { cache: 'no-store' })
-      .then((res) => {
-        if (cancelled) return;
-        setEnabled(res.status === 404 ? false : res.ok ? true : null);
-      })
-      .catch(() => { if (!cancelled) setEnabled(null); });
-    return () => { cancelled = true; };
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    // Retry while the answer is unknown so a transient failure (server
+    // still starting) cannot strand the board on the loading spinner.
+    const retryWhileUnknown = () => {
+      if (attempts < 12) {
+        attempts += 1;
+        retryTimer = setTimeout(run, 5000);
+      }
+    };
+    const run = () => {
+      fetch(`${baseUrl}/api/kds/info`, { cache: 'no-store' })
+        .then((res) => {
+          if (cancelled) return;
+          if (res.status === 404) setEnabled(false);
+          else if (res.ok) setEnabled(true);
+          else {
+            setEnabled(null);
+            retryWhileUnknown();
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setEnabled(null);
+          retryWhileUnknown();
+        });
+    };
+    run();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [baseUrl]);
   return enabled;
 }

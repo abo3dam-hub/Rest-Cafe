@@ -282,8 +282,11 @@ export function startServer(): Promise<void> {
       app.use(express.static(frontendDir, { dotfiles: 'allow', index: false }));
 
       // Serve each Next.js static route index directly to avoid root redirects.
+      // The KDS page route must stay servable here: WebSocket upgrades on the
+      // exact /kds path are handled by the HTTP upgrade listener, never by
+      // this GET fallback, so excluding the prefix only breaks page loads.
       app.get(
-        /^(?!\/api(?:\/|$)|\/kds(?:\/|$)).*$/,
+        /^(?!\/api(?:\/|$)).*$/,
         staticRouteRateLimit(),
         (req: Request, res: Response) => {
           res.sendFile(resolveStaticPage(frontendDir, req.path), { dotfiles: 'allow' });
