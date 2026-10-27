@@ -599,7 +599,13 @@
     "updating": "اپ ڈیٹ ہو رہا ہے…",
     "viewKanban": "کانبن",
     "viewTabs": "ٹیبز",
-    "wsConnected": "WebSocket منسلک ہے"
+    "wsConnected": "WebSocket منسلک ہے",
+    "soundOn": "آواز آن",
+    "soundOff": "آواز آف",
+    "testSound": "آواز ٹیسٹ کریں",
+    "enableSoundBanner": "نئے آرڈر کی آوازیں فعال کرنے کے لیے یہاں ٹیپ کریں",
+    "newOrderAlert": "{count, plural, other {# نئے آرڈر}}",
+    "newOrderAlertTable": "نیا آرڈر · میز {table}"
   },
   "nav": {
     "collapse": "جمع کریں",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# کھلا آرڈر اگلی شفٹ میں منتقل ہوگا} other {# کھلے آرڈرز اگلی شفٹ میں منتقل ہوں گے}}",
     "shiftCloseUnpaidWarningHint": "یہ آرڈرز اگلی شفٹ کے لیے کھلے رہیں گے۔ اس شفٹ کو بند کرنے سے صرف وہ نقد ادائیگیاں ملائی جاتی ہیں جو اس شفٹ کے دوران وصول ہو چکی ہیں۔",
     "shiftCloseUnpaidMoreCount": "+{count} مزید کھلے آرڈرز",
-    "tableBillRequested": "بل کی درخواست کی گئی"
+    "tableBillRequested": "بل کی درخواست کی گئی",
+    "soldOutEnded": "ختم ہو گیا",
+    "soldOutMark": "ختم شدہ نشان زد کریں",
+    "soldOutRestore": "واپس فروخت کے لیے رکھیں",
+    "cardSize": "کارڈ کا سائز",
+    "densityLarge": "بڑا",
+    "densityMedium": "درمیانہ",
+    "densitySmall": "چھوٹا",
+    "soldOutReminderTitle": "اشیاء جو ابھی بھی ختم ہیں",
+    "soldOutReactivateAll": "سب دوبارہ فعال کریں",
+    "soldOutSaved": "ختم شدہ حالت اپ ڈیٹ ہو گئی",
+    "soldOutSaveFailed": "ختم شدہ حالت اپ ڈیٹ نہیں ہو سکی"
   },
   "printTest": {
     "amt": "رقم",
@@ -1576,7 +1593,23 @@
     "variantToggle": "اس پروڈکٹ کے وریئنٹ ہیں (مثلاً سائز، کرسٹ، ذائقہ)",
     "variantsSection": "اقسام",
     "variantDeactivateConfirm": "یہ وریئنٹ محفوظ کرنے پر غیر فعال ہو جائے گا اور اس اسکرین سے بحال نہیں کیا جا سکتا۔",
-    "variantRemoveAllConfirm": "اسے بند کرنے پر اس پروڈکٹ کے تمام وریئنٹ غیر فعال ہو جائیں گے۔ پرانے آرڈرز انہیں برقرار رکھتے ہیں۔"
+    "variantRemoveAllConfirm": "اسے بند کرنے پر اس پروڈکٹ کے تمام وریئنٹ غیر فعال ہو جائیں گے۔ پرانے آرڈرز انہیں برقرار رکھتے ہیں۔",
+    "pinProduct": "اوپر پن کریں",
+    "unpinProduct": "پن ہٹائیں",
+    "pinUpdateFailed": "پن اپ ڈیٹ نہیں ہو سکی",
+    "soldOutBadge": "ختم ہو گیا",
+    "soldOutOnly": "صرف ختم شدہ",
+    "markSoldOut": "ختم شدہ نشان زد کریں",
+    "clearSoldOut": "واپس فروخت کے لیے رکھیں",
+    "soldOutUpdateFailed": "ختم شدہ حالت اپ ڈیٹ نہیں ہو سکی",
+    "editPrices": "قیمتیں ترمیم کریں",
+    "saveAllPrices": "سب محفوظ کریں",
+    "pricesSaved": "قیمتیں اپ ڈیٹ ہو گئیں",
+    "pricesSaveFailed": "قیمتیں محفوظ نہیں ہو سکیں",
+    "bulkPercent": "بلک %",
+    "bulkPercentApply": "لاگو کریں",
+    "bulkPercentCategory": "زمرہ",
+    "bulkAllCategories": "تمام زمرے"
   },
   "productAnalytics": {
     "title": "اگلا کیا بنائیں، یہ طے کرنے میں ہماری مدد کریں",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV فائل",
     "exportPdf": "PDF فائل",
     "loadFailed": "رپورٹس لوڈ نہیں ہو سکیں",
-    "noData": "اس مدت کے لیے کوئی ڈیٹا نہیں"
+    "noData": "اس مدت کے لیے کوئی ڈیٹا نہیں",
+    "tabProfitability": "پکوانوں کا منافع",
+    "dishClass": "درجہ",
+    "dish": "پکوان",
+    "revenue": "آمدنی",
+    "ingredientCost": "اجزاء کی لاگت",
+    "costCoverage": "لاگت کوریج",
+    "margin": "مارجن",
+    "marginPct": "مارجن %",
+    "classStar": "اسٹار",
+    "classPuzzle": "پہیلی",
+    "classPlowhorse": "محنتی گھوڑا",
+    "classDog": "کمزور"
   },
   "serverApp": {
     "addToOrder": "آرڈر میں شامل کریں",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "انٹرنیٹ کے تمام اختیاری کنکشن بند کر دیتا ہے: کلاؤڈ سنک، Google Drive بیک اپ، واٹس ایپ، اپ ڈیٹ کی جانچ، استعمال کا تجزیہ اور ویب سے تصاویر درآمد کرنا۔ آرڈرز، بلنگ، پرنٹنگ اور آپ کے مقامی نیٹ ورک کے آلات کام کرتے رہتے ہیں۔",
     "offlineModeFailed": "آف لائن موڈ تبدیل نہیں ہو سکا",
     "offlineModeReadFailed": "آف لائن موڈ کی موجودہ ترتیب نہیں پڑھی جا سکی۔",
-    "offlineModeRetry": "دوبارہ کوشش کریں"
+    "offlineModeRetry": "دوبارہ کوشش کریں",
+    "tabCustomerDisplay": "کسٹمر ڈسپلے"
   },
   "setup": {
     "alreadyCompleted": "اس انسٹال کا سیٹ اپ پہلے ہی مکمل ہو چکا ہے۔ سائن ان پر بھیج رہا ہے…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "آرڈر ضم ہو گئے",
     "mergeNoTargets": "ضم کرنے کے لیے کوئی اور فعال آرڈر نہیں",
     "openedFirstOrder": "پہلا آرڈر کھولا گیا",
-    "newOrder": "نیا آرڈر"
+    "newOrder": "نیا آرڈر",
+    "arrivalTime": "آمد کا وقت",
+    "todaysReservations": "آج کی بکنگ"
   },
   "tax": {
     "actionActivate": "پیک فعال ہو گیا",

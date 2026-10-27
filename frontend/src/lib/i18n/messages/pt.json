@@ -599,7 +599,13 @@
     "updating": "Atualizando…",
     "viewKanban": "Kanban",
     "viewTabs": "Abas",
-    "wsConnected": "WebSocket conectado"
+    "wsConnected": "WebSocket conectado",
+    "soundOn": "Som ligado",
+    "soundOff": "Som desligado",
+    "testSound": "Testar som",
+    "enableSoundBanner": "Toque aqui para ativar os sons de novos pedidos",
+    "newOrderAlert": "{count, plural, one {Novo pedido} other {# novos pedidos}}",
+    "newOrderAlertTable": "Novo pedido · Mesa {table}"
   },
   "nav": {
     "collapse": "Recolher",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# pedido aberto será transferido} other {# pedidos abertos serão transferidos}}",
     "shiftCloseUnpaidWarningHint": "Estes pedidos permanecem abertos para o próximo turno. Fechar este turno concilia apenas os pagamentos em dinheiro já recebidos durante este turno.",
     "shiftCloseUnpaidMoreCount": "+{count} outros pedidos abertos",
-    "tableBillRequested": "Conta solicitada"
+    "tableBillRequested": "Conta solicitada",
+    "soldOutEnded": "Esgotado",
+    "soldOutMark": "Marcar como esgotado",
+    "soldOutRestore": "Voltar a vender",
+    "cardSize": "Tamanho dos cartões",
+    "densityLarge": "Grande",
+    "densityMedium": "Médio",
+    "densitySmall": "Pequeno",
+    "soldOutReminderTitle": "Itens que continuam esgotados",
+    "soldOutReactivateAll": "Reativar tudo",
+    "soldOutSaved": "Estado de esgotado atualizado",
+    "soldOutSaveFailed": "Não foi possível atualizar o estado de esgotado"
   },
   "printTest": {
     "amt": "Total",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Este produto tem variantes (ex.: tamanho, massa, sabor)",
     "variantsSection": "Variantes",
     "variantDeactivateConfirm": "Esta variante será desativada ao salvar e não poderá ser restaurada a partir desta tela.",
-    "variantRemoveAllConfirm": "Ao desligar, todas as variantes deste produto serão desativadas. Os pedidos anteriores as mantêm."
+    "variantRemoveAllConfirm": "Ao desligar, todas as variantes deste produto serão desativadas. Os pedidos anteriores as mantêm.",
+    "pinProduct": "Fixar no topo",
+    "unpinProduct": "Desafixar",
+    "pinUpdateFailed": "Não foi possível atualizar a fixação",
+    "soldOutBadge": "Esgotado",
+    "soldOutOnly": "Apenas esgotados",
+    "markSoldOut": "Marcar como esgotado",
+    "clearSoldOut": "Voltar a vender",
+    "soldOutUpdateFailed": "Não foi possível atualizar o estado de esgotado",
+    "editPrices": "Editar preços",
+    "saveAllPrices": "Salvar tudo",
+    "pricesSaved": "Preços atualizados",
+    "pricesSaveFailed": "Não foi possível salvar os preços",
+    "bulkPercent": "% em massa",
+    "bulkPercentApply": "Aplicar",
+    "bulkPercentCategory": "Categoria",
+    "bulkAllCategories": "Todas as categorias"
   },
   "productAnalytics": {
     "title": "Ajude-nos a decidir o que construir a seguir",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Falha ao carregar os relatórios",
-    "noData": "Sem dados neste período"
+    "noData": "Sem dados neste período",
+    "tabProfitability": "Lucratividade dos pratos",
+    "dishClass": "Classe",
+    "dish": "Prato",
+    "revenue": "Receita",
+    "ingredientCost": "Custo dos ingredientes",
+    "costCoverage": "Cobertura de custos",
+    "margin": "Margem",
+    "marginPct": "Margem %",
+    "classStar": "Estrela",
+    "classPuzzle": "Enigma",
+    "classPlowhorse": "Cavalo de trabalho",
+    "classDog": "Fraco"
   },
   "serverApp": {
     "addToOrder": "Adicionar ao pedido",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Desativa toda conexão opcional com a internet: sincronização na nuvem, backups no Google Drive, WhatsApp, verificação de atualizações, análises de uso e importação de imagens da web. Pedidos, faturação, impressão e dispositivos da sua rede local continuam a funcionar.",
     "offlineModeFailed": "Não foi possível alterar o modo offline",
     "offlineModeReadFailed": "Não foi possível ler a definição atual do modo offline.",
-    "offlineModeRetry": "Tentar novamente"
+    "offlineModeRetry": "Tentar novamente",
+    "tabCustomerDisplay": "Tela do cliente"
   },
   "setup": {
     "alreadyCompleted": "A configuração já foi concluída nesta instalação. Redirecionando para o login…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Pedidos mesclados",
     "mergeNoTargets": "Nenhum outro pedido ativo para mesclar",
     "openedFirstOrder": "Primeiro pedido aberto",
-    "newOrder": "Novo pedido"
+    "newOrder": "Novo pedido",
+    "arrivalTime": "Hora de chegada",
+    "todaysReservations": "Reservas de hoje"
   },
   "tax": {
     "actionActivate": "Pacote ativado",

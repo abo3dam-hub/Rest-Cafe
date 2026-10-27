@@ -599,7 +599,13 @@
     "updating": "Duke u përditësuar...",
     "viewKanban": "Kanban",
     "viewTabs": "Kartela",
-    "wsConnected": "WebSocket i lidhur"
+    "wsConnected": "WebSocket i lidhur",
+    "soundOn": "Zëri aktiv",
+    "soundOff": "Zëri joaktiv",
+    "testSound": "Provo zërin",
+    "enableSoundBanner": "Prek këtu për të aktivizuar tingujt e porosive të reja",
+    "newOrderAlert": "{count, plural, one {Porosi e re} other {# porosi të reja}}",
+    "newOrderAlertTable": "Porosi e re · Tavolina {table}"
   },
   "nav": {
     "collapse": "Mblidh",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# porosi e hapur do të bartet} other {# porosi të hapura do të barten}}",
     "shiftCloseUnpaidWarningHint": "Këto porosi mbeten të hapura për turnin tjetër. Mbyllja e këtij turni rakordon vetëm pagesat me para në dorë të arkëtuara tashmë gjatë këtij turni.",
     "shiftCloseUnpaidMoreCount": "+{count} porosi të tjera të hapura",
-    "tableBillRequested": "Fatura u kërkua"
+    "tableBillRequested": "Fatura u kërkua",
+    "soldOutEnded": "Ka mbaruar",
+    "soldOutMark": "Shëno si të mbaruar",
+    "soldOutRestore": "Kthe në shitje",
+    "cardSize": "Madhësia e kartave",
+    "densityLarge": "I madh",
+    "densityMedium": "Mesatar",
+    "densitySmall": "I vogël",
+    "soldOutReminderTitle": "Artikuj ende të mbaruar",
+    "soldOutReactivateAll": "Riaktivizo të gjitha",
+    "soldOutSaved": "Gjendja e mbarimit u përditësua",
+    "soldOutSaveFailed": "Nuk u përditësua gjendja e mbarimit"
   },
   "printTest": {
     "amt": "Shuma",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Ky produkt ka variante (p.sh. madhësi, kore, shije)",
     "variantsSection": "Variantet",
     "variantDeactivateConfirm": "Ky variant do të çaktivizohet kur ruhet dhe nuk mund të rikthehet nga ky ekran.",
-    "variantRemoveAllConfirm": "Nëse e çaktivizoni, do të çaktivizohen të gjitha variantet e këtij produkti. Porositë e vjetra i ruajnë."
+    "variantRemoveAllConfirm": "Nëse e çaktivizoni, do të çaktivizohen të gjitha variantet e këtij produkti. Porositë e vjetra i ruajnë.",
+    "pinProduct": "Fikso në krye",
+    "unpinProduct": "Hiq fiksimin",
+    "pinUpdateFailed": "Nuk u përditësua fiksimi",
+    "soldOutBadge": "Ka mbaruar",
+    "soldOutOnly": "Vetëm të mbaruarat",
+    "markSoldOut": "Shëno si të mbaruar",
+    "clearSoldOut": "Kthe në shitje",
+    "soldOutUpdateFailed": "Nuk u përditësua gjendja e mbarimit",
+    "editPrices": "Ndrysho çmimet",
+    "saveAllPrices": "Ruaj të gjitha",
+    "pricesSaved": "Çmimet u përditësuan",
+    "pricesSaveFailed": "Nuk u ruajtën çmimet",
+    "bulkPercent": "% në masë",
+    "bulkPercentApply": "Apliko",
+    "bulkPercentCategory": "Kategoria",
+    "bulkAllCategories": "Të gjitha kategoritë"
   },
   "productAnalytics": {
     "title": "Na ndihmoni të vendosim çfarë të ndërtojmë më pas",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Ngarkimi i raporteve dështoi",
-    "noData": "Nuk ka të dhëna për këtë periudhë"
+    "noData": "Nuk ka të dhëna për këtë periudhë",
+    "tabProfitability": "Rentabiliteti i pjatave",
+    "dishClass": "Klasa",
+    "dish": "Pjata",
+    "revenue": "Të ardhurat",
+    "ingredientCost": "Kostoja e përbërësve",
+    "costCoverage": "Mbulimi i kostos",
+    "margin": "Marzhi",
+    "marginPct": "Marzhi %",
+    "classStar": "Yll",
+    "classPuzzle": "Enigmë",
+    "classPlowhorse": "Kalë pune",
+    "classDog": "I dobët"
   },
   "serverApp": {
     "addToOrder": "Shto në porosi",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Çaktivizon çdo lidhje opsionale me internetin: sinkronizimin në re, kopjet rezervë në Google Drive, WhatsApp, kontrollin e përditësimeve, analizat e përdorimit dhe importimin e imazheve nga uebi. Porositë, faturimi, printimi dhe pajisjet në rrjetin tuaj lokal vazhdojnë të punojnë.",
     "offlineModeFailed": "Modaliteti pa internet nuk u ndryshua dot",
     "offlineModeReadFailed": "Cilësimi aktual i modalitetit pa internet nuk u lexua dot.",
-    "offlineModeRetry": "Provo përsëri"
+    "offlineModeRetry": "Provo përsëri",
+    "tabCustomerDisplay": "Ekrani i klientit"
   },
   "setup": {
     "alreadyCompleted": "Konfigurimi në këtë instalim është përfunduar. Po ridrejtohemi te hyrja...",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Porositë u bashkuan",
     "mergeNoTargets": "Nuk ka porosi të tjera aktive për bashkim",
     "openedFirstOrder": "Porosia e parë u hap",
-    "newOrder": "Porosi e re"
+    "newOrder": "Porosi e re",
+    "arrivalTime": "Koha e mbërritjes",
+    "todaysReservations": "Rezervimet e sotme"
   },
   "tax": {
     "actionActivate": "Pakoja u aktivizua",

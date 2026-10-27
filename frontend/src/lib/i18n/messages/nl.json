@@ -599,7 +599,13 @@
     "updating": "Updaten…",
     "viewKanban": "Kanban",
     "viewTabs": "Tabbladen",
-    "wsConnected": "WebSocket verbonden"
+    "wsConnected": "WebSocket verbonden",
+    "soundOn": "Geluid aan",
+    "soundOff": "Geluid uit",
+    "testSound": "Geluid testen",
+    "enableSoundBanner": "Tik hier om geluiden voor nieuwe bestellingen in te schakelen",
+    "newOrderAlert": "{count, plural, one {Nieuwe bestelling} other {# nieuwe bestellingen}}",
+    "newOrderAlertTable": "Nieuwe bestelling · Tafel {table}"
   },
   "nav": {
     "collapse": "Inklappen",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# open bestelling wordt meegenomen} other {# open bestellingen worden meegenomen}}",
     "shiftCloseUnpaidWarningHint": "Deze bestellingen blijven open voor de volgende dienst. Bij het sluiten van deze dienst worden alleen de contante betalingen verrekend die tijdens deze dienst al zijn ontvangen.",
     "shiftCloseUnpaidMoreCount": "+{count} extra open bestellingen",
-    "tableBillRequested": "Rekening aangevraagd"
+    "tableBillRequested": "Rekening aangevraagd",
+    "soldOutEnded": "Uitverkocht",
+    "soldOutMark": "Markeren als uitverkocht",
+    "soldOutRestore": "Weer te koop zetten",
+    "cardSize": "Kaartgrootte",
+    "densityLarge": "Groot",
+    "densityMedium": "Middel",
+    "densitySmall": "Klein",
+    "soldOutReminderTitle": "Artikelen nog steeds uitverkocht",
+    "soldOutReactivateAll": "Alles opnieuw activeren",
+    "soldOutSaved": "Status uitverkocht bijgewerkt",
+    "soldOutSaveFailed": "Status uitverkocht kon niet worden bijgewerkt"
   },
   "printTest": {
     "amt": "Bedrag",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Dit product heeft varianten (bijv. formaat, korst, smaak)",
     "variantsSection": "Varianten",
     "variantDeactivateConfirm": "Deze variant wordt bij opslaan gedeactiveerd en kan vanaf dit scherm niet worden hersteld.",
-    "variantRemoveAllConfirm": "Als u dit uitschakelt, worden alle varianten van dit product gedeactiveerd. Eerdere bestellingen behouden ze."
+    "variantRemoveAllConfirm": "Als u dit uitschakelt, worden alle varianten van dit product gedeactiveerd. Eerdere bestellingen behouden ze.",
+    "pinProduct": "Bovenaan vastzetten",
+    "unpinProduct": "Losmaken",
+    "pinUpdateFailed": "Vastzetten kon niet worden bijgewerkt",
+    "soldOutBadge": "Uitverkocht",
+    "soldOutOnly": "Alleen uitverkocht",
+    "markSoldOut": "Markeren als uitverkocht",
+    "clearSoldOut": "Weer te koop zetten",
+    "soldOutUpdateFailed": "Status uitverkocht kon niet worden bijgewerkt",
+    "editPrices": "Prijzen bewerken",
+    "saveAllPrices": "Alles opslaan",
+    "pricesSaved": "Prijzen bijgewerkt",
+    "pricesSaveFailed": "Prijzen konden niet worden opgeslagen",
+    "bulkPercent": "Groeps %",
+    "bulkPercentApply": "Toepassen",
+    "bulkPercentCategory": "Categorie",
+    "bulkAllCategories": "Alle categorieën"
   },
   "productAnalytics": {
     "title": "Help ons bepalen wat we hierna bouwen",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Rapporten laden mislukt",
-    "noData": "Geen gegevens voor deze periode"
+    "noData": "Geen gegevens voor deze periode",
+    "tabProfitability": "Winstgevendheid van gerechten",
+    "dishClass": "Klasse",
+    "dish": "Gerecht",
+    "revenue": "Omzet",
+    "ingredientCost": "Ingrediëntenkosten",
+    "costCoverage": "Kostendekking",
+    "margin": "Marge",
+    "marginPct": "Marge %",
+    "classStar": "Ster",
+    "classPuzzle": "Puzzel",
+    "classPlowhorse": "Werkpaard",
+    "classDog": "Zwak"
   },
   "serverApp": {
     "addToOrder": "Toevoegen aan bestelling",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Schakelt elke optionele internetverbinding uit: cloudsynchronisatie, Google Drive-back-ups, WhatsApp, updatecontroles, gebruiksanalyse en afbeeldingen importeren van het web. Bestellingen, facturatie, afdrukken en apparaten op je lokale netwerk blijven werken.",
     "offlineModeFailed": "De offlinemodus kon niet worden gewijzigd",
     "offlineModeReadFailed": "De huidige instelling voor de offlinemodus kon niet worden gelezen.",
-    "offlineModeRetry": "Opnieuw proberen"
+    "offlineModeRetry": "Opnieuw proberen",
+    "tabCustomerDisplay": "Klantendisplay"
   },
   "setup": {
     "alreadyCompleted": "De installatie is bij deze installatie al voltooid. Omleiden naar inloggen…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Bestellingen samengevoegd",
     "mergeNoTargets": "Geen andere actieve bestellingen om samen te voegen",
     "openedFirstOrder": "Eerste bestelling geopend",
-    "newOrder": "Nieuwe bestelling"
+    "newOrder": "Nieuwe bestelling",
+    "arrivalTime": "Aankomsttijd",
+    "todaysReservations": "Reserveringen van vandaag"
   },
   "tax": {
     "actionActivate": "Pakket geactiveerd",

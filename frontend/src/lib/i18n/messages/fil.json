@@ -599,7 +599,13 @@
     "updating": "Nag-uupdate...",
     "viewKanban": "Kanban",
     "viewTabs": "Tabs",
-    "wsConnected": "Konektado ang WebSocket"
+    "wsConnected": "Konektado ang WebSocket",
+    "soundOn": "Naka-on ang tunog",
+    "soundOff": "Naka-off ang tunog",
+    "testSound": "Subukan ang tunog",
+    "enableSoundBanner": "I-tap dito para paganahin ang tunog ng bagong order",
+    "newOrderAlert": "{count, plural, other {# bagong order}}",
+    "newOrderAlertTable": "Bagong order · Mesa {table}"
   },
   "nav": {
     "collapse": "I-collapse ang Sidebar",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# bukas na order ang ililipat sa susunod na shift} other {# bukas na mga order ang ililipat sa susunod na shift}}",
     "shiftCloseUnpaidWarningHint": "Mananatiling bukas ang mga order na ito para sa susunod na shift. Ang pagsasara ng shift na ito ay nagtutugma lamang sa mga bayad na cash na nakolekta na sa shift na ito.",
     "shiftCloseUnpaidMoreCount": "+{count} pang bukas na order",
-    "tableBillRequested": "Hiniling ang bill"
+    "tableBillRequested": "Hiniling ang bill",
+    "soldOutEnded": "Ubos na",
+    "soldOutMark": "Markahang ubos na",
+    "soldOutRestore": "Ibenta ulit",
+    "cardSize": "Laki ng card",
+    "densityLarge": "Malaki",
+    "densityMedium": "Katamtaman",
+    "densitySmall": "Maliit",
+    "soldOutReminderTitle": "Mga item na ubos pa rin",
+    "soldOutReactivateAll": "I-reactivate lahat",
+    "soldOutSaved": "Na-update ang estado ng pagkaubos",
+    "soldOutSaveFailed": "Hindi ma-update ang estado ng pagkaubos"
   },
   "printTest": {
     "amt": "Halaga",
@@ -1576,7 +1593,23 @@
     "variantToggle": "May mga variant ang produktong ito (hal. Sukat, Crust, Flavor)",
     "variantsSection": "Mga variant",
     "variantDeactivateConfirm": "I-deactivate ang variant na ito kapag nai-save at hindi ito maibabalik mula sa screen na ito.",
-    "variantRemoveAllConfirm": "Kapag pinatay ito, made-deactivate ang lahat ng variant ng produktong ito. Nananatili ang dating mga order."
+    "variantRemoveAllConfirm": "Kapag pinatay ito, made-deactivate ang lahat ng variant ng produktong ito. Nananatili ang dating mga order.",
+    "pinProduct": "I-pin sa itaas",
+    "unpinProduct": "I-unpin",
+    "pinUpdateFailed": "Hindi ma-update ang pin",
+    "soldOutBadge": "Ubos na",
+    "soldOutOnly": "Ubos lang",
+    "markSoldOut": "Markahang ubos na",
+    "clearSoldOut": "Ibalik sa bentahan",
+    "soldOutUpdateFailed": "Hindi ma-update ang estado ng pagkaubos",
+    "editPrices": "I-edit ang mga presyo",
+    "saveAllPrices": "I-save lahat",
+    "pricesSaved": "Na-update ang mga presyo",
+    "pricesSaveFailed": "Hindi mai-save ang mga presyo",
+    "bulkPercent": "Maramihang %",
+    "bulkPercentApply": "Ilapat",
+    "bulkPercentCategory": "Kategorya",
+    "bulkAllCategories": "Lahat ng kategorya"
   },
   "productAnalytics": {
     "title": "Tulungan kaming magpasya kung ano ang susunod naming gagawin",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Nabigong i-load ang mga ulat",
-    "noData": "Walang data para sa panahong ito"
+    "noData": "Walang data para sa panahong ito",
+    "tabProfitability": "Kita ng mga putahe",
+    "dishClass": "Klase",
+    "dish": "Putahe",
+    "revenue": "Kita",
+    "ingredientCost": "Gastos sa sangkap",
+    "costCoverage": "Saklaw ng gastos",
+    "margin": "Tubo",
+    "marginPct": "Tubo %",
+    "classStar": "Bituin",
+    "classPuzzle": "Palaisipan",
+    "classPlowhorse": "Kabayo ng trabaho",
+    "classDog": "Mahina"
   },
   "serverApp": {
     "addToOrder": "Magdagdag to order",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Pinapatay nito ang bawat opsyonal na koneksyon sa internet: cloud sync, backup sa Google Drive, WhatsApp, pag-check ng update, usage analytics at pag-import ng larawan mula sa web. Patuloy na gumagana ang mga order, billing, pag-print at mga device sa iyong local network.",
     "offlineModeFailed": "Hindi mabago ang Offline mode",
     "offlineModeReadFailed": "Hindi mabasa ang kasalukuyang setting ng Offline mode.",
-    "offlineModeRetry": "Subukan muli"
+    "offlineModeRetry": "Subukan muli",
+    "tabCustomerDisplay": "Display ng customer"
   },
   "setup": {
     "alreadyCompleted": "Nakumpleto na ang setup sa installation na ito. Nireredirect sa pag-login…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Pinagsama ang mga order",
     "mergeNoTargets": "Walang ibang aktibong order na pagasamahin",
     "openedFirstOrder": "Binuksan ang unang order",
-    "newOrder": "Bagong order"
+    "newOrder": "Bagong order",
+    "arrivalTime": "Oras ng pagdating",
+    "todaysReservations": "Mga reserbasyon ngayon"
   },
   "tax": {
     "actionActivate": "Na-activate ang pack",

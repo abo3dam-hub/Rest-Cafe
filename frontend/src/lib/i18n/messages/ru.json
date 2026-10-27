@@ -599,7 +599,13 @@
     "updating": "Обновление…",
     "viewKanban": "Канбан",
     "viewTabs": "Вкладки",
-    "wsConnected": "WebSocket подключен"
+    "wsConnected": "WebSocket подключен",
+    "soundOn": "Звук включён",
+    "soundOff": "Звук выключен",
+    "testSound": "Проверить звук",
+    "enableSoundBanner": "Нажмите здесь, чтобы включить звуки новых заказов",
+    "newOrderAlert": "{count, plural, one {Новый заказ} few {# новых заказа} many {# новых заказов} other {# новых заказа}}",
+    "newOrderAlertTable": "Новый заказ · Стол {table}"
   },
   "nav": {
     "collapse": "Свернуть",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# открытый заказ перейдет в следующую смену} other {# открытых заказов перейдут в следующую смену}}",
     "shiftCloseUnpaidWarningHint": "Эти заказы остаются открытыми для следующей смены. Закрытие этой смены сверяет только наличные платежи, уже принятые в течение этой смены.",
     "shiftCloseUnpaidMoreCount": "+ещё {count} открытых заказов",
-    "tableBillRequested": "Счёт запрошен"
+    "tableBillRequested": "Счёт запрошен",
+    "soldOutEnded": "Закончилось",
+    "soldOutMark": "Отметить как закончившееся",
+    "soldOutRestore": "Вернуть в продажу",
+    "cardSize": "Размер карточек",
+    "densityLarge": "Крупный",
+    "densityMedium": "Средний",
+    "densitySmall": "Мелкий",
+    "soldOutReminderTitle": "Товары, которые всё ещё закончились",
+    "soldOutReactivateAll": "Активировать все",
+    "soldOutSaved": "Статус наличия обновлён",
+    "soldOutSaveFailed": "Не удалось обновить статус наличия"
   },
   "printTest": {
     "amt": "Сумма",
@@ -1576,7 +1593,23 @@
     "variantToggle": "У этого товара есть варианты (например, размер, начинка, вкус)",
     "variantsSection": "Варианты",
     "variantDeactivateConfirm": "Этот вариант будет отключён при сохранении, и восстановить его с этого экрана нельзя.",
-    "variantRemoveAllConfirm": "Если выключить, будут отключены все варианты этого товара. В прежних заказах они сохранятся."
+    "variantRemoveAllConfirm": "Если выключить, будут отключены все варианты этого товара. В прежних заказах они сохранятся.",
+    "pinProduct": "Закрепить сверху",
+    "unpinProduct": "Открепить",
+    "pinUpdateFailed": "Не удалось обновить закрепление",
+    "soldOutBadge": "Закончилось",
+    "soldOutOnly": "Только закончившиеся",
+    "markSoldOut": "Отметить как закончившееся",
+    "clearSoldOut": "Вернуть в продажу",
+    "soldOutUpdateFailed": "Не удалось обновить статус наличия",
+    "editPrices": "Изменить цены",
+    "saveAllPrices": "Сохранить все",
+    "pricesSaved": "Цены обновлены",
+    "pricesSaveFailed": "Не удалось сохранить цены",
+    "bulkPercent": "Массово %",
+    "bulkPercentApply": "Применить",
+    "bulkPercentCategory": "Категория",
+    "bulkAllCategories": "Все категории"
   },
   "productAnalytics": {
     "title": "Помогите нам решить, что делать дальше",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Не удалось загрузить отчёты",
-    "noData": "Нет данных за этот период"
+    "noData": "Нет данных за этот период",
+    "tabProfitability": "Прибыльность блюд",
+    "dishClass": "Класс",
+    "dish": "Блюдо",
+    "revenue": "Выручка",
+    "ingredientCost": "Себестоимость ингредиентов",
+    "costCoverage": "Покрытие затрат",
+    "margin": "Маржа",
+    "marginPct": "Маржа %",
+    "classStar": "Звезда",
+    "classPuzzle": "Загадка",
+    "classPlowhorse": "Рабочая лошадка",
+    "classDog": "Слабое"
   },
   "serverApp": {
     "addToOrder": "Добавить в заказ",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Отключает все необязательные подключения к интернету: облачную синхронизацию, резервные копии Google Drive, WhatsApp, проверку обновлений, аналитику использования и импорт изображений из сети. Заказы, расчёты, печать и устройства в локальной сети продолжают работать.",
     "offlineModeFailed": "Не удалось изменить автономный режим",
     "offlineModeReadFailed": "Не удалось прочитать текущую настройку автономного режима.",
-    "offlineModeRetry": "Повторить"
+    "offlineModeRetry": "Повторить",
+    "tabCustomerDisplay": "Дисплей покупателя"
   },
   "setup": {
     "alreadyCompleted": "Настройка этой установки уже завершена. Перенаправление на вход…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Заказы объединены",
     "mergeNoTargets": "Нет других активных заказов для объединения",
     "openedFirstOrder": "Первый заказ открыт",
-    "newOrder": "Новый заказ"
+    "newOrder": "Новый заказ",
+    "arrivalTime": "Время прибытия",
+    "todaysReservations": "Бронирования на сегодня"
   },
   "tax": {
     "actionActivate": "Пакет активирован",

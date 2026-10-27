@@ -599,7 +599,13 @@
     "updating": "Güncelleniyor...",
     "viewKanban": "Kanban Görünümü",
     "viewTabs": "Sekme Görünümü",
-    "wsConnected": "WebSocket Bağlı"
+    "wsConnected": "WebSocket Bağlı",
+    "soundOn": "Ses açık",
+    "soundOff": "Ses kapalı",
+    "testSound": "Sesi test et",
+    "enableSoundBanner": "Yeni sipariş seslerini açmak için buraya dokunun",
+    "newOrderAlert": "{count, plural, one {Yeni sipariş} other {# yeni sipariş}}",
+    "newOrderAlertTable": "Yeni sipariş · Masa {table}"
   },
   "nav": {
     "collapse": "Menüyü Daralt",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# açık sipariş sonraki vardiyaya devredilecek} other {# açık sipariş sonraki vardiyaya devredilecek}}",
     "shiftCloseUnpaidWarningHint": "Bu siparişler bir sonraki vardiya için açık kalır. Bu vardiyayı kapatmak yalnızca bu vardiya sırasında tahsil edilmiş nakit ödemeleri mutabakatlandırır.",
     "shiftCloseUnpaidMoreCount": "+{count} açık sipariş daha",
-    "tableBillRequested": "Hesap istendi"
+    "tableBillRequested": "Hesap istendi",
+    "soldOutEnded": "Tükendi",
+    "soldOutMark": "Tükendi olarak işaretle",
+    "soldOutRestore": "Tekrar satışa al",
+    "cardSize": "Kart boyutu",
+    "densityLarge": "Büyük",
+    "densityMedium": "Orta",
+    "densitySmall": "Küçük",
+    "soldOutReminderTitle": "Hâlâ tükenmiş öğeler",
+    "soldOutReactivateAll": "Tümünü yeniden etkinleştir",
+    "soldOutSaved": "Tükenme durumu güncellendi",
+    "soldOutSaveFailed": "Tükenme durumu güncellenemedi"
   },
   "printTest": {
     "amt": "Tutar",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Bu ürünün varyantları var (örn. Boyut, Hamur, Tat)",
     "variantsSection": "Varyantlar",
     "variantDeactivateConfirm": "Bu varyant kaydedildiğinde devre dışı bırakılır ve bu ekrandan geri alınamaz.",
-    "variantRemoveAllConfirm": "Bunu kapatırsanız bu ürünün tüm varyantları devre dışı bırakılır. Eski siparişler korunur."
+    "variantRemoveAllConfirm": "Bunu kapatırsanız bu ürünün tüm varyantları devre dışı bırakılır. Eski siparişler korunur.",
+    "pinProduct": "Başa sabitle",
+    "unpinProduct": "Sabiti kaldır",
+    "pinUpdateFailed": "Sabitleme güncellenemedi",
+    "soldOutBadge": "Tükendi",
+    "soldOutOnly": "Yalnızca tükenenler",
+    "markSoldOut": "Tükendi olarak işaretle",
+    "clearSoldOut": "Tekrar satışa al",
+    "soldOutUpdateFailed": "Tükenme durumu güncellenemedi",
+    "editPrices": "Fiyatları düzenle",
+    "saveAllPrices": "Tümünü kaydet",
+    "pricesSaved": "Fiyatlar güncellendi",
+    "pricesSaveFailed": "Fiyatlar kaydedilemedi",
+    "bulkPercent": "Toplu %",
+    "bulkPercentApply": "Uygula",
+    "bulkPercentCategory": "Kategori",
+    "bulkAllCategories": "Tüm kategoriler"
   },
   "productAnalytics": {
     "title": "Sırada ne yapacağımıza karar vermemize yardım edin",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Raporlar yüklenemedi",
-    "noData": "Bu dönem için veri yok"
+    "noData": "Bu dönem için veri yok",
+    "tabProfitability": "Yemek kârlılığı",
+    "dishClass": "Sınıf",
+    "dish": "Yemek",
+    "revenue": "Gelir",
+    "ingredientCost": "Malzeme maliyeti",
+    "costCoverage": "Maliyet kapsamı",
+    "margin": "Marj",
+    "marginPct": "Marj %",
+    "classStar": "Yıldız",
+    "classPuzzle": "Bulmaca",
+    "classPlowhorse": "Emekçi",
+    "classDog": "Zayıf"
   },
   "serverApp": {
     "addToOrder": "Siparişe Ekle",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Tüm isteğe bağlı internet bağlantılarını kapatır: bulut eşitleme, Google Drive yedekleri, WhatsApp, güncelleme denetimi, kullanım analizi ve web'den görsel içe aktarma. Siparişler, faturalama, yazdırma ve yerel ağınızdaki cihazlar çalışmaya devam eder.",
     "offlineModeFailed": "Çevrimdışı mod değiştirilemedi",
     "offlineModeReadFailed": "Geçerli çevrimdışı mod ayarı okunamadı.",
-    "offlineModeRetry": "Yeniden dene"
+    "offlineModeRetry": "Yeniden dene",
+    "tabCustomerDisplay": "Müşteri ekranı"
   },
   "setup": {
     "alreadyCompleted": "Kurulum bu cihazda zaten tamamlandı. Giriş ekranına yönlendiriliyorsunuz…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Siparişler birleştirildi",
     "mergeNoTargets": "Birleştirilecek başka aktif sipariş yok",
     "openedFirstOrder": "İlk sipariş açıldı",
-    "newOrder": "Yeni sipariş"
+    "newOrder": "Yeni sipariş",
+    "arrivalTime": "Varış saati",
+    "todaysReservations": "Bugünün rezervasyonları"
   },
   "tax": {
     "actionActivate": "Vergi paketi etkinleştirildi",

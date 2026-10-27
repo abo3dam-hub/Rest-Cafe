@@ -599,7 +599,13 @@
     "updating": "আপডেট হচ্ছে...",
     "viewKanban": "কানবন",
     "viewTabs": "ট্যাব",
-    "wsConnected": "WebSocket সংযুক্ত"
+    "wsConnected": "WebSocket সংযুক্ত",
+    "soundOn": "শব্দ চালু",
+    "soundOff": "শব্দ বন্ধ",
+    "testSound": "শব্দ পরীক্ষা",
+    "enableSoundBanner": "নতুন অর্ডারের শব্দ চালু করতে এখানে চাপ দিন",
+    "newOrderAlert": "{count, plural, other {#টি নতুন অর্ডার}}",
+    "newOrderAlertTable": "নতুন অর্ডার · টেবিল {table}"
   },
   "nav": {
     "collapse": "সঙ্কুচিত",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {#টি খোলা অর্ডার পরবর্তী শিফটে যাবে} other {#টি খোলা অর্ডার পরবর্তী শিফটে যাবে}}",
     "shiftCloseUnpaidWarningHint": "এই অর্ডারগুলো পরবর্তী শিফটের জন্য খোলা থাকবে। এই শিফট বন্ধ করলে শুধুমাত্র এই শিফটে ইতিমধ্যে সংগৃহীত নগদ পেমেন্টের হিসাব মেলানো হয়।",
     "shiftCloseUnpaidMoreCount": "+আরও {count}টি খোলা অর্ডার",
-    "tableBillRequested": "বিলের অনুরোধ করা হয়েছে"
+    "tableBillRequested": "বিলের অনুরোধ করা হয়েছে",
+    "soldOutEnded": "শেষ হয়ে গেছে",
+    "soldOutMark": "শেষ বলে চিহ্নিত করুন",
+    "soldOutRestore": "আবার বিক্রি করুন",
+    "cardSize": "কার্ডের আকার",
+    "densityLarge": "বড়",
+    "densityMedium": "মাঝারি",
+    "densitySmall": "ছোট",
+    "soldOutReminderTitle": "যেসব পণ্য এখনও শেষ",
+    "soldOutReactivateAll": "সব আবার চালু করুন",
+    "soldOutSaved": "শেষ-অবস্থা আপডেট হয়েছে",
+    "soldOutSaveFailed": "শেষ-অবস্থা আপডেট করা যায়নি"
   },
   "printTest": {
     "amt": "এএমটি",
@@ -1576,7 +1593,23 @@
     "variantToggle": "এই পণ্যের ভ্যারিয়েন্ট আছে (যেমন: সাইজ, ক্রাস্ট, ফ্লেভার)",
     "variantsSection": "ভ্যারিয়েন্ট",
     "variantDeactivateConfirm": "এই ভ্যারিয়েন্টটি সংরক্ষণের সময় নিষ্ক্রিয় হবে এবং এই স্ক্রিন থেকে ফিরিয়ে আনা যাবে না।",
-    "variantRemoveAllConfirm": "এটি বন্ধ করলে এই পণ্যের সব ভ্যারিয়েন্ট নিষ্ক্রিয় হয়ে যাবে। পুরোনো অর্ডারে সেগুলো থাকবে।"
+    "variantRemoveAllConfirm": "এটি বন্ধ করলে এই পণ্যের সব ভ্যারিয়েন্ট নিষ্ক্রিয় হয়ে যাবে। পুরোনো অর্ডারে সেগুলো থাকবে।",
+    "pinProduct": "উপরে পিন করুন",
+    "unpinProduct": "পিন সরান",
+    "pinUpdateFailed": "পিন আপডেট করা যায়নি",
+    "soldOutBadge": "শেষ হয়ে গেছে",
+    "soldOutOnly": "শুধু শেষ হওয়াগুলো",
+    "markSoldOut": "শেষ বলে চিহ্নিত করুন",
+    "clearSoldOut": "আবার বিক্রিযোগ্য করুন",
+    "soldOutUpdateFailed": "শেষ-অবস্থা আপডেট করা যায়নি",
+    "editPrices": "দাম সম্পাদনা",
+    "saveAllPrices": "সব সংরক্ষণ",
+    "pricesSaved": "দাম আপডেট হয়েছে",
+    "pricesSaveFailed": "দাম সংরক্ষণ করা যায়নি",
+    "bulkPercent": "পাইকারি %",
+    "bulkPercentApply": "প্রয়োগ",
+    "bulkPercentCategory": "বিভাগ",
+    "bulkAllCategories": "সব বিভাগ"
   },
   "productAnalytics": {
     "title": "এরপর কী বানাব, তা ঠিক করতে আমাদের সাহায্য করুন",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "রিপোর্ট লোড করা যায়নি",
-    "noData": "এই সময়ের জন্য কোনো ডেটা নেই"
+    "noData": "এই সময়ের জন্য কোনো ডেটা নেই",
+    "tabProfitability": "পদের লাভজনকতা",
+    "dishClass": "শ্রেণি",
+    "dish": "পদ",
+    "revenue": "আয়",
+    "ingredientCost": "উপকরণের খরচ",
+    "costCoverage": "খরচ কভারেজ",
+    "margin": "মার্জিন",
+    "marginPct": "মার্জিন %",
+    "classStar": "তারকা",
+    "classPuzzle": "ধাঁধা",
+    "classPlowhorse": "পরিশ্রমী ঘোড়া",
+    "classDog": "দুর্বল"
   },
   "serverApp": {
     "addToOrder": "অর্ডার যোগ করুন",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "ইন্টারনেটের সব ঐচ্ছিক সংযোগ বন্ধ করে: ক্লাউড সিঙ্ক, Google Drive ব্যাকআপ, হোয়াটসঅ্যাপ, আপডেট পরীক্ষা, ব্যবহার বিশ্লেষণ ও ওয়েব থেকে ছবি আমদানি। অর্ডার, বিলিং, প্রিন্টিং এবং আপনার লোকাল নেটওয়ার্কের ডিভাইস কাজ করতে থাকে।",
     "offlineModeFailed": "অফলাইন মোড পরিবর্তন করা যায়নি",
     "offlineModeReadFailed": "বর্তমান অফলাইন মোড সেটিং পড়া যায়নি।",
-    "offlineModeRetry": "আবার চেষ্টা করুন"
+    "offlineModeRetry": "আবার চেষ্টা করুন",
+    "tabCustomerDisplay": "গ্রাহক ডিসপ্লে"
   },
   "setup": {
     "alreadyCompleted": "এই ইনস্টলে সেটআপ ইতিমধ্যেই সম্পন্ন হয়েছে। লগইন করার জন্য পুনঃনির্দেশ করা হচ্ছে...",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "অর্ডার মার্জ হয়েছে",
     "mergeNoTargets": "মার্জ করার জন্য অন্য কোনো সক্রিয় অর্ডার নেই",
     "openedFirstOrder": "প্রথম অর্ডার খোলা হয়েছে",
-    "newOrder": "নতুন অর্ডার"
+    "newOrder": "নতুন অর্ডার",
+    "arrivalTime": "আগমনের সময়",
+    "todaysReservations": "আজকের রিজার্ভেশন"
   },
   "tax": {
     "actionActivate": "প্যাক সক্রিয় করা হয়েছে",

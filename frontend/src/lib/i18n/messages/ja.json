@@ -599,7 +599,13 @@
     "updating": "更新中…",
     "viewKanban": "カンバン",
     "viewTabs": "タブ",
-    "wsConnected": "WebSocket接続済み"
+    "wsConnected": "WebSocket接続済み",
+    "soundOn": "サウンド オン",
+    "soundOff": "サウンド オフ",
+    "testSound": "サウンドをテスト",
+    "enableSoundBanner": "新しい注文のサウンドを有効にするにはここをタップ",
+    "newOrderAlert": "{count, plural, other {新しい注文が # 件}}",
+    "newOrderAlertTable": "新しい注文 · テーブル {table}"
   },
   "nav": {
     "collapse": "折りたたむ",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 件の未会計注文が次のシフトに引き継がれます} other {# 件の未会計注文が次のシフトに引き継がれます}}",
     "shiftCloseUnpaidWarningHint": "これらの注文は次のシフトに引き継がれます。このシフトの精算では、このシフト中に受け取った現金支払いのみを集計します。",
     "shiftCloseUnpaidMoreCount": "他 +{count} 件の未会計注文",
-    "tableBillRequested": "会計がリクエストされました"
+    "tableBillRequested": "会計がリクエストされました",
+    "soldOutEnded": "売り切れ",
+    "soldOutMark": "売り切れにする",
+    "soldOutRestore": "販売を再開",
+    "cardSize": "カードサイズ",
+    "densityLarge": "大",
+    "densityMedium": "中",
+    "densitySmall": "小",
+    "soldOutReminderTitle": "まだ売り切れの商品",
+    "soldOutReactivateAll": "すべて再開",
+    "soldOutSaved": "売り切れ状態を更新しました",
+    "soldOutSaveFailed": "売り切れ状態を更新できませんでした"
   },
   "printTest": {
     "amt": "金額",
@@ -1576,7 +1593,23 @@
     "variantToggle": "この商品にはバリアントがあります（例：サイズ、生地、フレーバー）",
     "variantsSection": "バリエーション",
     "variantDeactivateConfirm": "保存するとこのバリアントは無効になり、この画面から復元できません。",
-    "variantRemoveAllConfirm": "オフにするとこの商品のすべてのバリアントが無効になります。過去の注文には残ります。"
+    "variantRemoveAllConfirm": "オフにするとこの商品のすべてのバリアントが無効になります。過去の注文には残ります。",
+    "pinProduct": "先頭に固定",
+    "unpinProduct": "固定を解除",
+    "pinUpdateFailed": "固定を更新できませんでした",
+    "soldOutBadge": "売り切れ",
+    "soldOutOnly": "売り切れのみ",
+    "markSoldOut": "売り切れにする",
+    "clearSoldOut": "販売を再開",
+    "soldOutUpdateFailed": "売り切れ状態を更新できませんでした",
+    "editPrices": "価格を編集",
+    "saveAllPrices": "すべて保存",
+    "pricesSaved": "価格を更新しました",
+    "pricesSaveFailed": "価格を保存できませんでした",
+    "bulkPercent": "一括 %",
+    "bulkPercentApply": "適用",
+    "bulkPercentCategory": "カテゴリ",
+    "bulkAllCategories": "すべてのカテゴリ"
   },
   "productAnalytics": {
     "title": "次に何を作るか、一緒に決めてください",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "レポートの読み込みに失敗しました",
-    "noData": "この期間のデータはありません"
+    "noData": "この期間のデータはありません",
+    "tabProfitability": "料理の収益性",
+    "dishClass": "クラス",
+    "dish": "料理",
+    "revenue": "売上",
+    "ingredientCost": "材料費",
+    "costCoverage": "コストカバー率",
+    "margin": "利益",
+    "marginPct": "利益率 %",
+    "classStar": "スター",
+    "classPuzzle": "パズル",
+    "classPlowhorse": "働き馬",
+    "classDog": "弱い"
   },
   "serverApp": {
     "addToOrder": "注文に追加",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "クラウド同期、Google Drive バックアップ、WhatsApp、アップデート確認、利用状況の分析、Web からの画像取り込みなど、任意のインターネット接続をすべて停止します。注文、会計、印刷、ローカルネットワーク上のデバイスは引き続き動作します。",
     "offlineModeFailed": "オフラインモードを変更できませんでした",
     "offlineModeReadFailed": "現在のオフラインモード設定を読み込めませんでした。",
-    "offlineModeRetry": "再試行"
+    "offlineModeRetry": "再試行",
+    "tabCustomerDisplay": "顧客用ディスプレイ"
   },
   "setup": {
     "alreadyCompleted": "このインストールではセットアップが完了しています。ログインへ移動します…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "注文を統合しました",
     "mergeNoTargets": "統合できる他のアクティブな注文はありません",
     "openedFirstOrder": "最初の注文が開かれました",
-    "newOrder": "新しい注文"
+    "newOrder": "新しい注文",
+    "arrivalTime": "到着時刻",
+    "todaysReservations": "本日の予約"
   },
   "tax": {
     "actionActivate": "パックを有効化",

@@ -599,7 +599,13 @@
     "updating": "更新中…",
     "viewKanban": "看板",
     "viewTabs": "标签页",
-    "wsConnected": "WebSocket 已连接"
+    "wsConnected": "WebSocket 已连接",
+    "soundOn": "声音开",
+    "soundOff": "声音关",
+    "testSound": "测试声音",
+    "enableSoundBanner": "点按此处启用新订单提示音",
+    "newOrderAlert": "{count, plural, other {# 个新订单}}",
+    "newOrderAlertTable": "新订单 · 桌 {table}"
   },
   "nav": {
     "collapse": "收起",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 笔未结订单将结转至下一班次} other {# 笔未结订单将结转至下一班次}}",
     "shiftCloseUnpaidWarningHint": "这些订单将保持开启并交接给下一班次。关闭本班次仅核对本班次期间已收取的现金付款。",
     "shiftCloseUnpaidMoreCount": "另有 +{count} 笔未结订单",
-    "tableBillRequested": "已请求账单"
+    "tableBillRequested": "已请求账单",
+    "soldOutEnded": "已售罄",
+    "soldOutMark": "标记为售罄",
+    "soldOutRestore": "恢复销售",
+    "cardSize": "卡片大小",
+    "densityLarge": "大",
+    "densityMedium": "中",
+    "densitySmall": "小",
+    "soldOutReminderTitle": "仍处于售罄的商品",
+    "soldOutReactivateAll": "全部重新激活",
+    "soldOutSaved": "售罄状态已更新",
+    "soldOutSaveFailed": "无法更新售罄状态"
   },
   "printTest": {
     "amt": "金额",
@@ -1576,7 +1593,23 @@
     "variantToggle": "此商品有变体（例如：尺寸、饼底、口味）",
     "variantsSection": "变体",
     "variantDeactivateConfirm": "该变体保存后将被停用，且无法在此页面恢复。",
-    "variantRemoveAllConfirm": "关闭后将停用该商品的所有变体，历史订单仍会保留。"
+    "variantRemoveAllConfirm": "关闭后将停用该商品的所有变体，历史订单仍会保留。",
+    "pinProduct": "置顶",
+    "unpinProduct": "取消置顶",
+    "pinUpdateFailed": "无法更新置顶状态",
+    "soldOutBadge": "已售罄",
+    "soldOutOnly": "仅已售罄",
+    "markSoldOut": "标记为售罄",
+    "clearSoldOut": "恢复销售",
+    "soldOutUpdateFailed": "无法更新售罄状态",
+    "editPrices": "编辑价格",
+    "saveAllPrices": "全部保存",
+    "pricesSaved": "价格已更新",
+    "pricesSaveFailed": "无法保存价格",
+    "bulkPercent": "批量 %",
+    "bulkPercentApply": "应用",
+    "bulkPercentCategory": "类别",
+    "bulkAllCategories": "所有类别"
   },
   "productAnalytics": {
     "title": "帮我们决定下一步做什么",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "报表加载失败",
-    "noData": "此期间没有数据"
+    "noData": "此期间没有数据",
+    "tabProfitability": "菜品盈利能力",
+    "dishClass": "等级",
+    "dish": "菜品",
+    "revenue": "收入",
+    "ingredientCost": "原料成本",
+    "costCoverage": "成本覆盖率",
+    "margin": "利润",
+    "marginPct": "利润率 %",
+    "classStar": "明星",
+    "classPuzzle": "谜题",
+    "classPlowhorse": "老黄牛",
+    "classDog": "弱势"
   },
   "serverApp": {
     "addToOrder": "加入订单",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "关闭所有可选的互联网连接：云同步、Google Drive 备份、WhatsApp、更新检查、使用分析以及从网络导入图片。订单、结账、打印和本地网络中的设备仍可正常使用。",
     "offlineModeFailed": "无法更改离线模式",
     "offlineModeReadFailed": "无法读取当前的离线模式设置。",
-    "offlineModeRetry": "重试"
+    "offlineModeRetry": "重试",
+    "tabCustomerDisplay": "顾客显示屏"
   },
   "setup": {
     "alreadyCompleted": "此安装已完成设置。正在跳转到登录…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "订单已合并",
     "mergeNoTargets": "没有其他可合并的活动订单",
     "openedFirstOrder": "第一个订单已打开",
-    "newOrder": "新订单"
+    "newOrder": "新订单",
+    "arrivalTime": "到达时间",
+    "todaysReservations": "今日预订"
   },
   "tax": {
     "actionActivate": "税务包已激活",

@@ -599,7 +599,13 @@
     "updating": "अपडेट हो रहा है...",
     "viewKanban": "कैनबन",
     "viewTabs": "टैब",
-    "wsConnected": "वेबसॉकेट कनेक्ट हुआ"
+    "wsConnected": "वेबसॉकेट कनेक्ट हुआ",
+    "soundOn": "ध्वनि चालू",
+    "soundOff": "ध्वनि बंद",
+    "testSound": "ध्वनि परीक्षण",
+    "enableSoundBanner": "नए ऑर्डर की ध्वनि चालू करने के लिए यहाँ टैप करें",
+    "newOrderAlert": "{count, plural, one {नया ऑर्डर} other {# नए ऑर्डर}}",
+    "newOrderAlertTable": "नया ऑर्डर · टेबल {table}"
   },
   "nav": {
     "collapse": "साइडबार समेटें",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# खुला ऑर्डर अगली शिफ्ट में आगे जाएगा} other {# खुले ऑर्डर अगली शिफ्ट में आगे जाएंगे}}",
     "shiftCloseUnpaidWarningHint": "ये ऑर्डर अगली शिफ्ट के लिए खुले रहते हैं। इस शिफ्ट को बंद करने पर केवल इस शिफ्ट के दौरान पहले से प्राप्त नकद भुगतानों का मिलान होता है।",
     "shiftCloseUnpaidMoreCount": "+{count} और खुले ऑर्डर",
-    "tableBillRequested": "बिल का अनुरोध किया गया"
+    "tableBillRequested": "बिल का अनुरोध किया गया",
+    "soldOutEnded": "खत्म हो गया",
+    "soldOutMark": "खत्म के रूप में चिह्नित करें",
+    "soldOutRestore": "वापस बिक्री के लिए रखें",
+    "cardSize": "कार्ड का आकार",
+    "densityLarge": "बड़ा",
+    "densityMedium": "मध्यम",
+    "densitySmall": "छोटा",
+    "soldOutReminderTitle": "आइटम जो अभी भी खत्म हैं",
+    "soldOutReactivateAll": "सब फिर से सक्रिय करें",
+    "soldOutSaved": "खत्म-स्थिति अपडेट हुई",
+    "soldOutSaveFailed": "खत्म-स्थिति अपडेट नहीं हो सकी"
   },
   "printTest": {
     "amt": "राशि",
@@ -1576,7 +1593,23 @@
     "variantToggle": "इस उत्पाद में वेरिएंट हैं (जैसे: आकार, क्रस्ट, स्वाद)",
     "variantsSection": "वेरिएंट",
     "variantDeactivateConfirm": "सहेजने पर यह वेरिएंट निष्क्रिय हो जाएगा और इसे इस स्क्रीन से वापस नहीं लाया जा सकता।",
-    "variantRemoveAllConfirm": "इसे बंद करने पर इस उत्पाद के सभी वेरिएंट निष्क्रिय हो जाएँगे। पुराने ऑर्डर उन्हें बनाए रखेंगे।"
+    "variantRemoveAllConfirm": "इसे बंद करने पर इस उत्पाद के सभी वेरिएंट निष्क्रिय हो जाएँगे। पुराने ऑर्डर उन्हें बनाए रखेंगे।",
+    "pinProduct": "ऊपर पिन करें",
+    "unpinProduct": "पिन हटाएँ",
+    "pinUpdateFailed": "पिन अपडेट नहीं हो सका",
+    "soldOutBadge": "खत्म हो गया",
+    "soldOutOnly": "केवल खत्म हुए",
+    "markSoldOut": "खत्म के रूप में चिह्नित करें",
+    "clearSoldOut": "वापस बिक्री के लिए रखें",
+    "soldOutUpdateFailed": "खत्म-स्थिति अपडेट नहीं हो सकी",
+    "editPrices": "कीमतें संपादित करें",
+    "saveAllPrices": "सब सहेजें",
+    "pricesSaved": "कीमतें अपडेट हो गईं",
+    "pricesSaveFailed": "कीमतें सहेजी नहीं जा सकीं",
+    "bulkPercent": "थोक %",
+    "bulkPercentApply": "लागू करें",
+    "bulkPercentCategory": "श्रेणी",
+    "bulkAllCategories": "सभी श्रेणियाँ"
   },
   "productAnalytics": {
     "title": "आगे क्या बनाएं, यह तय करने में हमारी मदद करें",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "रिपोर्ट लोड नहीं हो सकीं",
-    "noData": "इस अवधि के लिए कोई डेटा नहीं"
+    "noData": "इस अवधि के लिए कोई डेटा नहीं",
+    "tabProfitability": "पकवानों की लाभप्रदता",
+    "dishClass": "वर्ग",
+    "dish": "पकवान",
+    "revenue": "राजस्व",
+    "ingredientCost": "सामग्री की लागत",
+    "costCoverage": "लागत कवरेज",
+    "margin": "मार्जिन",
+    "marginPct": "मार्जिन %",
+    "classStar": "स्टार",
+    "classPuzzle": "पहेली",
+    "classPlowhorse": "मेहनती घोड़ा",
+    "classDog": "कमज़ोर"
   },
   "serverApp": {
     "addToOrder": "ऑर्डर में जोड़ें",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "इंटरनेट के सभी वैकल्पिक कनेक्शन बंद कर देता है: क्लाउड सिंक, Google Drive बैकअप, WhatsApp, अपडेट जाँच, उपयोग विश्लेषण और वेब से छवि आयात। ऑर्डर, बिलिंग, प्रिंटिंग और आपके लोकल नेटवर्क के डिवाइस चलते रहते हैं।",
     "offlineModeFailed": "ऑफ़लाइन मोड बदला नहीं जा सका",
     "offlineModeReadFailed": "वर्तमान ऑफ़लाइन मोड सेटिंग पढ़ी नहीं जा सकी।",
-    "offlineModeRetry": "फिर कोशिश करें"
+    "offlineModeRetry": "फिर कोशिश करें",
+    "tabCustomerDisplay": "ग्राहक डिस्प्ले"
   },
   "setup": {
     "alreadyCompleted": "इस इंस्टाल पर सेटअप पहले ही पूरा हो चुका है. लॉगिन करने के लिए पुनः निर्देशित किया जा रहा है...",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "ऑर्डर मर्ज हो गए",
     "mergeNoTargets": "मर्ज करने के लिए कोई अन्य सक्रिय ऑर्डर नहीं",
     "openedFirstOrder": "पहला ऑर्डर खोला गया",
-    "newOrder": "नया ऑर्डर"
+    "newOrder": "नया ऑर्डर",
+    "arrivalTime": "आगमन का समय",
+    "todaysReservations": "आज के आरक्षण"
   },
   "tax": {
     "actionActivate": "पैक सक्रिय",

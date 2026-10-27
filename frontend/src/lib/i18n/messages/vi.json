@@ -599,7 +599,13 @@
     "updating": "Đang cập nhật…",
     "viewKanban": "Kanban",
     "viewTabs": "Danh sách thẻ",
-    "wsConnected": "Đã kết nối WebSocket"
+    "wsConnected": "Đã kết nối WebSocket",
+    "soundOn": "Bật âm thanh",
+    "soundOff": "Tắt âm thanh",
+    "testSound": "Kiểm tra âm thanh",
+    "enableSoundBanner": "Chạm vào đây để bật âm thanh đơn hàng mới",
+    "newOrderAlert": "{count, plural, other {# đơn hàng mới}}",
+    "newOrderAlertTable": "Đơn mới · Bàn {table}"
   },
   "nav": {
     "collapse": "Thu gọn",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# đơn đang mở sẽ chuyển sang ca tiếp theo} other {# đơn đang mở sẽ chuyển sang ca tiếp theo}}",
     "shiftCloseUnpaidWarningHint": "Các đơn này vẫn mở cho ca tiếp theo. Việc đóng ca này chỉ đối soát các khoản tiền mặt đã thu trong ca này.",
     "shiftCloseUnpaidMoreCount": "+{count} đơn đang mở khác",
-    "tableBillRequested": "Đã yêu cầu hóa đơn"
+    "tableBillRequested": "Đã yêu cầu hóa đơn",
+    "soldOutEnded": "Hết hàng",
+    "soldOutMark": "Đánh dấu hết hàng",
+    "soldOutRestore": "Bán lại",
+    "cardSize": "Kích thước thẻ",
+    "densityLarge": "Lớn",
+    "densityMedium": "Vừa",
+    "densitySmall": "Nhỏ",
+    "soldOutReminderTitle": "Mặt hàng vẫn đang hết",
+    "soldOutReactivateAll": "Kích hoạt lại tất cả",
+    "soldOutSaved": "Đã cập nhật trạng thái hết hàng",
+    "soldOutSaveFailed": "Không thể cập nhật trạng thái hết hàng"
   },
   "printTest": {
     "amt": "Số tiền",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Sản phẩm này có biến thể (ví dụ: kích cỡ, đế bánh, hương vị)",
     "variantsSection": "Biến thể",
     "variantDeactivateConfirm": "Biến thể này sẽ bị vô hiệu hóa khi lưu và không thể khôi phục từ màn hình này.",
-    "variantRemoveAllConfirm": "Tắt mục này sẽ vô hiệu hóa mọi biến thể của sản phẩm này. Các đơn hàng cũ vẫn giữ chúng."
+    "variantRemoveAllConfirm": "Tắt mục này sẽ vô hiệu hóa mọi biến thể của sản phẩm này. Các đơn hàng cũ vẫn giữ chúng.",
+    "pinProduct": "Ghim lên đầu",
+    "unpinProduct": "Bỏ ghim",
+    "pinUpdateFailed": "Không thể cập nhật ghim",
+    "soldOutBadge": "Hết hàng",
+    "soldOutOnly": "Chỉ hàng đã hết",
+    "markSoldOut": "Đánh dấu hết hàng",
+    "clearSoldOut": "Bán lại",
+    "soldOutUpdateFailed": "Không thể cập nhật trạng thái hết hàng",
+    "editPrices": "Sửa giá",
+    "saveAllPrices": "Lưu tất cả",
+    "pricesSaved": "Đã cập nhật giá",
+    "pricesSaveFailed": "Không thể lưu giá",
+    "bulkPercent": "% hàng loạt",
+    "bulkPercentApply": "Áp dụng",
+    "bulkPercentCategory": "Danh mục",
+    "bulkAllCategories": "Tất cả danh mục"
   },
   "productAnalytics": {
     "title": "Giúp chúng tôi quyết định nên làm gì tiếp theo",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Không tải được báo cáo",
-    "noData": "Không có dữ liệu cho kỳ này"
+    "noData": "Không có dữ liệu cho kỳ này",
+    "tabProfitability": "Lợi nhuận món ăn",
+    "dishClass": "Hạng",
+    "dish": "Món ăn",
+    "revenue": "Doanh thu",
+    "ingredientCost": "Chi phí nguyên liệu",
+    "costCoverage": "Độ bao phủ chi phí",
+    "margin": "Biên lợi nhuận",
+    "marginPct": "Biên %",
+    "classStar": "Ngôi sao",
+    "classPuzzle": "Câu đố",
+    "classPlowhorse": "Ngựa thồ",
+    "classDog": "Yếu"
   },
   "serverApp": {
     "addToOrder": "Thêm vào đơn hàng",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Tắt mọi kết nối internet tùy chọn: đồng bộ đám mây, sao lưu Google Drive, WhatsApp, kiểm tra cập nhật, phân tích mức sử dụng và nhập ảnh từ web. Đơn hàng, thanh toán, in ấn và các thiết bị trong mạng cục bộ vẫn hoạt động.",
     "offlineModeFailed": "Không thể thay đổi chế độ ngoại tuyến",
     "offlineModeReadFailed": "Không đọc được cài đặt chế độ ngoại tuyến hiện tại.",
-    "offlineModeRetry": "Thử lại"
+    "offlineModeRetry": "Thử lại",
+    "tabCustomerDisplay": "Màn hình khách hàng"
   },
   "setup": {
     "alreadyCompleted": "Bản cài đặt này đã hoàn tất thiết lập. Đang chuyển đến đăng nhập…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Đã gộp đơn",
     "mergeNoTargets": "Không có đơn đang hoạt động khác để gộp",
     "openedFirstOrder": "Đơn đầu tiên đã mở",
-    "newOrder": "Đơn mới"
+    "newOrder": "Đơn mới",
+    "arrivalTime": "Giờ đến",
+    "todaysReservations": "Đặt bàn hôm nay"
   },
   "tax": {
     "actionActivate": "Đã kích hoạt gói",

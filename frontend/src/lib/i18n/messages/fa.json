@@ -599,7 +599,13 @@
     "updating": "در حال به‌روزرسانی…",
     "viewKanban": "کانبان",
     "viewTabs": "زبانه‌ها",
-    "wsConnected": "WebSocket پیوند داده شد"
+    "wsConnected": "WebSocket پیوند داده شد",
+    "soundOn": "صدا روشن",
+    "soundOff": "صدا خاموش",
+    "testSound": "آزمایش صدا",
+    "enableSoundBanner": "برای فعال‌کردن صدای سفارش‌های جدید اینجا ضربه بزنید",
+    "newOrderAlert": "{count, plural, other {# سفارش جدید}}",
+    "newOrderAlertTable": "سفارش جدید · میز {table}"
   },
   "nav": {
     "collapse": "جمع کردن",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# سفارش باز به شیفت بعد منتقل می‌شود} other {# سفارش باز به شیفت بعد منتقل می‌شوند}}",
     "shiftCloseUnpaidWarningHint": "این سفارش‌ها برای شیفت بعدی باز می‌مانند. بستن این شیفت فقط پرداخت‌های نقدی دریافت‌شده در همین شیفت را تسویه می‌کند.",
     "shiftCloseUnpaidMoreCount": "+{count} سفارش باز دیگر",
-    "tableBillRequested": "صورتحساب درخواست شد"
+    "tableBillRequested": "صورتحساب درخواست شد",
+    "soldOutEnded": "تمام شد",
+    "soldOutMark": "علامت‌گذاری به‌عنوان تمام‌شده",
+    "soldOutRestore": "بازگردانی به فروش",
+    "cardSize": "اندازه کارت",
+    "densityLarge": "بزرگ",
+    "densityMedium": "متوسط",
+    "densitySmall": "کوچک",
+    "soldOutReminderTitle": "اقلامی که هنوز تمام شده‌اند",
+    "soldOutReactivateAll": "فعال‌سازی همه",
+    "soldOutSaved": "وضعیت تمام‌شدن به‌روز شد",
+    "soldOutSaveFailed": "به‌روزرسانی وضعیت تمام‌شدن ممکن نشد"
   },
   "printTest": {
     "amt": "مبلغ",
@@ -1576,7 +1593,23 @@
     "variantToggle": "این محصول گزینه‌هایی دارد (مانند: اندازه، خمیر، طعم)",
     "variantsSection": "گونه‌ها",
     "variantDeactivateConfirm": "این گزینه هنگام ذخیره غیرفعال می‌شود و از این صفحه قابل بازگردانی نیست.",
-    "variantRemoveAllConfirm": "با خاموش کردن این، همه گزینه‌های این محصول غیرفعال می‌شوند. سفارش‌های قبلی آن‌ها را نگه می‌دارند."
+    "variantRemoveAllConfirm": "با خاموش کردن این، همه گزینه‌های این محصول غیرفعال می‌شوند. سفارش‌های قبلی آن‌ها را نگه می‌دارند.",
+    "pinProduct": "سنجاق به بالا",
+    "unpinProduct": "برداشتن سنجاق",
+    "pinUpdateFailed": "به‌روزرسانی سنجاق ممکن نشد",
+    "soldOutBadge": "تمام شد",
+    "soldOutOnly": "فقط تمام‌شده‌ها",
+    "markSoldOut": "علامت‌گذاری به‌عنوان تمام‌شده",
+    "clearSoldOut": "بازگردانی به فروش",
+    "soldOutUpdateFailed": "به‌روزرسانی وضعیت تمام‌شدن ممکن نشد",
+    "editPrices": "ویرایش قیمت‌ها",
+    "saveAllPrices": "ذخیره همه",
+    "pricesSaved": "قیمت‌ها به‌روز شد",
+    "pricesSaveFailed": "ذخیره قیمت‌ها ممکن نشد",
+    "bulkPercent": "٪ گروهی",
+    "bulkPercentApply": "اعمال",
+    "bulkPercentCategory": "دسته‌بندی",
+    "bulkAllCategories": "همه دسته‌بندی‌ها"
   },
   "productAnalytics": {
     "title": "کمک کنید تصمیم بگیریم بعداً چه بسازیم",
@@ -1693,7 +1726,19 @@
     "exportCsv": "فایل CSV",
     "exportPdf": "فایل PDF",
     "loadFailed": "بارگذاری گزارش‌ها ناموفق بود",
-    "noData": "داده‌ای برای این دوره نیست"
+    "noData": "داده‌ای برای این دوره نیست",
+    "tabProfitability": "سودآوری غذاها",
+    "dishClass": "طبقه",
+    "dish": "غذا",
+    "revenue": "درآمد",
+    "ingredientCost": "هزینه مواد اولیه",
+    "costCoverage": "پوشش هزینه",
+    "margin": "حاشیه سود",
+    "marginPct": "حاشیه ٪",
+    "classStar": "ستاره",
+    "classPuzzle": "معما",
+    "classPlowhorse": "اسب کاری",
+    "classDog": "ضعیف"
   },
   "serverApp": {
     "addToOrder": "افزودن به سفارش",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "هر اتصال اختیاری به اینترنت را خاموش می‌کند: همگام‌سازی ابری، پشتیبان‌گیری Google Drive، واتس‌اپ، بررسی به‌روزرسانی، تحلیل استفاده و وارد کردن تصویر از وب. سفارش‌ها، صورتحساب، چاپ و دستگاه‌های شبکه محلی شما به کار ادامه می‌دهند.",
     "offlineModeFailed": "تغییر حالت آفلاین ممکن نشد",
     "offlineModeReadFailed": "خواندن تنظیم فعلی حالت آفلاین ممکن نشد.",
-    "offlineModeRetry": "تلاش دوباره"
+    "offlineModeRetry": "تلاش دوباره",
+    "tabCustomerDisplay": "نمایشگر مشتری"
   },
   "setup": {
     "alreadyCompleted": "راه‌اندازی در این نصب پیش‌تر انجام شده است. در حال بازگشت به ورود…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "سفارش‌ها ادغام شدند",
     "mergeNoTargets": "سفارش فعال دیگری برای ادغام وجود ندارد",
     "openedFirstOrder": "اولین سفارش باز شد",
-    "newOrder": "سفارش جدید"
+    "newOrder": "سفارش جدید",
+    "arrivalTime": "زمان رسیدن",
+    "todaysReservations": "رزروهای امروز"
   },
   "tax": {
     "actionActivate": "بسته فعال شد",

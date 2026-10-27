@@ -599,7 +599,13 @@
     "updating": "Wird aktualisiert…",
     "viewKanban": "Kanban",
     "viewTabs": "Reiter",
-    "wsConnected": "WebSocket verbunden"
+    "wsConnected": "WebSocket verbunden",
+    "soundOn": "Ton an",
+    "soundOff": "Ton aus",
+    "testSound": "Ton testen",
+    "enableSoundBanner": "Hier tippen, um Töne für neue Bestellungen zu aktivieren",
+    "newOrderAlert": "{count, plural, one {Neue Bestellung} other {# neue Bestellungen}}",
+    "newOrderAlertTable": "Neue Bestellung · Tisch {table}"
   },
   "nav": {
     "collapse": "Einklappen",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# offene Bestellung wird übertragen} other {# offene Bestellungen werden übertragen}}",
     "shiftCloseUnpaidWarningHint": "Diese Bestellungen bleiben für die nächste Schicht geöffnet. Beim Schließen dieser Schicht werden nur die in dieser Schicht bereits kassierten Barzahlungen abgestimmt.",
     "shiftCloseUnpaidMoreCount": "+{count} weitere offene Bestellungen",
-    "tableBillRequested": "Rechnung angefordert"
+    "tableBillRequested": "Rechnung angefordert",
+    "soldOutEnded": "Ausverkauft",
+    "soldOutMark": "Als ausverkauft markieren",
+    "soldOutRestore": "Wieder verkaufen",
+    "cardSize": "Kartengröße",
+    "densityLarge": "Groß",
+    "densityMedium": "Mittel",
+    "densitySmall": "Klein",
+    "soldOutReminderTitle": "Artikel weiterhin ausverkauft",
+    "soldOutReactivateAll": "Alle reaktivieren",
+    "soldOutSaved": "Ausverkauft-Status aktualisiert",
+    "soldOutSaveFailed": "Ausverkauft-Status konnte nicht aktualisiert werden"
   },
   "printTest": {
     "amt": "Betrag",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Dieses Produkt hat Varianten (z. B. Größe, Belag, Geschmack)",
     "variantsSection": "Varianten",
     "variantDeactivateConfirm": "Diese Variante wird beim Speichern deaktiviert und kann auf diesem Bildschirm nicht wiederhergestellt werden.",
-    "variantRemoveAllConfirm": "Wenn Sie dies abschalten, werden alle Varianten dieses Produkts deaktiviert. Frühere Bestellungen behalten sie."
+    "variantRemoveAllConfirm": "Wenn Sie dies abschalten, werden alle Varianten dieses Produkts deaktiviert. Frühere Bestellungen behalten sie.",
+    "pinProduct": "Oben anheften",
+    "unpinProduct": "Anheftung lösen",
+    "pinUpdateFailed": "Anheftung konnte nicht aktualisiert werden",
+    "soldOutBadge": "Ausverkauft",
+    "soldOutOnly": "Nur Ausverkaufte",
+    "markSoldOut": "Als ausverkauft markieren",
+    "clearSoldOut": "Wieder als verfügbar markieren",
+    "soldOutUpdateFailed": "Ausverkauft-Status konnte nicht aktualisiert werden",
+    "editPrices": "Preise bearbeiten",
+    "saveAllPrices": "Alle speichern",
+    "pricesSaved": "Preise aktualisiert",
+    "pricesSaveFailed": "Preise konnten nicht gespeichert werden",
+    "bulkPercent": "Pauschal %",
+    "bulkPercentApply": "Anwenden",
+    "bulkPercentCategory": "Kategorie",
+    "bulkAllCategories": "Alle Kategorien"
   },
   "productAnalytics": {
     "title": "Hilf uns zu entscheiden, was wir als Nächstes bauen",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Berichte konnten nicht geladen werden",
-    "noData": "Keine Daten für diesen Zeitraum"
+    "noData": "Keine Daten für diesen Zeitraum",
+    "tabProfitability": "Rentabilität der Gerichte",
+    "dishClass": "Klasse",
+    "dish": "Gericht",
+    "revenue": "Umsatz",
+    "ingredientCost": "Zutatenkosten",
+    "costCoverage": "Kostenabdeckung",
+    "margin": "Marge",
+    "marginPct": "Marge %",
+    "classStar": "Stars",
+    "classPuzzle": "Rätsel",
+    "classPlowhorse": "Arbeitstier",
+    "classDog": "Schwach"
   },
   "serverApp": {
     "addToOrder": "Zur Bestellung hinzufügen",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Schaltet jede optionale Internetverbindung ab: Cloud-Sync, Google-Drive-Sicherungen, WhatsApp, Update-Prüfungen, Nutzungsanalysen und den Bildimport aus dem Web. Bestellungen, Abrechnung, Drucken und Geräte im lokalen Netzwerk funktionieren weiter.",
     "offlineModeFailed": "Der Offline-Modus konnte nicht geändert werden",
     "offlineModeReadFailed": "Die aktuelle Offline-Modus-Einstellung konnte nicht gelesen werden.",
-    "offlineModeRetry": "Erneut versuchen"
+    "offlineModeRetry": "Erneut versuchen",
+    "tabCustomerDisplay": "Kundenanzeige"
   },
   "setup": {
     "alreadyCompleted": "Die Ersteinrichtung wurde bereits abgeschlossen. Weiterleitung zur Anmeldung…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Bestellungen zusammengeführt",
     "mergeNoTargets": "Keine anderen aktiven Bestellungen zum Zusammenführen",
     "openedFirstOrder": "Erste Bestellung geöffnet",
-    "newOrder": "Neue Bestellung"
+    "newOrder": "Neue Bestellung",
+    "arrivalTime": "Ankunftszeit",
+    "todaysReservations": "Reservierungen heute"
   },
   "tax": {
     "actionActivate": "Steuerpaket aktiviert",

@@ -599,7 +599,13 @@
     "updating": "अद्यावधिक गर्दै...",
     "viewKanban": "कानबन",
     "viewTabs": "ट्याबहरू",
-    "wsConnected": "WebSocket जडान भयो"
+    "wsConnected": "WebSocket जडान भयो",
+    "soundOn": "ध्वनि खुला",
+    "soundOff": "ध्वनि बन्द",
+    "testSound": "ध्वनि परीक्षण गर्नुहोस्",
+    "enableSoundBanner": "नयाँ अर्डरको ध्वनि खोल्न यहाँ ट्याप गर्नुहोस्",
+    "newOrderAlert": "{count, plural, one {नयाँ अर्डर} other {# नयाँ अर्डरहरू}}",
+    "newOrderAlertTable": "नयाँ अर्डर · टेबल {table}"
   },
   "nav": {
     "collapse": "संक्षिप्त गर्नुहोस्",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# खुला अर्डर अर्को सिफ्टमा सर्नेछ} other {# खुला अर्डरहरू अर्को सिफ्टमा सर्नेछन्}}",
     "shiftCloseUnpaidWarningHint": "यी अर्डरहरू अर्को सिफ्टका लागि खुला नै रहन्छन्। यो सिफ्ट बन्द गर्दा यस सिफ्टमा पहिले नै संकलन गरिएका नगद भुक्तानी मात्र मिलान गरिन्छ।",
     "shiftCloseUnpaidMoreCount": "+थप {count} खुला अर्डरहरू",
-    "tableBillRequested": "बिल अनुरोध गरियो"
+    "tableBillRequested": "बिल अनुरोध गरियो",
+    "soldOutEnded": "सकियो",
+    "soldOutMark": "सकिएको रूपमा चिन्ह लगाउनुहोस्",
+    "soldOutRestore": "फेरि बिक्रीमा राख्नुहोस्",
+    "cardSize": "कार्डको आकार",
+    "densityLarge": "ठूलो",
+    "densityMedium": "मध्यम",
+    "densitySmall": "सानो",
+    "soldOutReminderTitle": "अझै सकिएका वस्तुहरू",
+    "soldOutReactivateAll": "सबै फेरि सक्रिय गर्नुहोस्",
+    "soldOutSaved": "सकिएको अवस्था अपडेट भयो",
+    "soldOutSaveFailed": "सकिएको अवस्था अपडेट गर्न सकिएन"
   },
   "printTest": {
     "amt": "रकम",
@@ -1576,7 +1593,23 @@
     "variantToggle": "यो उत्पादनमा भेरियन्टहरू छन् (जस्तै: आकार, क्रस्ट, स्वाद)",
     "variantsSection": "भेरिएन्टहरू",
     "variantDeactivateConfirm": "यो भेरियन्ट सेव गर्दा निष्क्रिय हुन्छ र यो स्क्रिनबाट पुनःस्थापना गर्न मिल्दैन।",
-    "variantRemoveAllConfirm": "यसलाई बन्द गर्दा यो उत्पादनका सबै भेरियन्टहरू निष्क्रिय हुन्छन्। पुराना अर्डरहरूमा तिनीहरू कायमै रहन्छन्।"
+    "variantRemoveAllConfirm": "यसलाई बन्द गर्दा यो उत्पादनका सबै भेरियन्टहरू निष्क्रिय हुन्छन्। पुराना अर्डरहरूमा तिनीहरू कायमै रहन्छन्।",
+    "pinProduct": "माथि पिन गर्नुहोस्",
+    "unpinProduct": "पिन हटाउनुहोस्",
+    "pinUpdateFailed": "पिन अपडेट गर्न सकिएन",
+    "soldOutBadge": "सकियो",
+    "soldOutOnly": "सकिएका मात्र",
+    "markSoldOut": "सकिएको रूपमा चिन्ह लगाउनुहोस्",
+    "clearSoldOut": "फेरि बिक्रीमा राख्नुहोस्",
+    "soldOutUpdateFailed": "सकिएको अवस्था अपडेट गर्न सकिएन",
+    "editPrices": "मूल्य सम्पादन गर्नुहोस्",
+    "saveAllPrices": "सबै सेभ गर्नुहोस्",
+    "pricesSaved": "मूल्यहरू अपडेट भए",
+    "pricesSaveFailed": "मूल्यहरू सेभ गर्न सकिएन",
+    "bulkPercent": "थोक %",
+    "bulkPercentApply": "लागू गर्नुहोस्",
+    "bulkPercentCategory": "वर्ग",
+    "bulkAllCategories": "सबै वर्गहरू"
   },
   "productAnalytics": {
     "title": "अब के बनाउने भनेर निर्णय गर्न हामीलाई मद्दत गर्नुहोस्",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "रिपोर्टहरू लोड गर्न सकिएन",
-    "noData": "यस अवधिको लागि कुनै डेटा छैन"
+    "noData": "यस अवधिको लागि कुनै डेटा छैन",
+    "tabProfitability": "परिकारको नाफा",
+    "dishClass": "वर्ग",
+    "dish": "परिकार",
+    "revenue": "राजस्व",
+    "ingredientCost": "सामग्री लागत",
+    "costCoverage": "लागत कभरेज",
+    "margin": "मार्जिन",
+    "marginPct": "मार्जिन %",
+    "classStar": "तारा",
+    "classPuzzle": "पहेली",
+    "classPlowhorse": "काम गर्ने घोडा",
+    "classDog": "कमजोर"
   },
   "serverApp": {
     "addToOrder": "अर्डरमा थप्नुहोस्",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "इन्टरनेटका सबै वैकल्पिक जडान बन्द गर्छ: क्लाउड सिंक, Google Drive ब्याकअप, WhatsApp, अपडेट जाँच, प्रयोग विश्लेषण र वेबबाट तस्विर आयात। अर्डर, बिलिङ, प्रिन्टिङ र तपाईंको स्थानीय नेटवर्कका उपकरण चलिरहन्छन्।",
     "offlineModeFailed": "अफलाइन मोड परिवर्तन गर्न सकिएन",
     "offlineModeReadFailed": "हालको अफलाइन मोड सेटिङ पढ्न सकिएन।",
-    "offlineModeRetry": "फेरि प्रयास गर्नुहोस्"
+    "offlineModeRetry": "फेरि प्रयास गर्नुहोस्",
+    "tabCustomerDisplay": "ग्राहक डिस्प्ले"
   },
   "setup": {
     "alreadyCompleted": "यस स्थापनामा सेटअप पहिले नै पूरा भइसकेको छ। लगइन गर्न रिडिरेक्ट गर्दै...",
@@ -3057,7 +3103,9 @@
     "mergeSuccess": "अर्डरहरू मर्ज गरियो",
     "mergeNoTargets": "मर्ज गर्न अन्य कुनै सक्रिय अर्डर छैन",
     "openedFirstOrder": "पहिलो अर्डर खोलियो",
-    "newOrder": "नयाँ अर्डर"
+    "newOrder": "नयाँ अर्डर",
+    "arrivalTime": "आगमन समय",
+    "todaysReservations": "आजका आरक्षणहरू"
   },
   "tax": {
     "actionActivate": "प्याक सक्रिय गरियो",

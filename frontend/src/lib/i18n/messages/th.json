@@ -599,7 +599,13 @@
     "updating": "กำลังอัปเดต…",
     "viewKanban": "คานบัน",
     "viewTabs": "แท็บ",
-    "wsConnected": "เชื่อมต่อ WebSocket แล้ว"
+    "wsConnected": "เชื่อมต่อ WebSocket แล้ว",
+    "soundOn": "เปิดเสียง",
+    "soundOff": "ปิดเสียง",
+    "testSound": "ทดสอบเสียง",
+    "enableSoundBanner": "แตะที่นี่เพื่อเปิดเสียงคำสั่งซื้อใหม่",
+    "newOrderAlert": "{count, plural, other {คำสั่งซื้อใหม่ # รายการ}}",
+    "newOrderAlertTable": "คำสั่งซื้อใหม่ · โต๊ะ {table}"
   },
   "nav": {
     "collapse": "ย่อ",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {ออเดอร์ที่เปิดอยู่ # รายการจะส่งต่อไปกะถัดไป} other {ออเดอร์ที่เปิดอยู่ # รายการจะส่งต่อไปกะถัดไป}}",
     "shiftCloseUnpaidWarningHint": "ออเดอร์เหล่านี้จะยังคงเปิดอยู่สำหรับกะถัดไป การปิดกะนี้จะกระทบยอดเฉพาะเงินสดที่รับชำระแล้วในระหว่างกะนี้เท่านั้น",
     "shiftCloseUnpaidMoreCount": "+อีก {count} ออเดอร์ที่เปิดอยู่",
-    "tableBillRequested": "เรียกเก็บเงินแล้ว"
+    "tableBillRequested": "เรียกเก็บเงินแล้ว",
+    "soldOutEnded": "หมด",
+    "soldOutMark": "ทำเครื่องหมายว่าหมด",
+    "soldOutRestore": "กลับมาขายอีกครั้ง",
+    "cardSize": "ขนาดการ์ด",
+    "densityLarge": "ใหญ่",
+    "densityMedium": "กลาง",
+    "densitySmall": "เล็ก",
+    "soldOutReminderTitle": "รายการที่ยังหมด",
+    "soldOutReactivateAll": "เปิดใช้งานทั้งหมดอีกครั้ง",
+    "soldOutSaved": "อัปเดตสถานะหมดแล้ว",
+    "soldOutSaveFailed": "อัปเดตสถานะหมดไม่ได้"
   },
   "printTest": {
     "amt": "จำนวนเงิน",
@@ -1576,7 +1593,23 @@
     "variantToggle": "สินค้านี้มีตัวเลือก (เช่น ขนาด แป้ง รสชาติ)",
     "variantsSection": "ตัวเลือก",
     "variantDeactivateConfirm": "ตัวเลือกนี้จะถูกปิดใช้งานเมื่อบันทึก และกู้คืนจากหน้าจอนี้ไม่ได้",
-    "variantRemoveAllConfirm": "การปิดตัวนี้จะปิดใช้งานตัวเลือกทั้งหมดของสินค้านี้ คำสั่งซื้อเดิมจะยังคงอยู่"
+    "variantRemoveAllConfirm": "การปิดตัวนี้จะปิดใช้งานตัวเลือกทั้งหมดของสินค้านี้ คำสั่งซื้อเดิมจะยังคงอยู่",
+    "pinProduct": "ปักหมุดด้านบน",
+    "unpinProduct": "เลิกปักหมุด",
+    "pinUpdateFailed": "อัปเดตการปักหมุดไม่ได้",
+    "soldOutBadge": "หมด",
+    "soldOutOnly": "เฉพาะที่หมด",
+    "markSoldOut": "ทำเครื่องหมายว่าหมด",
+    "clearSoldOut": "กลับมาขายอีกครั้ง",
+    "soldOutUpdateFailed": "อัปเดตสถานะหมดไม่ได้",
+    "editPrices": "แก้ไขราคา",
+    "saveAllPrices": "บันทึกทั้งหมด",
+    "pricesSaved": "อัปเดตราคาแล้ว",
+    "pricesSaveFailed": "บันทึกราคาไม่ได้",
+    "bulkPercent": "% แบบกลุ่ม",
+    "bulkPercentApply": "ใช้",
+    "bulkPercentCategory": "หมวดหมู่",
+    "bulkAllCategories": "ทุกหมวดหมู่"
   },
   "productAnalytics": {
     "title": "ช่วยเราตัดสินใจว่าจะสร้างอะไรต่อไป",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "โหลดรายงานไม่สำเร็จ",
-    "noData": "ไม่มีข้อมูลในช่วงนี้"
+    "noData": "ไม่มีข้อมูลในช่วงนี้",
+    "tabProfitability": "ความสามารถทำกำไรของอาหาร",
+    "dishClass": "ระดับ",
+    "dish": "อาหาร",
+    "revenue": "รายได้",
+    "ingredientCost": "ต้นทุนวัตถุดิบ",
+    "costCoverage": "ความครอบคลุมต้นทุน",
+    "margin": "กำไรส่วนต่าง",
+    "marginPct": "กำไร %",
+    "classStar": "ดาวเด่น",
+    "classPuzzle": "ปริศนา",
+    "classPlowhorse": "ม้างาน",
+    "classDog": "อ่อนแอ"
   },
   "serverApp": {
     "addToOrder": "เพิ่มเข้าคำสั่งซื้อ",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "ปิดการเชื่อมต่ออินเทอร์เน็ตที่เป็นตัวเลือกทั้งหมด ได้แก่ การซิงก์คลาวด์ การสำรองข้อมูล Google Drive, WhatsApp, การตรวจสอบอัปเดต การวิเคราะห์การใช้งาน และการนำเข้ารูปภาพจากเว็บ ออเดอร์ การเรียกเก็บเงิน การพิมพ์ และอุปกรณ์ในเครือข่ายภายในของคุณยังทำงานต่อได้",
     "offlineModeFailed": "ไม่สามารถเปลี่ยนโหมดออฟไลน์ได้",
     "offlineModeReadFailed": "ไม่สามารถอ่านการตั้งค่าโหมดออฟไลน์ปัจจุบันได้",
-    "offlineModeRetry": "ลองอีกครั้ง"
+    "offlineModeRetry": "ลองอีกครั้ง",
+    "tabCustomerDisplay": "จอแสดงผลลูกค้า"
   },
   "setup": {
     "alreadyCompleted": "ตั้งค่าการติดตั้งนี้เสร็จสมบูรณ์แล้ว กำลังกลับไปหน้าเข้าสู่ระบบ…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "รวมคำสั่งซื้อแล้ว",
     "mergeNoTargets": "ไม่มีคำสั่งซื้ออื่นที่กำลังดำเนินการเพื่อรวม",
     "openedFirstOrder": "เปิดคำสั่งซื้อแรกแล้ว",
-    "newOrder": "คำสั่งซื้อใหม่"
+    "newOrder": "คำสั่งซื้อใหม่",
+    "arrivalTime": "เวลามาถึง",
+    "todaysReservations": "การจองวันนี้"
   },
   "tax": {
     "actionActivate": "เปิดใช้แพ็กแล้ว",

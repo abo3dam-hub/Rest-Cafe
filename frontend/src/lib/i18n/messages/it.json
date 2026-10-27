@@ -599,7 +599,13 @@
     "updating": "Aggiornamento…",
     "viewKanban": "Kanban",
     "viewTabs": "Schede",
-    "wsConnected": "WebSocket connesso"
+    "wsConnected": "WebSocket connesso",
+    "soundOn": "Audio attivo",
+    "soundOff": "Audio disattivo",
+    "testSound": "Prova audio",
+    "enableSoundBanner": "Tocca qui per attivare i suoni dei nuovi ordini",
+    "newOrderAlert": "{count, plural, one {Nuovo ordine} other {# nuovi ordini}}",
+    "newOrderAlertTable": "Nuovo ordine · Tavolo {table}"
   },
   "nav": {
     "collapse": "Comprimi",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# ordine aperto verrà trasferito} other {# ordini aperti verranno trasferiti}}",
     "shiftCloseUnpaidWarningHint": "Questi ordini restano aperti per il turno successivo. La chiusura di questo turno riconcilia solo i pagamenti in contanti già incassati durante questo turno.",
     "shiftCloseUnpaidMoreCount": "+{count} altri ordini aperti",
-    "tableBillRequested": "Conto richiesto"
+    "tableBillRequested": "Conto richiesto",
+    "soldOutEnded": "Esaurito",
+    "soldOutMark": "Segna come esaurito",
+    "soldOutRestore": "Rimetti in vendita",
+    "cardSize": "Dimensione schede",
+    "densityLarge": "Grande",
+    "densityMedium": "Medio",
+    "densitySmall": "Piccolo",
+    "soldOutReminderTitle": "Articoli ancora esauriti",
+    "soldOutReactivateAll": "Riattiva tutto",
+    "soldOutSaved": "Stato di esaurimento aggiornato",
+    "soldOutSaveFailed": "Impossibile aggiornare lo stato di esaurimento"
   },
   "printTest": {
     "amt": "Importo",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Questo prodotto ha varianti (es. formato, impasto, gusto)",
     "variantsSection": "Varianti",
     "variantDeactivateConfirm": "Questa variante verrà disattivata al salvataggio e non potrà essere ripristinata da questa schermata.",
-    "variantRemoveAllConfirm": "Disattivandolo verranno disattivate tutte le varianti di questo prodotto. Gli ordini passati le conservano."
+    "variantRemoveAllConfirm": "Disattivandolo verranno disattivate tutte le varianti di questo prodotto. Gli ordini passati le conservano.",
+    "pinProduct": "Fissa in alto",
+    "unpinProduct": "Rimuovi fissaggio",
+    "pinUpdateFailed": "Impossibile aggiornare il fissaggio",
+    "soldOutBadge": "Esaurito",
+    "soldOutOnly": "Solo esauriti",
+    "markSoldOut": "Segna come esaurito",
+    "clearSoldOut": "Rimetti in vendita",
+    "soldOutUpdateFailed": "Impossibile aggiornare lo stato di esaurimento",
+    "editPrices": "Modifica prezzi",
+    "saveAllPrices": "Salva tutto",
+    "pricesSaved": "Prezzi aggiornati",
+    "pricesSaveFailed": "Impossibile salvare i prezzi",
+    "bulkPercent": "% in blocco",
+    "bulkPercentApply": "Applica",
+    "bulkPercentCategory": "Categoria",
+    "bulkAllCategories": "Tutte le categorie"
   },
   "productAnalytics": {
     "title": "Aiutaci a decidere cosa costruire dopo",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Caricamento dei report non riuscito",
-    "noData": "Nessun dato per questo periodo"
+    "noData": "Nessun dato per questo periodo",
+    "tabProfitability": "Redditività dei piatti",
+    "dishClass": "Classe",
+    "dish": "Piatto",
+    "revenue": "Ricavi",
+    "ingredientCost": "Costo ingredienti",
+    "costCoverage": "Copertura costi",
+    "margin": "Margine",
+    "marginPct": "Margine %",
+    "classStar": "Stella",
+    "classPuzzle": "Enigma",
+    "classPlowhorse": "Cavallo da lavoro",
+    "classDog": "Debole"
   },
   "serverApp": {
     "addToOrder": "Aggiungi all'ordine",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Disattiva ogni connessione a internet facoltativa: sincronizzazione cloud, backup su Google Drive, WhatsApp, controllo aggiornamenti, analisi d'uso e importazione di immagini dal web. Ordini, fatturazione, stampa e dispositivi della rete locale continuano a funzionare.",
     "offlineModeFailed": "Impossibile cambiare la modalità offline",
     "offlineModeReadFailed": "Impossibile leggere l'impostazione attuale della modalità offline.",
-    "offlineModeRetry": "Riprova"
+    "offlineModeRetry": "Riprova",
+    "tabCustomerDisplay": "Display cliente"
   },
   "setup": {
     "alreadyCompleted": "La configurazione è già stata completata su questa installazione. Reindirizzamento all'accesso…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Ordini uniti",
     "mergeNoTargets": "Nessun altro ordine attivo da unire",
     "openedFirstOrder": "Primo ordine aperto",
-    "newOrder": "Nuovo ordine"
+    "newOrder": "Nuovo ordine",
+    "arrivalTime": "Orario di arrivo",
+    "todaysReservations": "Prenotazioni di oggi"
   },
   "tax": {
     "actionActivate": "Pack attivato",

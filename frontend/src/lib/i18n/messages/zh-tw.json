@@ -599,7 +599,13 @@
     "updating": "更新中…",
     "viewKanban": "看板",
     "viewTabs": "標籤頁",
-    "wsConnected": "WebSocket 已連線"
+    "wsConnected": "WebSocket 已連線",
+    "soundOn": "聲音開",
+    "soundOff": "聲音關",
+    "testSound": "測試聲音",
+    "enableSoundBanner": "點按此處啟用新訂單提示音",
+    "newOrderAlert": "{count, plural, other {# 個新訂單}}",
+    "newOrderAlertTable": "新訂單 · 桌 {table}"
   },
   "nav": {
     "collapse": "收起",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# 筆未結訂單將結轉至下一班次} other {# 筆未結訂單將結轉至下一班次}}",
     "shiftCloseUnpaidWarningHint": "這些訂單將保持開啟並交接給下一班次。關閉本班次僅核對本班次期間已收取的現金付款。",
     "shiftCloseUnpaidMoreCount": "另有 +{count} 筆未結訂單",
-    "tableBillRequested": "已請求帳單"
+    "tableBillRequested": "已請求帳單",
+    "soldOutEnded": "已售罄",
+    "soldOutMark": "標記為售罄",
+    "soldOutRestore": "恢復銷售",
+    "cardSize": "卡片大小",
+    "densityLarge": "大",
+    "densityMedium": "中",
+    "densitySmall": "小",
+    "soldOutReminderTitle": "仍處於售罄的商品",
+    "soldOutReactivateAll": "全部重新啟用",
+    "soldOutSaved": "售罄狀態已更新",
+    "soldOutSaveFailed": "無法更新售罄狀態"
   },
   "printTest": {
     "amt": "金額",
@@ -1576,7 +1593,23 @@
     "variantToggle": "此商品有變體（例如：尺寸、餅底、口味）",
     "variantsSection": "變體",
     "variantDeactivateConfirm": "該變體儲存後將被停用，且無法在此頁面還原。",
-    "variantRemoveAllConfirm": "關閉後將停用該商品的所有變體，歷史訂單仍會保留。"
+    "variantRemoveAllConfirm": "關閉後將停用該商品的所有變體，歷史訂單仍會保留。",
+    "pinProduct": "置頂",
+    "unpinProduct": "取消置頂",
+    "pinUpdateFailed": "無法更新置頂狀態",
+    "soldOutBadge": "已售罄",
+    "soldOutOnly": "僅已售罄",
+    "markSoldOut": "標記為售罄",
+    "clearSoldOut": "恢復銷售",
+    "soldOutUpdateFailed": "無法更新售罄狀態",
+    "editPrices": "編輯價格",
+    "saveAllPrices": "全部儲存",
+    "pricesSaved": "價格已更新",
+    "pricesSaveFailed": "無法儲存價格",
+    "bulkPercent": "批次 %",
+    "bulkPercentApply": "套用",
+    "bulkPercentCategory": "類別",
+    "bulkAllCategories": "所有類別"
   },
   "productAnalytics": {
     "title": "幫我們決定下一步要做什麼",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "報表載入失敗",
-    "noData": "此期間沒有資料"
+    "noData": "此期間沒有資料",
+    "tabProfitability": "菜品獲利能力",
+    "dishClass": "等級",
+    "dish": "菜品",
+    "revenue": "收入",
+    "ingredientCost": "原料成本",
+    "costCoverage": "成本覆蓋率",
+    "margin": "利潤",
+    "marginPct": "利潤率 %",
+    "classStar": "明星",
+    "classPuzzle": "謎題",
+    "classPlowhorse": "老黃牛",
+    "classDog": "弱勢"
   },
   "serverApp": {
     "addToOrder": "加入訂單",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "關閉所有選用的網際網路連線：雲端同步、Google Drive 備份、WhatsApp、更新檢查、使用分析與從網路匯入圖片。訂單、結帳、列印與區域網路中的裝置仍可正常運作。",
     "offlineModeFailed": "無法變更離線模式",
     "offlineModeReadFailed": "無法讀取目前的離線模式設定。",
-    "offlineModeRetry": "重試"
+    "offlineModeRetry": "重試",
+    "tabCustomerDisplay": "顧客顯示屏"
   },
   "setup": {
     "alreadyCompleted": "此安裝已完成設定。正在跳轉到登入…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "訂單已合併",
     "mergeNoTargets": "沒有其他可合併的活動訂單",
     "openedFirstOrder": "第一個訂單已打開",
-    "newOrder": "新訂單"
+    "newOrder": "新訂單",
+    "arrivalTime": "到達時間",
+    "todaysReservations": "今日預訂"
   },
   "tax": {
     "actionActivate": "稅務包已啟用",

@@ -599,7 +599,13 @@
     "updating": "Memperbarui…",
     "viewKanban": "Kanban",
     "viewTabs": "Tab",
-    "wsConnected": "WebSocket terhubung"
+    "wsConnected": "WebSocket terhubung",
+    "soundOn": "Suara aktif",
+    "soundOff": "Suara nonaktif",
+    "testSound": "Uji suara",
+    "enableSoundBanner": "Ketuk di sini untuk mengaktifkan suara pesanan baru",
+    "newOrderAlert": "{count, plural, other {# pesanan baru}}",
+    "newOrderAlertTable": "Pesanan baru · Meja {table}"
   },
   "nav": {
     "collapse": "Ciutkan",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# pesanan terbuka akan dilanjutkan ke shift berikutnya} other {# pesanan terbuka akan dilanjutkan ke shift berikutnya}}",
     "shiftCloseUnpaidWarningHint": "Pesanan ini tetap terbuka untuk shift berikutnya. Menutup shift ini hanya mencocokkan pembayaran tunai yang sudah diterima selama shift ini.",
     "shiftCloseUnpaidMoreCount": "+{count} pesanan terbuka lainnya",
-    "tableBillRequested": "Tagihan diminta"
+    "tableBillRequested": "Tagihan diminta",
+    "soldOutEnded": "Habis",
+    "soldOutMark": "Tandai habis",
+    "soldOutRestore": "Jual kembali",
+    "cardSize": "Ukuran kartu",
+    "densityLarge": "Besar",
+    "densityMedium": "Sedang",
+    "densitySmall": "Kecil",
+    "soldOutReminderTitle": "Item yang masih habis",
+    "soldOutReactivateAll": "Aktifkan kembali semua",
+    "soldOutSaved": "Status habis diperbarui",
+    "soldOutSaveFailed": "Tidak dapat memperbarui status habis"
   },
   "printTest": {
     "amt": "Jml",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Produk ini memiliki varian (mis. Ukuran, Adonan, Rasa)",
     "variantsSection": "Varian",
     "variantDeactivateConfirm": "Varian ini akan dinonaktifkan saat disimpan dan tidak dapat dipulihkan dari layar ini.",
-    "variantRemoveAllConfirm": "Mematikannya akan menonaktifkan semua varian produk ini. Pesanan lama tetap menyimpannya."
+    "variantRemoveAllConfirm": "Mematikannya akan menonaktifkan semua varian produk ini. Pesanan lama tetap menyimpannya.",
+    "pinProduct": "Sematkan di atas",
+    "unpinProduct": "Lepas sematan",
+    "pinUpdateFailed": "Tidak dapat memperbarui sematan",
+    "soldOutBadge": "Habis",
+    "soldOutOnly": "Hanya yang habis",
+    "markSoldOut": "Tandai habis",
+    "clearSoldOut": "Kembalikan untuk dijual",
+    "soldOutUpdateFailed": "Tidak dapat memperbarui status habis",
+    "editPrices": "Edit harga",
+    "saveAllPrices": "Simpan semua",
+    "pricesSaved": "Harga diperbarui",
+    "pricesSaveFailed": "Tidak dapat menyimpan harga",
+    "bulkPercent": "Massal %",
+    "bulkPercentApply": "Terapkan",
+    "bulkPercentCategory": "Kategori",
+    "bulkAllCategories": "Semua kategori"
   },
   "productAnalytics": {
     "title": "Bantu kami memutuskan apa yang dibuat berikutnya",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Gagal memuat laporan",
-    "noData": "Tidak ada data untuk periode ini"
+    "noData": "Tidak ada data untuk periode ini",
+    "tabProfitability": "Profitabilitas hidangan",
+    "dishClass": "Kelas",
+    "dish": "Hidangan",
+    "revenue": "Pendapatan",
+    "ingredientCost": "Biaya bahan",
+    "costCoverage": "Cakupan biaya",
+    "margin": "Marjin",
+    "marginPct": "Marjin %",
+    "classStar": "Bintang",
+    "classPuzzle": "Teka-teki",
+    "classPlowhorse": "Kuda pekerja",
+    "classDog": "Lemah"
   },
   "serverApp": {
     "addToOrder": "Tambahkan ke pesanan",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Mematikan semua koneksi internet opsional: sinkronisasi cloud, cadangan Google Drive, WhatsApp, pemeriksaan pembaruan, analitik penggunaan, dan impor gambar dari web. Pesanan, penagihan, pencetakan, dan perangkat di jaringan lokal Anda tetap berfungsi.",
     "offlineModeFailed": "Tidak dapat mengubah mode offline",
     "offlineModeReadFailed": "Tidak dapat membaca pengaturan mode offline saat ini.",
-    "offlineModeRetry": "Coba lagi"
+    "offlineModeRetry": "Coba lagi",
+    "tabCustomerDisplay": "Layar pelanggan"
   },
   "setup": {
     "alreadyCompleted": "Pengaturan awal sudah selesai dilakukan pada instalasi ini. Mengalihkan ke layar masuk…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Pesanan digabungkan",
     "mergeNoTargets": "Tidak ada pesanan aktif lain untuk digabungkan",
     "openedFirstOrder": "Pesanan pertama dibuka",
-    "newOrder": "Pesanan baru"
+    "newOrder": "Pesanan baru",
+    "arrivalTime": "Waktu kedatangan",
+    "todaysReservations": "Reservasi hari ini"
   },
   "tax": {
     "actionActivate": "Paket diaktifkan",

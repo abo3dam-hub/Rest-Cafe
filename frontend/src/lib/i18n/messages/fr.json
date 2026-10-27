@@ -599,7 +599,13 @@
     "updating": "Mise à jour…",
     "viewKanban": "Kanban",
     "viewTabs": "Onglets",
-    "wsConnected": "WebSocket connecté"
+    "wsConnected": "WebSocket connecté",
+    "soundOn": "Son activé",
+    "soundOff": "Son désactivé",
+    "testSound": "Tester le son",
+    "enableSoundBanner": "Appuyez ici pour activer les sons des nouvelles commandes",
+    "newOrderAlert": "{count, plural, one {Nouvelle commande} other {# nouvelles commandes}}",
+    "newOrderAlertTable": "Nouvelle commande · Table {table}"
   },
   "nav": {
     "collapse": "Réduire",
@@ -1199,7 +1205,18 @@
     "shiftCloseUnpaidWarningTitle": "{count, plural, one {# commande ouverte sera reportée} other {# commandes ouvertes seront reportées}}",
     "shiftCloseUnpaidWarningHint": "Ces commandes restent ouvertes pour le service suivant. La clôture de ce service ne rapproche que les paiements en espèces déjà encaissés pendant ce service.",
     "shiftCloseUnpaidMoreCount": "+{count} autres commandes ouvertes",
-    "tableBillRequested": "Addition demandée"
+    "tableBillRequested": "Addition demandée",
+    "soldOutEnded": "Épuisé",
+    "soldOutMark": "Marquer comme épuisé",
+    "soldOutRestore": "Remettre en vente",
+    "cardSize": "Taille des cartes",
+    "densityLarge": "Grand",
+    "densityMedium": "Moyen",
+    "densitySmall": "Petit",
+    "soldOutReminderTitle": "Articles toujours épuisés",
+    "soldOutReactivateAll": "Tout réactiver",
+    "soldOutSaved": "État d'épuisement mis à jour",
+    "soldOutSaveFailed": "Impossible de mettre à jour l'état d'épuisement"
   },
   "printTest": {
     "amt": "Montant",
@@ -1576,7 +1593,23 @@
     "variantToggle": "Ce produit possède des variantes (ex. : taille, pâte, saveur)",
     "variantsSection": "Variantes",
     "variantDeactivateConfirm": "Cette variante sera désactivée à l’enregistrement et ne pourra pas être restaurée depuis cet écran.",
-    "variantRemoveAllConfirm": "Si vous le désactivez, toutes les variantes de ce produit seront désactivées. Les commandes passées les conservent."
+    "variantRemoveAllConfirm": "Si vous le désactivez, toutes les variantes de ce produit seront désactivées. Les commandes passées les conservent.",
+    "pinProduct": "Épingler en haut",
+    "unpinProduct": "Désépingler",
+    "pinUpdateFailed": "Impossible de mettre à jour l'épingle",
+    "soldOutBadge": "Épuisé",
+    "soldOutOnly": "Épuisés uniquement",
+    "markSoldOut": "Marquer comme épuisé",
+    "clearSoldOut": "Remettre en vente",
+    "soldOutUpdateFailed": "Impossible de mettre à jour l'état d'épuisement",
+    "editPrices": "Modifier les prix",
+    "saveAllPrices": "Tout enregistrer",
+    "pricesSaved": "Prix mis à jour",
+    "pricesSaveFailed": "Impossible d’enregistrer les prix",
+    "bulkPercent": "% en masse",
+    "bulkPercentApply": "Appliquer",
+    "bulkPercentCategory": "Catégorie",
+    "bulkAllCategories": "Toutes les catégories"
   },
   "productAnalytics": {
     "title": "Aidez-nous à décider quoi construire ensuite",
@@ -1693,7 +1726,19 @@
     "exportCsv": "CSV",
     "exportPdf": "PDF",
     "loadFailed": "Échec du chargement des rapports",
-    "noData": "Aucune donnée pour cette période"
+    "noData": "Aucune donnée pour cette période",
+    "tabProfitability": "Rentabilité des plats",
+    "dishClass": "Classe",
+    "dish": "Plat",
+    "revenue": "Revenus",
+    "ingredientCost": "Coût des ingrédients",
+    "costCoverage": "Couverture des coûts",
+    "margin": "Marge",
+    "marginPct": "Marge %",
+    "classStar": "Vedette",
+    "classPuzzle": "Énigme",
+    "classPlowhorse": "Cheval de trait",
+    "classDog": "Faible"
   },
   "serverApp": {
     "addToOrder": "Ajouter à la commande",
@@ -2615,7 +2660,8 @@
     "offlineModeDescription": "Coupe toute connexion facultative à internet : synchronisation cloud, sauvegardes Google Drive, WhatsApp, recherche de mises à jour, statistiques d'usage et import d'images depuis le web. Les commandes, la facturation, l'impression et les appareils de votre réseau local continuent de fonctionner.",
     "offlineModeFailed": "Impossible de modifier le mode hors ligne",
     "offlineModeReadFailed": "Impossible de lire le réglage actuel du mode hors ligne.",
-    "offlineModeRetry": "Réessayer"
+    "offlineModeRetry": "Réessayer",
+    "tabCustomerDisplay": "Écran client"
   },
   "setup": {
     "alreadyCompleted": "La configuration a déjà été effectuée sur cette installation. Redirection vers la connexion…",
@@ -3070,7 +3116,9 @@
     "mergeSuccess": "Commandes fusionnées",
     "mergeNoTargets": "Aucune autre commande active pour la fusion",
     "openedFirstOrder": "Première commande ouverte",
-    "newOrder": "Nouvelle commande"
+    "newOrder": "Nouvelle commande",
+    "arrivalTime": "Heure d'arrivée",
+    "todaysReservations": "Réservations d'aujourd'hui"
   },
   "tax": {
     "actionActivate": "Module activé",
