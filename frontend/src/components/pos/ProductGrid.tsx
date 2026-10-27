@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Search, SlidersHorizontal, PackageX, PackageCheck, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Category, Product, ProductVariant } from '@/lib/types';
 import { useCartStore } from '@/store/cart';
-import { usePosSettingsStore } from '@/store/pos-settings';
+import { usePosSettingsStore, type PosGridDensity } from '@/store/pos-settings';
 import { nameToColor } from '@/lib/image-utils';
 import TagBadge from './DietaryBadge';
 import { productNeedsCustomizer } from '@/lib/product-variants';
@@ -305,6 +305,15 @@ interface Props {
   collapseCategories?: boolean;
   categorySort?: PosCategorySort;
   itemSort?: PosItemSort;
+  /** Card density for this surface; 'large' is the original size. */
+  density?: PosGridDensity;
+  onDensityChange?: (density: PosGridDensity) => void;
+  /** Sold-out quick toggle (cashier POS only). */
+  onToggleSoldOut?: (product: Product) => void;
+  soldOutCount?: number;
+  onOpenSoldOutList?: () => void;
+  /** Extra control rendered at the end of the toolbar row (cashier sound toggle). */
+  soundControl?: ReactNode;
 }
 
 export default function ProductGrid({
@@ -327,6 +336,12 @@ export default function ProductGrid({
   collapseCategories = false,
   categorySort = 'saved',
   itemSort = 'saved',
+  density = 'large',
+  onDensityChange,
+  onToggleSoldOut,
+  soldOutCount = 0,
+  onOpenSoldOutList,
+  soundControl,
 }: Props) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cart = useCartStore();
@@ -365,11 +380,16 @@ export default function ProductGrid({
   );
   const sortedProducts = useMemo(() => sortProducts(products, itemSort), [products, itemSort]);
 
-  const filtered = sortedProducts.filter((p) => {
-    const matchCat = !selectedCategory || p.category_id === selectedCategory;
-    const matchSearch = !activeQuery || p.name.toLowerCase().includes(activeQuery.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  const filtered = sortedProducts
+    .filter((p) => {
+      const matchCat = !selectedCategory || p.category_id === selectedCategory;
+      const matchSearch = !activeQuery || p.name.toLowerCase().includes(activeQuery.toLowerCase());
+      return matchCat && matchSearch;
+    })
+    // Pinned staples always lead the grid (stable within the saved sort).
+    .sort((a, b) => Number(b.is_pinned === true || b.is_pinned === 1) - Number(a.is_pinned === true || a.is_pinned === 1));
+
+  const effectiveShowImages = showProductImages && density !== 'small';
 
   return (
     <div
@@ -458,6 +478,44 @@ export default function ProductGrid({
         />
       </div>
 
+      {(soldOutCount > 0 || onDensityChange || soundControl) && (
+        <div className="shrink-0 mb-2 flex items-center gap-2 flex-wrap">
+          {soldOutCount > 0 && (
+            <button
+              type="button"
+              onClick={onOpenSoldOutList}
+              className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/50 px-3 py-1 text-xs font-bold"
+            >
+              <PackageX size={14} />
+              {t('soldOutEnded')}: {soldOutCount}
+            </button>
+          )}
+          <div className="ms-auto inline-flex items-center gap-1">
+            {soundControl}
+            {onDensityChange && (
+              <>
+                <span className="text-[11px] text-muted-foreground me-1">{t('cardSize')}</span>
+                {(['large', 'medium', 'small'] as PosGridDensity[]).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => onDensityChange(d)}
+                    aria-pressed={density === d}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                      density === d
+                        ? 'bg-brand text-white border-brand'
+                        : 'bg-card text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    {t(d === 'large' ? 'densityLarge' : d === 'medium' ? 'densityMedium' : 'densitySmall')}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* min-h-0 overrides the content-based automatic minimum size, so a long
           catalog scrolls inside the grid instead of growing past the viewport. */}
       <div
@@ -469,20 +527,28 @@ export default function ProductGrid({
         >
           {filtered.map((product) => {
             const inCartQty = cartQuantities.get(product.id) || 0;
+            const soldOut = product.is_sold_out === true || product.is_sold_out === 1;
+            const pinned = product.is_pinned === true || product.is_pinned === 1;
 
             return (
+              <div key={product.id} className="relative">
               <button
-                key={product.id}
                 data-testid="pos-product-card"
                 type="button"
                 disabled={disabled}
                 onClick={() => {
                   if (disabled) return;
+                  if (soldOut) {
+                    toast.error(t('soldOutEnded'));
+                    return;
+                  }
                   const quantity = parsedSearch?.quantity ?? 1;
                   if (!validateSelectionQuantity(product, quantity)) return;
                   onProductClick(product, quantity);
                 }}
-                className="min-h-36 bg-card rounded-xl p-2.5 border border-border hover:border-brand/40 active:border-brand active:bg-muted/40 hover:shadow-md transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full h-full bg-card rounded-xl border border-border hover:border-brand/40 active:border-brand active:bg-muted/40 hover:shadow-md transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed ${
+                  density === 'small' ? 'min-h-20 p-2' : density === 'medium' ? 'min-h-28 p-2' : 'min-h-36 p-2.5'
+                }`}
               >
                 {!!product.track_inventory && (
                   <>
@@ -503,7 +569,7 @@ export default function ProductGrid({
                   </span>
                 )}
 
-                {showProductImages && (
+                {effectiveShowImages && (
                   <div className="w-full aspect-square rounded-lg mb-3 relative overflow-hidden">
                     {/* Always-visible background tile — no flash when image loads */}
                     <div
@@ -535,13 +601,20 @@ export default function ProductGrid({
                   </div>
                 )}
 
-                <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-snug">
+                <h3
+                  className={`font-medium text-foreground leading-snug ${
+                    density === 'small' ? 'text-xs line-clamp-1' : 'text-sm line-clamp-2'
+                  }`}
+                >
+                  {pinned && (
+                    <Star size={12} className="inline-block me-1 -mt-0.5 fill-amber-400 text-amber-400" />
+                  )}
                   {product.name}
                 </h3>
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-brand font-bold">{fmt(Number(product.price))}</p>
                   <div className="flex items-center gap-1 shrink-0">
-                    {!showProductImages && product.tags && product.tags.length > 0 && (
+                    {!effectiveShowImages && product.tags && product.tags.length > 0 && (
                       <TagBadge tag={product.tags[0]} />
                     )}
                     {productNeedsCustomizer(product) && (
@@ -555,7 +628,34 @@ export default function ProductGrid({
                     )}
                   </div>
                 </div>
+                {soldOut && (
+                  <span className="absolute inset-0 z-10 flex items-center justify-center bg-card/75">
+                    <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-xs font-bold px-3 py-1 rounded-full border border-red-200 dark:border-red-800/50">
+                      {t('soldOutEnded')}
+                    </span>
+                  </span>
+                )}
               </button>
+              {onToggleSoldOut && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  title={soldOut ? t('soldOutRestore') : t('soldOutMark')}
+                  aria-label={soldOut ? t('soldOutRestore') : t('soldOutMark')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSoldOut(product);
+                  }}
+                  className={`absolute bottom-1.5 end-1.5 z-20 rounded-full border p-1.5 shadow-sm cursor-pointer ${
+                    soldOut
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-card/90 text-muted-foreground border-border hover:text-red-600 hover:border-red-300'
+                  }`}
+                >
+                  {soldOut ? <PackageCheck size={14} /> : <PackageX size={14} />}
+                </span>
+              )}
+              </div>
             );
           })}
         </div>

@@ -9,7 +9,7 @@ import { useHeldOrdersStore } from '@/store/held-orders';
 import { usePosSettingsStore } from '@/store/pos-settings';
 import { useSidebar } from '@/components/ui/sidebar';
 import toast from 'react-hot-toast';
-import { ShoppingCart, X } from 'lucide-react';
+import { ShoppingCart, X, Bell, BellOff } from 'lucide-react';
 import type {
   Addon,
   Category,
@@ -56,6 +56,7 @@ import { dispatchQuickSearchRequest } from '@/lib/quick-search';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
+import { useNewOrderAlert, type AlertableOrder } from '@/hooks/useNewOrderAlert';
 import {
   captureClientOperationFailure,
   createOperationReference,
@@ -247,6 +248,8 @@ export default function POSPage() {
     autoPrintBill,
     billingType,
     kotPrintingEnabled,
+    gridDensity,
+    setGridDensity,
     setBillingType,
     setTablesRequired,
     setKotPrintingEnabled,
@@ -257,6 +260,7 @@ export default function POSPage() {
   const tCommon = useTranslations('common');
   const tSupport = useTranslations('support');
   const tTables = useTranslations('tables');
+  const tKds = useTranslations('kds');
   const currencyFmt = useFormatCurrency();
   const { confirm, ConfirmDialog, isConfirmOpen } = useConfirm();
   const cashDrawer = useCashDrawerMovements();
@@ -264,6 +268,7 @@ export default function POSPage() {
   // Shift actions follow the same owner/manager/cashier group as the
   // backend route gates (backend still enforces; this only hides the entry).
   const canUseShift = tenantCan(currentTenant, 'cash.shifts.view');
+
 
   const { categorySort, itemSort } = usePosSortPreference();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -275,6 +280,103 @@ export default function POSPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [showPrintMenuModal, setShowPrintMenuModal] = useState(false);
+  const [showSoldOutModal, setShowSoldOutModal] = useState(false);
+  const [alertOrders, setAlertOrders] = useState<AlertableOrder[]>([]);
+  // Sold-out («انتهاء الكمية») — manual per-product flag, independent of stock.
+  const soldOutProducts = products.filter(
+    (p) => p.is_sold_out === true || p.is_sold_out === 1,
+  );
+
+  const applySoldOutResponse = useCallback((updated: Product) => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === updated.id
+          ? { ...p, is_sold_out: updated.is_sold_out, sold_out_at: updated.sold_out_at }
+          : p,
+      ),
+    );
+  }, []);
+
+  const handleToggleSoldOut = useCallback(
+    async (product: Product) => {
+      const next = !(product.is_sold_out === true || product.is_sold_out === 1);
+      try {
+        const res = await api.patch(`/products/${product.id}/sold-out`, { sold_out: next });
+        if (res.data?.product) applySoldOutResponse(res.data.product as Product);
+        toast.success(t('soldOutSaved'));
+      } catch {
+        toast.error(t('soldOutSaveFailed'));
+      }
+    },
+    [applySoldOutResponse, t],
+  );
+
+  const handleReactivateAllSoldOut = useCallback(async () => {
+    try {
+      const results = await Promise.all(
+        soldOutProducts.map((p) => api.patch(`/products/${p.id}/sold-out`, { sold_out: false })),
+      );
+      results.forEach((res) => {
+        if (res.data?.product) applySoldOutResponse(res.data.product as Product);
+      });
+      toast.success(t('soldOutSaved'));
+      setShowSoldOutModal(false);
+    } catch {
+      toast.error(t('soldOutSaveFailed'));
+    }
+  }, [soldOutProducts, applySoldOutResponse, t]);
+
+  // Once per business day, the first POS visit re-surfaces items left sold
+  // out so yesterday's «انتهت الكمية» is never silently forgotten.
+  const soldOutReminderChecked = useRef(false);
+  useEffect(() => {
+    if (soldOutReminderChecked.current || products.length === 0) return;
+    soldOutReminderChecked.current = true;
+    if (soldOutProducts.length === 0) return;
+    try {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Damascus' }).format(new Date());
+      const key = `restcafe:soldout-reminder:${today}`;
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, '1');
+      setShowSoldOutModal(true);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+
+  // New-order sound for the cashier: the POS has no live orders socket, so
+  // it polls the same kitchen feed the KDS REST fallback uses.
+  const orderAlert = useNewOrderAlert(alertOrders, { surface: 'pos' });
+  useEffect(() => {
+    if (!orderAlert.enabled) return;
+    let cancelled = false;
+    const fetchOrders = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const { data } = await api.get('/kitchen/orders?status=pending,preparing,ready,served');
+        if (!cancelled) setAlertOrders((data.orders as AlertableOrder[]) || []);
+      } catch {}
+    };
+    fetchOrders();
+    const id = setInterval(fetchOrders, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [orderAlert.enabled]);
+
+  const [primeBannerDismissed, setPrimeBannerDismissed] = useState<boolean>(() =>
+    typeof window === 'undefined'
+      ? true
+      : window.localStorage.getItem('flocafe:order-alert:prime-banner-dismissed') === '1',
+  );
+  const showPrimeBanner = orderAlert.enabled && !orderAlert.primed && !primeBannerDismissed;
+  const handlePrimeBanner = () => {
+    orderAlert.primeAudio();
+    try {
+      window.localStorage.setItem('flocafe:order-alert:prime-banner-dismissed', '1');
+    } catch {}
+    setPrimeBannerDismissed(true);
+  };
 
   // Modal state
   const [showTablePicker, setShowTablePicker] = useState(false);
@@ -2771,6 +2873,34 @@ export default function POSPage() {
             categorySort={categorySort}
             itemSort={itemSort}
             collapseCategories
+            density={gridDensity}
+            onDensityChange={setGridDensity}
+            gridClassName={
+              gridDensity === 'medium'
+                ? leftSidebarOpen
+                  ? 'grid-cols-5'
+                  : 'grid-cols-6'
+                : gridDensity === 'small'
+                  ? leftSidebarOpen
+                    ? 'grid-cols-6'
+                    : 'grid-cols-8'
+                  : undefined
+            }
+            soldOutCount={soldOutProducts.length}
+            onOpenSoldOutList={() => setShowSoldOutModal(true)}
+            onToggleSoldOut={tenantCan(currentTenant, 'pos.use') ? handleToggleSoldOut : undefined}
+            soundControl={
+              <button
+                type="button"
+                onClick={() => orderAlert.setEnabled(!orderAlert.enabled)}
+                aria-pressed={orderAlert.enabled}
+                title={orderAlert.enabled ? tKds('soundOn') : tKds('soundOff')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-card text-foreground border-border hover:bg-muted"
+              >
+                {orderAlert.enabled ? <Bell size={13} /> : <BellOff size={13} />}
+                {orderAlert.enabled ? tKds('soundOn') : tKds('soundOff')}
+              </button>
+            }
           />
         </div>
 
@@ -2949,6 +3079,82 @@ export default function POSPage() {
 
       {ConfirmDialog}
 
+      {showPrimeBanner && (
+        <button
+          type="button"
+          onClick={handlePrimeBanner}
+          className="fixed bottom-5 inset-x-0 mx-auto w-fit z-40 flex items-center gap-2 rounded-full bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 px-4 py-2 text-sm font-medium shadow-lg"
+        >
+          <Bell size={16} />
+          {tKds('enableSoundBanner')}
+        </button>
+      )}
+      {orderAlert.alert && (
+        <button
+          type="button"
+          onClick={orderAlert.dismissAlert}
+          className="fixed top-4 inset-x-0 mx-auto w-fit z-50 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg"
+          role="status"
+        >
+          <Bell size={16} />
+          {orderAlert.alert.latestTableLabel
+            ? tKds('newOrderAlertTable', { table: orderAlert.alert.latestTableLabel })
+            : tKds('newOrderAlert', { count: orderAlert.alert.count })}
+        </button>
+      )}
+      {showSoldOutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSoldOutModal(false)}>
+          <div
+            className="bg-card rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="font-bold text-foreground">{t('soldOutReminderTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setShowSoldOutModal(false)}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label={tCommon('close')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-2">
+              {soldOutProducts.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-muted/50">
+                  <span className="text-sm font-medium text-foreground">{p.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSoldOut(p)}
+                    className="shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1 text-xs font-bold"
+                  >
+                    {t('soldOutRestore')}
+                  </button>
+                </div>
+              ))}
+              {soldOutProducts.length === 0 && (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('soldOutSaved')}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-border">
+              <button
+                type="button"
+                onClick={handleReactivateAllSoldOut}
+                className="flex-1 rounded-lg bg-brand text-white px-4 py-2 text-sm font-bold hover:bg-brand-hover"
+              >
+                {t('soldOutReactivateAll')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSoldOutModal(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                {tCommon('close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <PrintMenuModal open={showPrintMenuModal} onOpenChange={setShowPrintMenuModal} />
 
       {/* Prepaid Checkout Modal - Payment BEFORE order is placed */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChefHat, LogOut, Wifi, WifiOff } from 'lucide-react';
+import { Bell, BellOff, ChefHat, LogOut, Volume2, Wifi, WifiOff } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 import type { ConnectionMode } from '@/hooks/useKdsConnection';
 import type { KdsViewMode } from '@/hooks/useKdsView';
@@ -13,6 +13,9 @@ export interface KdsHeaderProps {
   viewMode: KdsViewMode;
   onChangeView: (mode: KdsViewMode) => void;
   onLogout: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
+  onTestSound: () => void;
 }
 
 export function KdsHeader({
@@ -23,6 +26,9 @@ export function KdsHeader({
   viewMode,
   onChangeView,
   onLogout,
+  soundEnabled,
+  onToggleSound,
+  onTestSound,
 }: KdsHeaderProps) {
   const t = useTranslations('kds');
   const tNav = useTranslations('nav');
@@ -80,6 +86,26 @@ export function KdsHeader({
               {t('viewKanban')}
             </button>
           </div>
+
+          <button
+            onClick={onToggleSound}
+            aria-pressed={soundEnabled}
+            className="min-h-11 px-2.5 flex items-center gap-1.5 hover:bg-muted rounded-lg text-muted-foreground ms-2"
+            title={soundEnabled ? t('soundOn') : t('soundOff')}
+          >
+            {soundEnabled ? <Bell size={20} /> : <BellOff size={20} />}
+            <span className="text-xs font-medium">
+              {soundEnabled ? t('soundOn') : t('soundOff')}
+            </span>
+          </button>
+          <button
+            onClick={onTestSound}
+            className="min-h-11 px-2.5 flex items-center gap-1.5 hover:bg-muted rounded-lg text-muted-foreground"
+            title={t('testSound')}
+          >
+            <Volume2 size={20} />
+            <span className="text-xs font-medium">{t('testSound')}</span>
+          </button>
 
           <button
             onClick={onLogout}

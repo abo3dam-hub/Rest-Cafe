@@ -9,8 +9,12 @@ export type PrinterPrintMode = 'escpos' | 'browser';
 export type CoreBillTemplate = 'classic' | 'compact';
 export type BillTemplate = CoreBillTemplate | (string & {});
 
+export type PosGridDensity = 'large' | 'medium' | 'small';
+
 export interface PosSettingsState {
   showProductImages: boolean;
+  // POS product-card density for this device; 'large' is the original size.
+  gridDensity: PosGridDensity;
   customerMandatory: boolean;
   // Auto-advances phone to name when typed digits form a valid number.
   enforcePhoneLength: boolean;
@@ -59,6 +63,7 @@ export interface PosSettingsState {
   kotLanguagePolicy: KotLanguagePolicy;
   // Actions
   setShowProductImages: (show: boolean) => void;
+  setGridDensity: (density: PosGridDensity) => void;
   setCustomerMandatory: (mandatory: boolean) => void;
   setEnforcePhoneLength: (enabled: boolean) => void;
   setLanguage: (lang: Language) => void;
@@ -140,6 +145,7 @@ export const usePosSettingsStore = create<PosSettingsState>()(
   persist(
     (set) => ({
       showProductImages: true,
+      gridDensity: 'large',
       customerMandatory: false,
       enforcePhoneLength: false,
       billingType: 'postpaid',
@@ -183,6 +189,7 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       kotLanguagePolicy: defaultPrintLanguagePolicy(),
       // Actions
       setShowProductImages: (show) => set({ showProductImages: show }),
+      setGridDensity: (gridDensity) => set({ gridDensity }),
       setCustomerMandatory: (mandatory) => set({ customerMandatory: mandatory }),
       setEnforcePhoneLength: (enabled) => set({ enforcePhoneLength: enabled }),
       setLanguage: (language) => set({ language }),
