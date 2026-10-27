@@ -116,6 +116,9 @@ export interface Product {
   stock_quantity: number;
   low_stock_threshold: number | null;
   is_active: boolean;
+  is_pinned?: boolean | number;
+  is_sold_out?: boolean | number;
+  sold_out_at?: string | null;
   available_online: boolean;
   has_image: boolean;
   updated_at: string;
@@ -176,6 +179,7 @@ export interface Table {
   reservation_customer_id?: string | null;
   reservation_customer_name?: string | null;
   reservation_customer_phone?: string | null;
+  reservation_at?: string | null;
 }
 
 export interface Customer {

@@ -16,7 +16,7 @@ import { Ltr } from '@/components/layout/Ltr';
 // endpoints — nothing is computed in the browser beyond display sums that the
 // endpoints themselves define. Exports read the same datasets server-side.
 
-type TabKey = 'daily' | 'sales' | 'cash';
+type TabKey = 'daily' | 'sales' | 'cash' | 'profitability';
 type Preset = 'day' | 'month' | 'year' | 'custom';
 
 interface PaymentMethodRow {
@@ -53,6 +53,30 @@ interface SalesBreakdown {
   byCategory: { category_name: string; quantity: number; total: number }[];
   byOrderType: { type: string; count: number; total: number }[];
   byHour: { hour: number; count: number; total: number }[];
+}
+
+interface DishProfitabilityRow {
+  product_id: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+  ingredient_cost: number;
+  cost_coverage_pct: number;
+  margin: number;
+  margin_pct: number;
+  class: string;
+}
+
+interface DishProfitability {
+  rows: DishProfitabilityRow[];
+  totals: {
+    quantity: number;
+    revenue: number;
+    ingredient_cost: number;
+    cost_coverage_pct: number;
+    margin: number;
+    margin_pct: number;
+  };
 }
 
 interface CashSummary {
@@ -129,6 +153,7 @@ export default function ReportsPage() {
   const [dailyBreakdown, setDailyBreakdown] = useState<SalesBreakdown | null>(null);
   const [sales, setSales] = useState<SalesBreakdown | null>(null);
   const [cash, setCash] = useState<CashSummary | null>(null);
+  const [profitability, setProfitability] = useState<DishProfitability | null>(null);
 
   const minorFactor = getCurrencyMinorUnitFactor(currentTenant?.currency || '');
 
@@ -191,12 +216,27 @@ export default function ReportsPage() {
     }
   }, [range.from, range.to, t]);
 
+  const loadProfitability = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/reports/dish-profitability', {
+        params: { start_date: range.from, end_date: range.to },
+      });
+      setProfitability(data.dishProfitability ?? null);
+    } catch {
+      toast.error(t('loadFailed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [range.from, range.to, t]);
+
   useEffect(() => {
     // oxlint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'daily') void loadDaily();
     else if (tab === 'sales') void loadSales();
+    else if (tab === 'profitability') void loadProfitability();
     else void loadCash();
-  }, [tab, loadDaily, loadSales, loadCash]);
+  }, [tab, loadDaily, loadSales, loadCash, loadProfitability]);
 
   const download = async (url: string, params: Record<string, string>, filename: string) => {
     const res = await api.get(url, { params, responseType: 'blob' });
@@ -231,6 +271,12 @@ export default function ReportsPage() {
           { start_date: range.from, end_date: range.to, format },
           `sales-report-${range.from}-to-${range.to}.${format}`,
         );
+      } else if (tab === 'profitability') {
+        await download(
+          '/reports/dish-profitability/export',
+          { start_date: range.from, end_date: range.to, format },
+          `dish-profitability-${range.from}-to-${range.to}.${format}`,
+        );
       } else {
         await download(
           '/reports/cash/export',
@@ -257,6 +303,25 @@ export default function ReportsPage() {
           : type;
   const statusCount = (status: string) =>
     daySummary?.ordersByStatus.find((row) => row.status === status)?.count ?? 0;
+  const dishClassLabel = (cls: string) =>
+    cls === 'star'
+      ? t('classStar')
+      : cls === 'puzzle'
+        ? t('classPuzzle')
+        : cls === 'plowhorse'
+          ? t('classPlowhorse')
+          : cls === 'dog'
+            ? t('classDog')
+            : cls;
+  const dishClassChipClass = (cls: string) =>
+    cls === 'star'
+      ? 'bg-amber-100 text-amber-800 border-amber-200'
+      : cls === 'puzzle'
+        ? 'bg-violet-100 text-violet-800 border-violet-200'
+        : cls === 'plowhorse'
+          ? 'bg-sky-100 text-sky-800 border-sky-200'
+          : 'bg-red-100 text-red-800 border-red-200';
+  const fmtPct = (value: number) => `${Number(value ?? 0).toFixed(1)}%`;
 
   const metricCards: { label: string; value: string }[] =
     tab === 'daily' && financial
@@ -283,7 +348,15 @@ export default function ReportsPage() {
             { label: t('discounts'), value: fmt(sales.totals.discounts) },
             { label: t('serviceCharges'), value: fmt(sales.totals.serviceCharges) },
           ]
-        : [];
+        : tab === 'profitability' && profitability
+          ? [
+              { label: t('revenue'), value: fmt(profitability.totals.revenue) },
+              { label: t('ingredientCost'), value: fmt(profitability.totals.ingredient_cost) },
+              { label: t('margin'), value: fmt(profitability.totals.margin) },
+              { label: t('marginPct'), value: fmtPct(profitability.totals.margin_pct) },
+              { label: t('costCoverage'), value: fmtPct(profitability.totals.cost_coverage_pct) },
+            ]
+          : [];
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
@@ -354,7 +427,7 @@ export default function ReportsPage() {
 
         {/* Tabs */}
         <div className="mt-4 flex gap-2 border-b">
-          {(['daily', 'sales', 'cash'] as TabKey[]).map((key) => (
+          {(['daily', 'sales', 'cash', 'profitability'] as TabKey[]).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -364,7 +437,15 @@ export default function ReportsPage() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t(key === 'daily' ? 'tabDaily' : key === 'sales' ? 'tabSales' : 'tabCash')}
+              {t(
+                key === 'daily'
+                  ? 'tabDaily'
+                  : key === 'sales'
+                    ? 'tabSales'
+                    : key === 'cash'
+                      ? 'tabCash'
+                      : 'tabProfitability',
+              )}
             </button>
           ))}
         </div>
@@ -429,6 +510,67 @@ export default function ReportsPage() {
           </>
         )}
 
+        {!loading && tab === 'profitability' && profitability && (
+          <Section title={t('tabProfitability')}>
+            {profitability.rows.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t('noData')}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-2 text-start font-medium">{t('dish')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('quantity')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('revenue')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('ingredientCost')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('margin')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('marginPct')}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t('dishClass')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profitability.rows.map((row) => (
+                    <tr key={row.product_id} className="border-b last:border-0">
+                      <td className="px-3 py-2 font-medium">{row.name}</td>
+                      <td className="px-3 py-2">{row.quantity}</td>
+                      <td className="px-3 py-2">{fmt(row.revenue)}</td>
+                      <td className="px-3 py-2">
+                        {fmt(row.ingredient_cost)}
+                        <span className="block text-xs text-muted-foreground">
+                          {t('costCoverage')}: <Ltr>{fmtPct(row.cost_coverage_pct)}</Ltr>
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">{fmt(row.margin)}</td>
+                      <td className="px-3 py-2">
+                        <Ltr>{fmtPct(row.margin_pct)}</Ltr>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${dishClassChipClass(row.class)}`}
+                        >
+                          {dishClassLabel(row.class)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t bg-muted/50 font-semibold">
+                    <td className="px-3 py-2">{t('total')}</td>
+                    <td className="px-3 py-2">{profitability.totals.quantity}</td>
+                    <td className="px-3 py-2">{fmt(profitability.totals.revenue)}</td>
+                    <td className="px-3 py-2">{fmt(profitability.totals.ingredient_cost)}</td>
+                    <td className="px-3 py-2">{fmt(profitability.totals.margin)}</td>
+                    <td className="px-3 py-2">
+                      <Ltr>{fmtPct(profitability.totals.margin_pct)}</Ltr>
+                    </td>
+                    <td className="px-3 py-2" />
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </Section>
+        )}
+
         {!loading && tab === 'cash' && cash && (
           <>
             <Section title={t('sessions')}>
@@ -471,8 +613,16 @@ export default function ReportsPage() {
       <div className="reports-print-area hidden" aria-hidden="true">
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t('title')}</h1>
         <p>
-          {t(tab === 'daily' ? 'tabDaily' : tab === 'sales' ? 'tabSales' : 'tabCash')} — {t('periodLabel')}:{' '}
-          {range.from} — {range.to}
+          {t(
+            tab === 'daily'
+              ? 'tabDaily'
+              : tab === 'sales'
+                ? 'tabSales'
+                : tab === 'cash'
+                  ? 'tabCash'
+                  : 'tabProfitability',
+          )}{' '}
+          — {t('periodLabel')}: {range.from} — {range.to}
         </p>
         {metricCards.map((card) => (
           <p key={card.label}>
@@ -494,6 +644,34 @@ export default function ReportsPage() {
                   <td>{row.product_name}</td>
                   <td>{row.quantity}</td>
                   <td>{fmt(row.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {tab === 'profitability' && profitability && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('dish')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('quantity')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('revenue')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('ingredientCost')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('margin')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('marginPct')}</th>
+                <th style={{ textAlign: 'start', borderBottom: '1px solid #000' }}>{t('dishClass')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {profitability.rows.map((row) => (
+                <tr key={row.product_id}>
+                  <td>{row.name}</td>
+                  <td>{row.quantity}</td>
+                  <td>{fmt(row.revenue)}</td>
+                  <td>{fmt(row.ingredient_cost)}</td>
+                  <td>{fmt(row.margin)}</td>
+                  <td>{fmtPct(row.margin_pct)}</td>
+                  <td>{dishClassLabel(row.class)}</td>
                 </tr>
               ))}
             </tbody>

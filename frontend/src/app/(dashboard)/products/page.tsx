@@ -25,6 +25,8 @@ import {
   ChevronUp,
   ChevronDown,
   Search,
+  Star,
+  PackageX,
 } from 'lucide-react';
 import type { Product, Category, AddonGroup, Addon } from '@/lib/types';
 import {
@@ -214,6 +216,12 @@ export default function ProductsPage() {
   const [bulkTaxApplying, setBulkTaxApplying] = useState(false);
   const [savingAddonGroup, setSavingAddonGroup] = useState(false);
   const addonGroupSaveInFlight = useRef(false);
+  const [soldOutOnly, setSoldOutOnly] = useState(false);
+  const [priceEditMode, setPriceEditMode] = useState(false);
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [bulkPercent, setBulkPercent] = useState('');
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [savingPrices, setSavingPrices] = useState(false);
 
   const router = useRouter();
   const currency = getCurrencySymbol(
@@ -872,6 +880,101 @@ export default function ProductsPage() {
     );
   const removeAddonItem = (idx: number) => setAddonList((prev) => prev.filter((_, i) => i !== idx));
 
+  const isPinnedProduct = (product: Product) =>
+    product.is_pinned === true || product.is_pinned === 1;
+  const isSoldOutProduct = (product: Product) =>
+    product.is_sold_out === true || product.is_sold_out === 1;
+
+  const handleTogglePin = async (product: Product) => {
+    const next = !isPinnedProduct(product);
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, is_pinned: next } : p)),
+    );
+    try {
+      await api.patch(`/products/${product.id}/pin`, { pinned: next });
+    } catch {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, is_pinned: !next } : p)),
+      );
+      toast.error(t('pinUpdateFailed'));
+    }
+  };
+
+  const handleToggleSoldOut = async (product: Product) => {
+    const next = !isSoldOutProduct(product);
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, is_sold_out: next } : p)),
+    );
+    try {
+      await api.patch(`/products/${product.id}/sold-out`, { sold_out: next });
+    } catch {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, is_sold_out: !next } : p)),
+      );
+      toast.error(t('soldOutUpdateFailed'));
+    }
+  };
+
+  const enterPriceEditMode = () => {
+    setPriceDrafts(
+      Object.fromEntries(products.map((p) => [String(p.id), String(p.price)])),
+    );
+    setBulkPercent('');
+    setBulkCategoryId('');
+    setPriceEditMode(true);
+  };
+
+  const exitPriceEditMode = () => {
+    setPriceEditMode(false);
+    setPriceDrafts({});
+  };
+
+  const applyBulkPercent = () => {
+    const pct = Number(bulkPercent);
+    if (!Number.isFinite(pct) || pct === 0) return;
+    setPriceDrafts((prev) => {
+      const next = { ...prev };
+      for (const product of products) {
+        if (bulkCategoryId !== '' && String(product.category_id ?? '') !== bulkCategoryId)
+          continue;
+        const current = Number(next[String(product.id)] ?? product.price);
+        if (!Number.isFinite(current)) continue;
+        next[String(product.id)] = String(Math.round(current * (1 + pct / 100)));
+      }
+      return next;
+    });
+  };
+
+  const handleSaveAllPrices = async () => {
+    const items: { id: string; price: number }[] = [];
+    for (const p of products) {
+      const draft = Number(priceDrafts[String(p.id)]);
+      if (Number.isFinite(draft) && draft >= 0 && draft !== Number(p.price)) {
+        items.push({ id: p.id, price: draft });
+      }
+    }
+    if (items.length === 0) {
+      exitPriceEditMode();
+      return;
+    }
+    setSavingPrices(true);
+    try {
+      await api.post('/products/bulk-prices', { items });
+      const priceById = new Map(items.map((item) => [String(item.id), item.price]));
+      setProducts((prev) =>
+        prev.map((p) =>
+          priceById.has(String(p.id)) ? { ...p, price: priceById.get(String(p.id))! } : p,
+        ),
+      );
+      toast.success(t('pricesSaved'));
+      exitPriceEditMode();
+    } catch {
+      toast.error(t('pricesSaveFailed'));
+    } finally {
+      setSavingPrices(false);
+    }
+  };
+
   // One search box filters whichever list the active tab shows; every list is
   // already fully loaded, so the filter never stops at a first page.
   const normalizedSearch = search.trim().toLowerCase();
@@ -893,6 +996,9 @@ export default function ProductsPage() {
             )?.name,
           ]),
         );
+  const listedProducts = soldOutOnly
+    ? visibleProducts.filter(isSoldOutProduct)
+    : visibleProducts;
   const visibleCategories =
     normalizedSearch === ''
       ? categories
@@ -1001,6 +1107,25 @@ export default function ProductsPage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {activeTab === 'products' && (
+              <button
+                type="button"
+                aria-pressed={soldOutOnly}
+                onClick={() => setSoldOutOnly((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  soldOutOnly
+                    ? 'border-red-500 bg-red-500 text-white'
+                    : 'border-border bg-card text-muted-foreground hover:border-red-400 hover:text-red-600'
+                }`}
+              >
+                <PackageX size={14} /> {t('soldOutOnly')}
+              </button>
+            )}
+            {activeTab === 'products' && isOwnerOrManager && !priceEditMode && (
+              <Button variant="outline" onClick={enterPriceEditMode}>
+                <Pencil size={16} className="me-1" /> {t('editPrices')}
+              </Button>
+            )}
             {activeTab === 'products' && isOwnerOrManager && taxCategories.length > 0 && (
               <Button
                 variant="outline"
@@ -1027,6 +1152,55 @@ export default function ProductsPage() {
           value="products"
           className="dashboard-scroll-pane flex min-h-0 flex-1 flex-col"
         >
+          {priceEditMode && (
+            <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-brand/40 bg-brand-light/40 dark:bg-[var(--color-brand-light)] px-3 py-2.5">
+              <span className="text-sm font-semibold text-foreground">{t('editPrices')}</span>
+              <span className="ms-2 flex items-center gap-1.5">
+                <label htmlFor="bulk-percent" className="text-xs text-muted-foreground">
+                  {t('bulkPercent')}
+                </label>
+                <input
+                  id="bulk-percent"
+                  type="number"
+                  step="any"
+                  value={bulkPercent}
+                  onChange={(e) => setBulkPercent(e.target.value)}
+                  placeholder="10"
+                  className="w-20 rounded-lg border border-border bg-card px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <label htmlFor="bulk-percent-category" className="text-xs text-muted-foreground">
+                  {t('bulkPercentCategory')}
+                </label>
+                <select
+                  id="bulk-percent-category"
+                  value={bulkCategoryId}
+                  onChange={(e) => setBulkCategoryId(e.target.value)}
+                  className="rounded-lg border border-border bg-card px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <option value="">{t('bulkAllCategories')}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <Button size="sm" variant="outline" onClick={applyBulkPercent}>
+                {t('bulkPercentApply')}
+              </Button>
+              <span className="ms-auto flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={exitPriceEditMode} disabled={savingPrices}>
+                  {tCommon('cancel')}
+                </Button>
+                <Button size="sm" onClick={() => void handleSaveAllPrices()} disabled={savingPrices}>
+                  {t('saveAllPrices')}
+                </Button>
+              </span>
+            </div>
+          )}
           {/* Product Table */}
           <div
             data-testid="products-list-scroll"
@@ -1067,7 +1241,7 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visibleProducts.map((product) => {
+                {listedProducts.map((product) => {
                   const parentCat = categories.find(
                     (c) => String(c.id) === String(product.category_id || product.category?.id),
                   );
@@ -1123,6 +1297,11 @@ export default function ProductsPage() {
                                 ))}
                               </div>
                             )}
+                            {isSoldOutProduct(product) && (
+                              <span className="mt-1.5 inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+                                <PackageX size={11} className="shrink-0" /> {t('soldOutBadge')}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1150,11 +1329,40 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="p-4 text-end">
-                        <p className="font-medium">{fmt(Number(product.price))}</p>
-                        {product.cost != null && product.cost > 0 && (
-                          <p className="text-xs text-gray-400">
-                            {t('costLabel', { value: fmt(Number(product.cost)) })}
-                          </p>
+                        {priceEditMode ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              aria-label={product.name}
+                              value={priceDrafts[String(product.id)] ?? String(product.price)}
+                              onChange={(e) =>
+                                setPriceDrafts((prev) => ({
+                                  ...prev,
+                                  [String(product.id)]: e.target.value,
+                                }))
+                              }
+                              className="w-32 rounded-lg border border-border bg-card px-2 py-1.5 text-end text-sm outline-none focus:ring-2 focus:ring-brand"
+                            />
+                            {Number(priceDrafts[String(product.id)]) !== Number(product.price) &&
+                              Number.isFinite(Number(priceDrafts[String(product.id)])) && (
+                                <span className="text-xs text-muted-foreground">
+                                  <span className="line-through">{fmt(Number(product.price))}</span>
+                                  {' → '}
+                                  {fmt(Number(priceDrafts[String(product.id)]))}
+                                </span>
+                              )}
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-medium">{fmt(Number(product.price))}</p>
+                            {product.cost != null && product.cost > 0 && (
+                              <p className="text-xs text-gray-400">
+                                {t('costLabel', { value: fmt(Number(product.cost)) })}
+                              </p>
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">
@@ -1220,6 +1428,27 @@ export default function ProductsPage() {
                           {isOwnerOrManager && (
                             <>
                               <button
+                                onClick={() => void handleTogglePin(product)}
+                                aria-label={isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')}
+                                title={isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')}
+                                aria-pressed={isPinnedProduct(product)}
+                                className={`p-1.5 ${isPinnedProduct(product) ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'}`}
+                              >
+                                <Star
+                                  size={16}
+                                  fill={isPinnedProduct(product) ? 'currentColor' : 'none'}
+                                />
+                              </button>
+                              <button
+                                onClick={() => void handleToggleSoldOut(product)}
+                                aria-label={isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')}
+                                title={isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')}
+                                aria-pressed={isSoldOutProduct(product)}
+                                className={`p-1.5 ${isSoldOutProduct(product) ? 'text-red-600' : 'text-gray-400 hover:text-red-600'}`}
+                              >
+                                <PackageX size={16} />
+                              </button>
+                              <button
                                 onClick={() => openEdit(product)}
                                 aria-label={tCommon('edit')}
                                 title={tCommon('edit')}
@@ -1244,9 +1473,9 @@ export default function ProductsPage() {
                 })}
               </tbody>
             </table>
-            {visibleProducts.length === 0 && (
+            {listedProducts.length === 0 && (
               <p className="text-center text-muted-foreground py-12">
-                {normalizedSearch === '' ? t('empty') : tCommon('noResults')}
+                {normalizedSearch === '' && !soldOutOnly ? t('empty') : tCommon('noResults')}
               </p>
             )}
           </div>

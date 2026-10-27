@@ -25,6 +25,7 @@ import {
 import type { Order, Table } from '@/lib/types';
 import { useTranslations } from 'use-intl';
 import { TABLE_STATUS_LABEL_KEYS } from '@/lib/i18n';
+import { parseDbTimestamp } from '@/lib/utils';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { Ltr } from '@/components/layout/Ltr';
 
@@ -33,6 +34,14 @@ const formatClock = (iso: string): string => {
   return Number.isNaN(d.getTime())
     ? ''
     : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatReservationWhen = (ts: string): string => {
+  const d = parseDbTimestamp(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  const date = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${time}`;
 };
 
 type XY = { x: number; y: number } | null;
@@ -796,6 +805,11 @@ export default function FloorplanEditor({
       !edit &&
       (shown === 'occupied' || shown === 'bill_requested') &&
       Boolean(activeOrder);
+    const showReservedHint =
+      hoverId === tb.id &&
+      !edit &&
+      shown === 'reserved' &&
+      Boolean(reservedName || tb.reservation_at);
     const hintItems = activeOrder?.items ?? [];
     const hintCounts = {
       pending: hintItems.filter((i) => i.status === 'pending').length,
@@ -849,6 +863,11 @@ export default function FloorplanEditor({
                   {reservedName}
                 </span>
               )}
+              {tb.status === 'reserved' && tb.reservation_at && (
+                <span className="max-w-full truncate text-[9px] font-medium text-muted-foreground">
+                  <Ltr>{formatReservationWhen(tb.reservation_at)}</Ltr>
+                </span>
+              )}
             </>
           )}
         </div>
@@ -894,6 +913,31 @@ export default function FloorplanEditor({
             <div className="mt-2 flex items-center justify-between border-t border-neutral-700 pt-2 text-sm">
               <span className="text-neutral-300">{tCommon('total')}</span>
               <span className="font-bold text-amber-400">{fmt(activeOrder.total ?? 0)}</span>
+            </div>
+          </div>
+        )}
+        {showReservedHint && (
+          <div className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-2 w-60 -translate-x-1/2 rtl:translate-x-1/2 rounded-xl bg-neutral-900 p-3 text-start text-white shadow-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold">
+                <Ltr>{tb.name}</Ltr>
+              </span>
+              <span className="text-xs font-semibold text-amber-400">
+                {t(TABLE_STATUS_LABEL_KEYS.reserved)}
+              </span>
+            </div>
+            <div className="mt-1.5 space-y-1 text-xs text-neutral-300">
+              {reservedName && <p>{reservedName}</p>}
+              {tb.reservation_customer_phone && (
+                <p>
+                  <Ltr>{tb.reservation_customer_phone}</Ltr>
+                </p>
+              )}
+              {tb.reservation_at && (
+                <p>
+                  {t('arrivalTime')} · <Ltr>{formatReservationWhen(tb.reservation_at)}</Ltr>
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1507,6 +1551,27 @@ export default function FloorplanEditor({
                 </div>
               </div>
             </div>
+            {actionTable.status === 'reserved' &&
+              (actionTable.reservation_customer_name || actionTable.reservation_at) && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/40 dark:bg-amber-950/40">
+                  {actionTable.reservation_customer_name && (
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      {actionTable.reservation_customer_name}
+                    </p>
+                  )}
+                  {actionTable.reservation_customer_phone && (
+                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                      <Ltr>{actionTable.reservation_customer_phone}</Ltr>
+                    </p>
+                  )}
+                  {actionTable.reservation_at && (
+                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                      {t('arrivalTime')}:{' '}
+                      <Ltr>{formatReservationWhen(actionTable.reservation_at)}</Ltr>
+                    </p>
+                  )}
+                </div>
+              )}
             {(() => {
               const sheetOrder = activeOrderOf(actionTable);
               if (!sheetOrder) return null;

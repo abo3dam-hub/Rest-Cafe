@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
@@ -31,6 +31,7 @@ import { useCartStore } from '@/store/cart';
 import { usePrinterStore } from '@/hooks/usePrinter';
 import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
 import { tenantCan } from '@/lib/permissions';
+import { parseDbTimestamp } from '@/lib/utils';
 import { countryName, getCurrencySymbol, getCountryByCode } from '@/lib/countries';
 import { parsePhone, dialCodeFor } from '@/lib/phone';
 import { useTranslations, type AppConfig } from 'use-intl';
@@ -56,6 +57,19 @@ const statusColors: Record<string, string> = {
 const displayTableStatus = (status: Table['status']): Table['status'] =>
   status === 'cleaning' ? 'available' : status;
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toLocalInputValue = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+// Arrival picker bounds: now through tomorrow, in local wall time.
+function reservationArrivalBounds(): { min: string; max: string } {
+  const now = new Date();
+  const end = new Date(now);
+  end.setDate(end.getDate() + 1);
+  end.setHours(23, 59, 0, 0);
+  return { min: toLocalInputValue(now), max: toLocalInputValue(end) };
+}
+
 type OrdersKey = keyof AppConfig['Messages']['orders'];
 
 const itemStatusLabelKey = (status: OrderItem['status']): OrdersKey =>
@@ -78,6 +92,7 @@ function ReserveModal({ table, onClose, onDone }: ReserveModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Customer[]>([]);
   const [selected, setSelected] = useState<Customer | null>(null);
+  const [arrival, setArrival] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -130,12 +145,15 @@ function ReserveModal({ table, onClose, onDone }: ReserveModalProps) {
     }
   };
 
+  const [arrivalBounds] = useState(reservationArrivalBounds);
+
   const handleReserve = async () => {
     setSaving(true);
     try {
       await api.patch(`/tables/${table.id}/status`, {
         status: 'reserved',
         reservation_customer_id: selected?.id ?? null,
+        reservation_at: arrival ? new Date(arrival).toISOString() : null,
       });
       const msg = selected
         ? tTables('reservedFor', { name: table.name, customer: selected.name })
@@ -265,6 +283,24 @@ function ReserveModal({ table, onClose, onDone }: ReserveModalProps) {
             )}
           </div>
         )}
+
+        <div className="mb-4">
+          <label
+            htmlFor="reserve-arrival"
+            className="mb-2 block text-sm text-muted-foreground"
+          >
+            {tTables('arrivalTime')}
+          </label>
+          <input
+            id="reserve-arrival"
+            type="datetime-local"
+            value={arrival}
+            min={arrivalBounds.min}
+            max={arrivalBounds.max}
+            onChange={(e) => setArrival(e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+          />
+        </div>
 
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose} className="flex-1">
@@ -904,6 +940,23 @@ export default function TablesPage() {
     }
   };
 
+  const todaysReservations = useMemo(() => {
+    const now = new Date();
+    return tables
+      .filter((tb) => tb.status === 'reserved' && tb.reservation_at)
+      .map((tb) => ({ table: tb, at: parseDbTimestamp(tb.reservation_at) }))
+      .filter(
+        ({ at }) =>
+          !Number.isNaN(at.getTime()) &&
+          at.getFullYear() === now.getFullYear() &&
+          at.getMonth() === now.getMonth() &&
+          at.getDate() === now.getDate(),
+      )
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+  }, [tables]);
+  const formatReservationTime = (d: Date) =>
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1037,6 +1090,26 @@ export default function TablesPage() {
           )}
         </div>
       </div>
+
+      {todaysReservations.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-950/40">
+          <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            {tTables('todaysReservations')}
+          </span>
+          {todaysReservations.map(({ table, at }) => (
+            <span
+              key={table.id}
+              className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-card px-2.5 py-1 text-xs font-medium text-foreground dark:border-amber-800/40"
+            >
+              <Ltr>{formatReservationTime(at)}</Ltr>
+              <span aria-hidden="true">·</span>
+              <span>{table.reservation_customer_name ?? '—'}</span>
+              <span aria-hidden="true">·</span>
+              <Ltr>{table.name}</Ltr>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Plan view: floorplan editor stays mounted so unsaved drag edits
           survive view switches between Plan and List. */}
@@ -1305,14 +1378,27 @@ export default function TablesPage() {
 
                         {/* Zone 2: Body */}
                         <div className="px-4 py-3 flex-1 flex flex-col justify-center space-y-2.5">
-                          {table.status === 'reserved' && table.reservation_customer_name && (
+                          {table.status === 'reserved' &&
+                            (table.reservation_customer_name || table.reservation_at) && (
                             <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/40 px-3 py-2">
-                              <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium truncate">
-                                {table.reservation_customer_name}
-                              </p>
+                              {table.reservation_customer_name && (
+                                <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium truncate">
+                                  {table.reservation_customer_name}
+                                </p>
+                              )}
                               {table.reservation_customer_phone && (
                                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
                                   <Ltr>{table.reservation_customer_phone}</Ltr>
+                                </p>
+                              )}
+                              {table.reservation_at && (
+                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+                                  {tTables('arrivalTime')}:{' '}
+                                  <Ltr>
+                                    {formatReservationTime(
+                                      parseDbTimestamp(table.reservation_at),
+                                    )}
+                                  </Ltr>
                                 </p>
                               )}
                             </div>

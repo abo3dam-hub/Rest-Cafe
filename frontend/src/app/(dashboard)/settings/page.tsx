@@ -2844,6 +2844,12 @@ export default function SettingsPage() {
               onClick={handleSettingsTabChange}
             />
             <SettingsNavItem
+              label={t('tabCustomerDisplay')}
+              value="customer-display"
+              active={activeTab}
+              onClick={handleSettingsTabChange}
+            />
+            <SettingsNavItem
               label={t('tablesideOrdering')}
               value="server-app"
               active={activeTab}
@@ -3866,6 +3872,11 @@ export default function SettingsPage() {
               )}
 
               <KdsDefaultViewCard />
+            </SettingsTabShell>
+          </TabsContent>
+
+          <TabsContent value="customer-display">
+            <SettingsTabShell>
               <CustomerDisplayCard />
             </SettingsTabShell>
           </TabsContent>
