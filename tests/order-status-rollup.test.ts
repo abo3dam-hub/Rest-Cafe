@@ -172,8 +172,8 @@ async function main() {
     // ── C) Split checks default-on + migration v119 ───────────────────────
     console.log('\n─── C) Split checks default (seed, fallback, v119) ───');
     const tail = MIGRATIONS[MIGRATIONS.length - 1];
-    assertEqualOrThrow(tail.version, 120, 'C: registry tail is migration v120');
-    assertEqualOrThrow(tail.name, 'customers_country_code_default_syria', 'C: v120 name registered');
+    assertEqualOrThrow(tail.version, 122, 'C: registry tail is migration v122');
+    assertEqualOrThrow(tail.name, 'add_table_reservation_at', 'C: v122 name registered');
     const v119 = MIGRATIONS.find((m: any) => m.version === 119);
     assertOrThrow(!!v119, 'C: migration v119 exists');
 

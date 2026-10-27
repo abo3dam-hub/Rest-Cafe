@@ -7781,6 +7781,36 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    // Cashier-facing product flags: sold out for the day (with the moment it
+    // was marked) and pinned ahead of category peers on the POS grid.
+    version: 121,
+    name: 'add_product_sold_out_and_pinned',
+    up: () => {
+      const productColumns = getColumns(db, 'products');
+      if (!productColumns.includes('is_sold_out')) {
+        db.exec('ALTER TABLE products ADD COLUMN is_sold_out INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!productColumns.includes('sold_out_at')) {
+        db.exec('ALTER TABLE products ADD COLUMN sold_out_at TEXT DEFAULT NULL');
+      }
+      if (!productColumns.includes('is_pinned')) {
+        db.exec('ALTER TABLE products ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+  },
+  {
+    // When a reserved table's party is expected; the reservation customer
+    // link already exists, this is its time half.
+    version: 122,
+    name: 'add_table_reservation_at',
+    up: () => {
+      const tableColumns = getColumns(db, 'tables');
+      if (!tableColumns.includes('reservation_at')) {
+        db.exec('ALTER TABLE tables ADD COLUMN reservation_at TEXT DEFAULT NULL');
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {

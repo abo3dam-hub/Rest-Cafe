@@ -32,7 +32,11 @@ function activeOrderForTable(
 
 function reservationCustomerShape(
   db: ReturnType<typeof getDatabase>,
-  table: { status: string; reservation_customer_id?: string | null },
+  table: {
+    status: string;
+    reservation_customer_id?: string | null;
+    reservation_at?: string | null;
+  },
 ) {
   const reservationCustomer =
     table.status === 'reserved' && table.reservation_customer_id
@@ -45,7 +49,15 @@ function reservationCustomerShape(
       table.status === 'reserved' ? (table.reservation_customer_id ?? null) : null,
     reservation_customer_name: reservationCustomer?.name ?? null,
     reservation_customer_phone: reservationCustomer?.phone ?? null,
+    reservation_at: table.status === 'reserved' ? (table.reservation_at ?? null) : null,
   };
+}
+
+/** Normalize an optional reservation timestamp: ISO string, null to clear. */
+function normalizeReservationAt(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  return Number.isNaN(Date.parse(value)) ? undefined : value;
 }
 
 function tableShape(
@@ -68,6 +80,7 @@ function tableShape(
           reservation_customer_id: null,
           reservation_customer_name: null,
           reservation_customer_phone: null,
+          reservation_at: null,
         }),
     activeOrder: visibleCurrentOrder,
     current_order: visibleCurrentOrder,
@@ -464,8 +477,17 @@ router.post('/bulk', requirePermission('tables.manage'), (req: Request, res: Res
 
 router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Response) => {
   try {
-    const { number, name, capacity, floor, section, position_x, position_y, kitchen_station_id } =
-      req.body;
+    const {
+      number,
+      name,
+      capacity,
+      floor,
+      section,
+      position_x,
+      position_y,
+      kitchen_station_id,
+      reservation_at,
+    } = req.body;
     const has = (key: string) => Object.prototype.hasOwnProperty.call(req.body, key);
     const hasTableNumber = has('number') || has('name');
     const tableNumber = hasTableNumber
@@ -489,6 +511,16 @@ router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Respo
       return res.status(400).json({
         code: 'TABLE_CAPACITY_INVALID',
         error: 'Capacity must be a positive whole number',
+      });
+    }
+
+    const normalizedReservationAt = has('reservation_at')
+      ? normalizeReservationAt(reservation_at)
+      : table.reservation_at;
+    if (normalizedReservationAt === undefined) {
+      return res.status(400).json({
+        code: 'TABLE_RESERVATION_AT_INVALID',
+        error: 'Reservation time must be an ISO datetime string or null',
       });
     }
 
@@ -527,6 +559,7 @@ router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Respo
         position_x = ?,
         position_y = ?,
         kitchen_station_id = ?,
+        reservation_at = ?,
         updated_at = ?
       WHERE id = ?
     `).run(
@@ -537,6 +570,7 @@ router.put('/:id', requirePermission('tables.manage'), (req: Request, res: Respo
       normalizedX,
       normalizedY,
       has('kitchen_station_id') ? kitchen_station_id : table.kitchen_station_id,
+      normalizedReservationAt,
       now(),
       req.params.id,
     );
@@ -754,6 +788,7 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
   try {
     const { status } = req.body;
     const reservationCustomerId = req.body.reservation_customer_id;
+    const hasReservationAt = Object.prototype.hasOwnProperty.call(req.body, 'reservation_at');
 
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
@@ -767,6 +802,19 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
       return res
         .status(400)
         .json({ error: 'A reservation customer can only be set for a reserved table' });
+    }
+    if (status !== 'reserved' && hasReservationAt && req.body.reservation_at != null) {
+      return res
+        .status(400)
+        .json({ error: 'A reservation time can only be set for a reserved table' });
+    }
+    const normalizedReservationAt = hasReservationAt
+      ? normalizeReservationAt(req.body.reservation_at)
+      : undefined;
+    if (hasReservationAt && normalizedReservationAt === undefined) {
+      return res
+        .status(400)
+        .json({ error: 'Reservation time must be an ISO datetime string or null' });
     }
 
     let normalizedReservationCustomerId: string | null = null;
@@ -796,8 +844,16 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
 
     if (status === 'reserved') {
       db.prepare(
-        'UPDATE tables SET status = ?, reservation_customer_id = ?, updated_at = ? WHERE id = ?',
-      ).run(status, normalizedReservationCustomerId, now(), req.params.id);
+        'UPDATE tables SET status = ?, reservation_customer_id = ?, reservation_at = ?, updated_at = ? WHERE id = ?',
+      ).run(
+        status,
+        normalizedReservationCustomerId,
+        hasReservationAt
+          ? normalizedReservationAt
+          : ((table as any).reservation_at ?? null),
+        now(),
+        req.params.id,
+      );
     } else {
       db.prepare('UPDATE tables SET status = ?, updated_at = ? WHERE id = ?').run(
         status,
@@ -809,6 +865,7 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
     const updated = db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id) as {
       status: string;
       reservation_customer_id?: string | null;
+      reservation_at?: string | null;
       [key: string]: unknown;
     };
     res.json({ table: { ...updated, ...reservationCustomerShape(db, updated) } });

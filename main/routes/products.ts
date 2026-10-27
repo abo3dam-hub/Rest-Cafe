@@ -7,7 +7,11 @@ import {
 import { Router, Request, Response } from 'express';
 import { getDatabase, now, generateShortId, getSettingValue } from '../db';
 import { isBlockedSsrfTarget } from '../middleware/security';
-import { hasPermission, requirePermission } from '../services/authorization';
+import {
+  hasPermission,
+  requireAnyPermission,
+  requirePermission,
+} from '../services/authorization';
 import { getHttpRequestSignal } from '../shutdown';
 import { getActiveCountryPack, hasConfiguredTaxCategories } from '../services/tax';
 import { adjustProductStock } from '../services/inventory';
@@ -487,6 +491,8 @@ function serializeProduct(product: any): any {
   return {
     ...product,
     is_active: toBoolean(product.is_active),
+    is_sold_out: toBoolean(product.is_sold_out),
+    is_pinned: toBoolean(product.is_pinned),
     track_inventory: toBoolean(product.track_inventory),
     allow_fractional_quantity: toBoolean(product.allow_fractional_quantity),
     has_image: toBoolean(product.has_image),
@@ -1180,7 +1186,7 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
     let query = `SELECT p.id, p.category_id, p.name, p.description, p.price, p.cost, p.sku, p.barcode,
       p.sale_unit, p.allow_fractional_quantity, p.weight_precision,
       p.inventory_product_id, p.inventory_deduction_quantity,
-      p.is_active, p.sort_order, p.track_inventory, p.stock_quantity, p.low_stock_threshold,
+      p.is_active, p.is_sold_out, p.sold_out_at, p.is_pinned, p.sort_order, p.track_inventory, p.stock_quantity, p.low_stock_threshold,
       p.tax_type, p.tax_rate, p.tax_category_id, p.tax_behavior, p.cb_percent, p.tags, p.dietary_tags, p.deleted_at, p.created_at, p.updated_at,
       CASE WHEN p.image_url IS NULL OR p.image_url = '' THEN 0 ELSE 1 END AS has_image
       FROM products p 
@@ -2214,6 +2220,146 @@ router.post(
         )
         .run(now());
       res.json({ updated: result.changes });
+    } catch (error: any) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+function loadSerializedProduct(
+  db: ReturnType<typeof getDatabase>,
+  req: Request,
+  id: string,
+): any | null {
+  const product = db
+    .prepare('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL')
+    .get(id) as any;
+  if (!product) return null;
+  const relations = loadProductRelationsBatch(db, [product], {
+    includeInactiveVariants: wantsInactiveVariants(req),
+  });
+  const rel = relations.get(product.id) || {
+    category: null,
+    addon_groups: [],
+    addon_group_ids: [],
+    variants: [],
+  };
+  return serializeProduct({
+    ...product,
+    tags: parseTags(product.tags),
+    category: rel.category,
+    addon_groups: rel.addon_groups,
+    addon_group_ids: rel.addon_group_ids,
+    variants: rel.variants,
+  });
+}
+
+// Sold-out is a service-floor action: anyone who can run the POS may mark or
+// clear it, as may catalog managers. Pinning and bulk pricing stay manager
+// work (catalog.manage gates every other product write in this router).
+router.patch(
+  '/:id/sold-out',
+  requireAnyPermission('pos.use', 'catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const { sold_out: soldOut } = req.body ?? {};
+      if (typeof soldOut !== 'boolean') {
+        return res.status(400).json({ error: 'sold_out must be a boolean' });
+      }
+      const db = getDatabase();
+      const product = db
+        .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+        .get(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      db.prepare(
+        'UPDATE products SET is_sold_out = ?, sold_out_at = ?, updated_at = ? WHERE id = ?',
+      ).run(soldOut ? 1 : 0, soldOut ? now() : null, now(), req.params.id);
+      res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
+    } catch (error: any) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+router.patch(
+  '/:id/pin',
+  requirePermission('catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const { pinned } = req.body ?? {};
+      if (typeof pinned !== 'boolean') {
+        return res.status(400).json({ error: 'pinned must be a boolean' });
+      }
+      const db = getDatabase();
+      const product = db
+        .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+        .get(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      db.prepare('UPDATE products SET is_pinned = ?, updated_at = ? WHERE id = ?').run(
+        pinned ? 1 : 0,
+        now(),
+        req.params.id,
+      );
+      res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
+    } catch (error: any) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+// Bulk repricing for fast menu-wide adjustments: every entry is validated
+// and resolved before the single transaction writes, so one bad id or price
+// leaves the whole menu untouched. Prices are stored exactly as the
+// single-product update stores them (the raw number on the product row).
+router.post(
+  '/bulk-prices',
+  requirePermission('catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const items = (req.body ?? {}).items;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ error: 'items must be an array' });
+      }
+      const priceById = new Map<string, number>();
+      for (const entry of items) {
+        if (!entry || typeof entry.id !== 'string' || !entry.id) {
+          return res.status(400).json({ error: 'each item needs a product id' });
+        }
+        if (
+          typeof entry.price !== 'number' ||
+          !Number.isFinite(entry.price) ||
+          entry.price < 0
+        ) {
+          return res
+            .status(400)
+            .json({ error: `price for product ${entry.id} must be a finite non-negative number` });
+        }
+        priceById.set(entry.id, entry.price);
+      }
+      const db = getDatabase();
+      for (const id of priceById.keys()) {
+        const product = db
+          .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+          .get(id);
+        if (!product) {
+          return res.status(400).json({ error: `Product not found: ${id}` });
+        }
+      }
+      const update = db.prepare('UPDATE products SET price = ?, updated_at = ? WHERE id = ?');
+      const applyAll = db.transaction(() => {
+        for (const [id, price] of priceById) {
+          update.run(price, now(), id);
+        }
+      });
+      applyAll();
+      res.json({ updated: priceById.size });
     } catch (error: any) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });

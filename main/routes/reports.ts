@@ -50,9 +50,12 @@ import {
 } from '../services/cash-close-export';
 import {
   buildCashSummary,
+  buildDishProfitability,
   buildSalesBreakdown,
   serializeCashSummaryCsv,
   serializeCashSummaryXlsx,
+  serializeDishProfitabilityCsv,
+  serializeDishProfitabilityXlsx,
   serializeSalesBreakdownCsv,
   serializeSalesBreakdownXlsx,
 } from '../services/reports-period-export';
@@ -1553,6 +1556,64 @@ router.get(
       return res.send(withUtf8Bom(serializeCashSummaryCsv(dataset)));
     } catch (error: unknown) {
       console.error('[API] Cash report export error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+router.get(
+  '/dish-profitability',
+  requirePermission('reports.view'),
+  (req: Request, res: Response) => {
+    try {
+      const range = periodRange(req);
+      if (!range) {
+        return res.status(400).json({ error: 'start_date must be on or before end_date' });
+      }
+      const db = getDatabase();
+      const [windowStart] = reportDayBounds(range.startDate);
+      const [, windowEnd] = reportDayBounds(range.endDate);
+      const dataset = buildDishProfitability(db, { ...range, windowStart, windowEnd });
+      res.json({ dishProfitability: dataset });
+    } catch (error: any) {
+      console.error('[API] Internal error:', error);
+      res
+        .status(error.statusCode || 500)
+        .json({ error: error.statusCode ? error.message : 'Internal server error' });
+    }
+  },
+);
+
+router.get(
+  '/dish-profitability/export',
+  requirePermission('reports.view'),
+  async (req: Request, res: Response) => {
+    try {
+      const format =
+        req.query.format === 'csv' ? 'csv' : req.query.format === 'xlsx' ? 'xlsx' : null;
+      if (!format) return res.status(400).json({ error: 'format must be xlsx or csv' });
+      const range = periodRange(req);
+      if (!range) {
+        return res.status(400).json({ error: 'start_date must be on or before end_date' });
+      }
+      const db = getDatabase();
+      const [windowStart] = reportDayBounds(range.startDate);
+      const [, windowEnd] = reportDayBounds(range.endDate);
+      const dataset = buildDishProfitability(db, { ...range, windowStart, windowEnd });
+      const filename = `dish-profitability-${range.startDate}-to-${range.endDate}.${format}`;
+      if (format === 'xlsx') {
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(await serializeDishProfitabilityXlsx(dataset));
+      }
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(withUtf8Bom(serializeDishProfitabilityCsv(dataset)));
+    } catch (error: unknown) {
+      console.error('[API] Dish profitability export error:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   },

@@ -320,6 +320,198 @@ export async function serializeSalesBreakdownXlsx(dataset: SalesBreakdownDataset
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
+export type DishClass = 'star' | 'puzzle' | 'plowhorse' | 'dog';
+
+export interface DishProfitabilityRow {
+  product_id: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+  ingredient_cost: number;
+  cost_coverage_pct: number;
+  margin: number;
+  margin_pct: number;
+  class: DishClass;
+}
+
+export interface DishProfitabilityDataset {
+  startDate: string;
+  endDate: string;
+  rows: DishProfitabilityRow[];
+  totals: {
+    quantity: number;
+    revenue: number;
+    ingredient_cost: number;
+    cost_coverage_pct: number;
+    margin: number;
+    margin_pct: number;
+  };
+}
+
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+const pctOf = (part: number, whole: number): number => (whole > 0 ? (part / whole) * 100 : 0);
+
+// Revenue is the stored line total (oi.subtotal); ingredient cost is the
+// line-total snapshot stored on the item, counted only where it was known
+// at sale time (ingredient_cost_known = 1). Margin therefore compares full
+// revenue against the known-cost portion, and cost_coverage_pct says how
+// much of the sold quantity that cost actually covers.
+export function buildDishProfitability(
+  db: Db,
+  opts: { startDate: string; endDate: string; windowStart: string; windowEnd: string },
+): DishProfitabilityDataset {
+  const { windowStart, windowEnd } = opts;
+
+  const rawRows = db
+    .prepare(
+      `SELECT oi.product_id, oi.product_name,
+              COALESCE(SUM(oi.quantity), 0) AS quantity,
+              COALESCE(SUM(oi.subtotal), 0) AS revenue,
+              COALESCE(SUM(CASE WHEN oi.ingredient_cost_known = 1
+                            THEN COALESCE(oi.ingredient_cost, 0) ELSE 0 END), 0) AS ingredient_cost,
+              COALESCE(SUM(CASE WHEN oi.ingredient_cost_known = 1
+                            THEN oi.quantity ELSE 0 END), 0) AS known_quantity
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+       WHERE o.created_at >= ? AND o.created_at < ? AND o.status != 'cancelled' AND ${ITEM_ACTIVE}
+       GROUP BY oi.product_id, oi.product_name
+       ORDER BY revenue DESC`,
+    )
+    .all(windowStart, windowEnd) as any[];
+
+  const rows: DishProfitabilityRow[] = rawRows
+    .map((r) => {
+      const quantity = Number(r.quantity || 0);
+      const revenue = Number(r.revenue || 0);
+      const ingredientCost = Number(r.ingredient_cost || 0);
+      const margin = revenue - ingredientCost;
+      return {
+        product_id: String(r.product_id),
+        name: String(r.product_name),
+        quantity,
+        revenue,
+        ingredient_cost: ingredientCost,
+        cost_coverage_pct: pctOf(Number(r.known_quantity || 0), quantity),
+        margin,
+        margin_pct: pctOf(margin, revenue),
+        class: 'dog' as DishClass,
+      };
+    })
+    .filter((r) => r.quantity > 0);
+
+  const quantityMedian = medianOf(rows.map((r) => r.quantity));
+  const marginMedian = medianOf(rows.map((r) => r.margin_pct));
+  for (const row of rows) {
+    const highPopularity = row.quantity >= quantityMedian;
+    const highMargin = row.margin_pct >= marginMedian;
+    row.class = highPopularity
+      ? highMargin
+        ? 'star'
+        : 'plowhorse'
+      : highMargin
+        ? 'puzzle'
+        : 'dog';
+  }
+
+  const totalQuantity = rows.reduce((sum, r) => sum + r.quantity, 0);
+  const totalRevenue = rows.reduce((sum, r) => sum + r.revenue, 0);
+  const totalCost = rows.reduce((sum, r) => sum + r.ingredient_cost, 0);
+  const totalKnownQuantity = rawRows.reduce(
+    (sum, r) => sum + (Number(r.quantity || 0) > 0 ? Number(r.known_quantity || 0) : 0),
+    0,
+  );
+  const totalMargin = totalRevenue - totalCost;
+
+  return {
+    startDate: opts.startDate,
+    endDate: opts.endDate,
+    rows,
+    totals: {
+      quantity: totalQuantity,
+      revenue: totalRevenue,
+      ingredient_cost: totalCost,
+      cost_coverage_pct: pctOf(totalKnownQuantity, totalQuantity),
+      margin: totalMargin,
+      margin_pct: pctOf(totalMargin, totalRevenue),
+    },
+  };
+}
+
+export function serializeDishProfitabilityCsv(dataset: DishProfitabilityDataset): string {
+  const lines: string[] = [];
+  lines.push(
+    toCsvRow([
+      'product_id',
+      'name',
+      'quantity',
+      'revenue',
+      'ingredient_cost',
+      'cost_coverage_pct',
+      'margin',
+      'margin_pct',
+      'class',
+    ]),
+  );
+  for (const r of dataset.rows) {
+    lines.push(
+      toCsvRow([
+        r.product_id,
+        r.name,
+        r.quantity,
+        r.revenue,
+        r.ingredient_cost,
+        r.cost_coverage_pct,
+        r.margin,
+        r.margin_pct,
+        r.class,
+      ]),
+    );
+  }
+  const t = dataset.totals;
+  lines.push(
+    toCsvRow(['total', '', t.quantity, t.revenue, t.ingredient_cost, t.cost_coverage_pct, t.margin, t.margin_pct, '']),
+  );
+  return lines.join('\n') + '\n';
+}
+
+export async function serializeDishProfitabilityXlsx(
+  dataset: DishProfitabilityDataset,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('DishProfitability');
+  sheet.columns = [
+    { header: 'product_id', key: 'product_id', width: 16 },
+    { header: 'name', key: 'name', width: 32 },
+    { header: 'quantity', key: 'quantity', width: 12 },
+    { header: 'revenue', key: 'revenue', width: 16 },
+    { header: 'ingredient_cost', key: 'ingredient_cost', width: 16 },
+    { header: 'cost_coverage_pct', key: 'cost_coverage_pct', width: 16 },
+    { header: 'margin', key: 'margin', width: 16 },
+    { header: 'margin_pct', key: 'margin_pct', width: 12 },
+    { header: 'class', key: 'class', width: 12 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  for (const r of dataset.rows) sheet.addRow(r);
+  const t = dataset.totals;
+  sheet.addRow({
+    product_id: 'total',
+    name: '',
+    quantity: t.quantity,
+    revenue: t.revenue,
+    ingredient_cost: t.ingredient_cost,
+    cost_coverage_pct: t.cost_coverage_pct,
+    margin: t.margin,
+    margin_pct: t.margin_pct,
+    class: '',
+  });
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
 export function serializeCashSummaryCsv(dataset: CashSummaryDataset): string {
   const lines: string[] = [];
   lines.push(
