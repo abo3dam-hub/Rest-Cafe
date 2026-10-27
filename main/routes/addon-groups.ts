@@ -233,7 +233,10 @@ function invalidTaxCategory(addons: any[] | undefined): string | null {
     if (categoryId === null || categoryId === undefined || categoryId === '') continue;
     if (typeof categoryId !== 'string') return 'tax_category_id must be a string or null';
     if (!hasConfiguredTaxCategories(pack, businessType)) {
-      return `No configured tax categories are available for country ${country} and business type ${businessType}`;
+      // No tax rules are configured for this business type, so there is
+      // nothing to validate the id against; rejecting would block every
+      // addon save that carries a stored category in such installs.
+      continue;
     }
     if (!pack.categories.some((category) => category.id === categoryId)) {
       return `Unknown tax_category_id "${categoryId}" for country ${country}`;

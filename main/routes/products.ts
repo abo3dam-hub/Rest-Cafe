@@ -668,7 +668,14 @@ function validateTaxCategoryId(categoryId: unknown): string | null {
   const businessType = getSettingValue('business_type') || 'restaurant';
   const pack = getActiveCountryPack(country);
   if (!hasConfiguredTaxCategories(pack, businessType)) {
-    return `No configured tax categories are available for country ${country} and business type ${businessType}`;
+    // The active pack defines no tax rules for this business type, so tax
+    // categorisation is not configured at all and there is nothing to
+    // validate the id against. Rejecting here would make every product
+    // that carries a stored category unsaveable — blocking unrelated
+    // edits such as cost — in exactly the installs that cannot configure
+    // categories. Strict membership validation below still applies
+    // wherever a pack actually configures categories.
+    return null;
   }
   if (!pack.categories.some((category) => category.id === categoryId)) {
     return `Unknown tax_category_id "${categoryId}" for country ${country}`;

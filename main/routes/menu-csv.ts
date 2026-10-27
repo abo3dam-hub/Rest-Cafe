@@ -310,6 +310,7 @@ function csvImportErrorResponse(res: Response, error: unknown): Response {
       skipped: 0,
       failed: 1,
       groups_created: 0,
+      categories_created: 0,
       addons_created: 0,
       groups_reactivated: 0,
       addons_reactivated: 0,
@@ -675,7 +676,8 @@ router.post(
         reactivated = 0,
         skipped = 0,
         failed = 0,
-        changedRows = 0;
+        changedRows = 0,
+        categoriesCreated = 0;
       const errors: string[] = [];
 
       const findExistingProduct = db.prepare(
@@ -785,11 +787,21 @@ router.post(
           if (r.category) {
             categoryId = catMap[r.category.toLowerCase()] ?? null;
             if (!categoryId) {
-              failed++;
-              errors.push(
-                `Row ${i + 2} (${r.name}): category "${r.category}" not found — import categories first`,
-              );
-              continue;
+              // A menu file names the category each item belongs to; create
+              // a missing one on the spot (same insert as /import/categories,
+              // and the addons import likewise creates missing groups)
+              // instead of failing every row that references it.
+              const slug = r.category
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '');
+              categoryId = randomUUID();
+              db.prepare(
+                `INSERT INTO categories (id, name, slug, description, color, icon, sort_order, is_active, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+              ).run(categoryId, r.category, slug, null, null, null, 0, now(), now());
+              catMap[r.category.toLowerCase()] = categoryId;
+              categoriesCreated++;
             }
           }
 
@@ -927,7 +939,15 @@ router.post(
       })();
 
       captureMenuCsvRowRejections(failed, changedRows);
-      res.json({ created, updated, reactivated, skipped, failed, errors });
+      res.json({
+        created,
+        updated,
+        reactivated,
+        skipped,
+        failed,
+        errors,
+        categories_created: categoriesCreated,
+      });
     } catch (err: any) {
       return csvImportErrorResponse(res, err);
     }
