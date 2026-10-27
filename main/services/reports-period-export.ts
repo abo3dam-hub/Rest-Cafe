@@ -35,6 +35,26 @@ export interface SalesBreakdownDataset {
 export interface CashSummaryDataset {
   startDate: string;
   endDate: string;
+  /**
+   * Per-business-day ledger collections. Payments never require an open
+   * cash session in this product, so a store that never opens shifts (and
+   * never runs a day close) still has real collections to show: these rows
+   * are computed straight from bills/refunds, bucketed by the business
+   * date of each bill's paid_at — the same attribution financial-summary
+   * uses. `expected_cash` is the sales-only drawer expectation (cash lines
+   * minus cash refunds); drawer movements and opening float live on
+   * sessions/closures, matching the X-report convention of reporting the
+   * float separately.
+   */
+  days: {
+    business_date: string;
+    bill_count: number;
+    gross_collected: number;
+    refunded: number;
+    net_collected: number;
+    cash_collected: number;
+    expected_cash: number;
+  }[];
   sessions: {
     id: number;
     opened_by_name: string;
@@ -191,9 +211,88 @@ export function buildSalesBreakdown(
 
 export function buildCashSummary(
   db: Db,
-  opts: { startDate: string; endDate: string; windowStart: string; windowEnd: string; minorFactor: number },
+  opts: {
+    startDate: string;
+    endDate: string;
+    windowStart: string;
+    windowEnd: string;
+    timeZone: string;
+    startTime: string;
+    minorFactor: number;
+  },
 ): CashSummaryDataset {
   const { windowStart, windowEnd, minorFactor } = opts;
+
+  // Per-day ledger collections (see the dataset doc): bucket paid bills by
+  // the business date of paid_at in JS — SQLite has no IANA timezone support.
+  const paidBills = db
+    .prepare(
+      `SELECT paid_amount, paid_at, payment_details FROM bills
+       WHERE paid_at >= ? AND paid_at < ?`,
+    )
+    .all(windowStart, windowEnd) as any[];
+  const refundRows = db
+    .prepare(
+      `SELECT r.amount_cents, r.method, b.paid_at
+       FROM refunds r JOIN bills b ON b.id = r.bill_id
+       WHERE b.paid_at >= ? AND b.paid_at < ?`,
+    )
+    .all(windowStart, windowEnd) as any[];
+
+  type DayBucket = {
+    bill_count: number;
+    gross: number;
+    refunded: number;
+    cash: number;
+    cashRefunded: number;
+  };
+  const dayBuckets = new Map<string, DayBucket>();
+  const bucketFor = (paidAt: string): DayBucket | null => {
+    const instant = parseDbTimestamp(paidAt);
+    if (isNaN(instant.getTime())) return null;
+    const date = localDateInTimezone(instant, opts.timeZone, opts.startTime);
+    if (date < opts.startDate || date > opts.endDate) return null;
+    let bucket = dayBuckets.get(date);
+    if (!bucket) {
+      bucket = { bill_count: 0, gross: 0, refunded: 0, cash: 0, cashRefunded: 0 };
+      dayBuckets.set(date, bucket);
+    }
+    return bucket;
+  };
+  for (const bill of paidBills) {
+    const bucket = bucketFor(String(bill.paid_at));
+    if (!bucket) continue;
+    bucket.bill_count += 1;
+    bucket.gross += Number(bill.paid_amount || 0);
+    let lines: any[] = [];
+    try {
+      const parsed = JSON.parse(bill.payment_details || '[]');
+      lines = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      lines = [];
+    }
+    for (const line of lines) {
+      if (line && line.method === 'cash') bucket.cash += Number(line.amount || 0);
+    }
+  }
+  for (const refund of refundRows) {
+    const bucket = bucketFor(String(refund.paid_at));
+    if (!bucket) continue;
+    const amount = Number(refund.amount_cents || 0) / minorFactor;
+    bucket.refunded += amount;
+    if (refund.method === 'cash') bucket.cashRefunded += amount;
+  }
+  const days = [...dayBuckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([business_date, b]) => ({
+      business_date,
+      bill_count: b.bill_count,
+      gross_collected: b.gross,
+      refunded: b.refunded,
+      net_collected: b.gross - b.refunded,
+      cash_collected: b.cash,
+      expected_cash: b.cash - b.cashRefunded,
+    }));
 
   const sessionRows = db
     .prepare(
@@ -218,6 +317,7 @@ export function buildCashSummary(
   return {
     startDate: opts.startDate,
     endDate: opts.endDate,
+    days,
     sessions: sessionRows.map((r) => ({
       id: Number(r.id),
       opened_by_name: String(r.opened_by_name || ''),
@@ -517,6 +617,11 @@ export function serializeCashSummaryCsv(dataset: CashSummaryDataset): string {
   lines.push(
     toCsvRow(['section', 'id_or_date', 'opened_by', 'opened_at', 'status_or_scope', 'opening_float', 'expected_cash', 'counted_cash', 'variance', 'net_collected']),
   );
+  for (const d of dataset.days) {
+    lines.push(
+      toCsvRow(['day', d.business_date, '', '', 'ledger', '', d.expected_cash, '', '', d.net_collected]),
+    );
+  }
   for (const s of dataset.sessions) {
     lines.push(
       toCsvRow(['session', s.id, s.opened_by_name, s.opened_at, s.status, s.opening_float, s.expected_cash ?? '', s.counted_cash ?? '', s.variance ?? '', '']),
@@ -532,6 +637,19 @@ export function serializeCashSummaryCsv(dataset: CashSummaryDataset): string {
 
 export async function serializeCashSummaryXlsx(dataset: CashSummaryDataset): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
+  const days = workbook.addWorksheet('Days');
+  days.columns = [
+    { header: 'business_date', key: 'business_date', width: 16 },
+    { header: 'bill_count', key: 'bill_count', width: 12 },
+    { header: 'gross_collected', key: 'gross_collected', width: 16 },
+    { header: 'refunded', key: 'refunded', width: 14 },
+    { header: 'net_collected', key: 'net_collected', width: 16 },
+    { header: 'cash_collected', key: 'cash_collected', width: 16 },
+    { header: 'expected_cash', key: 'expected_cash', width: 16 },
+  ];
+  days.getRow(1).font = { bold: true };
+  for (const d of dataset.days) days.addRow(d);
+
   const sessions = workbook.addWorksheet('Sessions');
   sessions.columns = [
     { header: 'id', key: 'id', width: 10 },

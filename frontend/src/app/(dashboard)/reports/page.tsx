@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Download, FileSpreadsheet, Printer } from 'lucide-react';
 import api from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
+import { businessDateForInstant } from '@shared/business-date';
 import { getCurrencyMinorUnitFactor } from '@/lib/countries';
 import { useAuthStore } from '@/store/auth';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
@@ -38,6 +39,7 @@ interface FinancialSummary {
 interface DaySummary {
   orders: { count: number; total: number };
   ordersByStatus: { status: string; count: number }[];
+  paymentMethods: PaymentMethodRow[];
 }
 
 interface SalesBreakdown {
@@ -80,6 +82,15 @@ interface DishProfitability {
 }
 
 interface CashSummary {
+  days: {
+    business_date: string;
+    bill_count: number;
+    gross_collected: number;
+    refunded: number;
+    net_collected: number;
+    cash_collected: number;
+    expected_cash: number;
+  }[];
   sessions: {
     id: number;
     opened_by_name: string;
@@ -108,24 +119,23 @@ interface CashSummary {
   }[];
 }
 
-function isoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function rangeForPreset(preset: Preset, custom: { from: string; to: string }): { from: string; to: string } {
-  const now = new Date();
+// Presets anchor on the tenant's business date (shared business-date rule:
+// tenant timezone + configured day-start), never on this device's local
+// clock — a browser whose timezone differs from the store's would otherwise
+// query a different day than the backend's business day and read zeros.
+function rangeForPreset(
+  preset: Preset,
+  custom: { from: string; to: string },
+  businessToday: string,
+): { from: string; to: string } {
   if (preset === 'day') {
-    const today = isoDate(now);
-    return { from: today, to: today };
+    return { from: businessToday, to: businessToday };
   }
   if (preset === 'month') {
-    return { from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDate(now) };
+    return { from: `${businessToday.slice(0, 7)}-01`, to: businessToday };
   }
   if (preset === 'year') {
-    return { from: isoDate(new Date(now.getFullYear(), 0, 1)), to: isoDate(now) };
+    return { from: `${businessToday.slice(0, 4)}-01-01`, to: businessToday };
   }
   return custom;
 }
@@ -136,13 +146,25 @@ export default function ReportsPage() {
   const { currentTenant } = useAuthStore();
   const fmt = useFormatCurrency();
 
+  const tenantTimeZone =
+    currentTenant?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Resolved once on mount: a reports view is a snapshot of one business
+  // day, and the lazy initializer keeps the impure clock read out of render.
+  const [businessToday] = useState(() =>
+    businessDateForInstant({
+      instant: new Date(),
+      timezone: tenantTimeZone,
+      startTime: currentTenant?.business_day_start_time || '00:00',
+    }),
+  );
+
   const [tab, setTab] = useState<TabKey>('daily');
   const [preset, setPreset] = useState<Preset>('day');
-  const [custom, setCustom] = useState(() => {
-    const today = isoDate(new Date());
-    return { from: today, to: today };
-  });
-  const range = useMemo(() => rangeForPreset(preset, custom), [preset, custom]);
+  const [custom, setCustom] = useState(() => ({ from: businessToday, to: businessToday }));
+  const range = useMemo(
+    () => rangeForPreset(preset, custom, businessToday),
+    [preset, custom, businessToday],
+  );
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -161,28 +183,44 @@ export default function ReportsPage() {
     const date = range.from;
     setLoading(true);
     try {
-      const [finRes, sumRes, xRes, expRes, brkRes] = await Promise.all([
+      // Each source settles independently: one failing endpoint (e.g. the
+      // owner-only financial summary for a manager, who holds reports.view
+      // but not reports.financial.view) must degrade its own cards, never
+      // blank the whole tab.
+      const [finRes, sumRes, xRes, expRes, brkRes] = await Promise.allSettled([
         api.get('/reports/financial-summary', { params: { start_date: date, end_date: date } }),
         api.get('/reports/summary', { params: { date } }),
         api.get('/reports/x-report', { params: { date } }),
         api.get('/expenses/summary', { params: { from: date, to: date } }),
         api.get('/reports/sales/breakdown', { params: { start_date: date, end_date: date } }),
       ]);
-      setFinancial(finRes.data.financialSummary ?? null);
-      setDaySummary(sumRes.data.summary ?? null);
-      const x = xRes.data.xReport;
-      setExpectedCash(
-        x ? (Number(x.expectedCashCents || 0) + Number(x.openingFloatCents || 0)) / minorFactor : null,
-      );
-      const totals = (expRes.data?.totals ?? []) as {
-        currency_code: string;
-        incurred_minor: number;
-      }[];
-      const own = totals.find((row) => row.currency_code === currentTenant?.currency) ?? totals[0];
-      setExpensesTotal(own ? Number(own.incurred_minor || 0) / minorFactor : 0);
-      setDailyBreakdown(brkRes.data.salesBreakdown ?? null);
-    } catch {
-      toast.error(t('loadFailed'));
+      const fulfilled = [finRes, sumRes, xRes, expRes, brkRes].filter(
+        (r) => r.status === 'fulfilled',
+      ).length;
+      if (finRes.status === 'fulfilled') {
+        setFinancial(finRes.value.data.financialSummary ?? null);
+      }
+      if (sumRes.status === 'fulfilled') {
+        setDaySummary(sumRes.value.data.summary ?? null);
+      }
+      if (xRes.status === 'fulfilled') {
+        const x = xRes.value.data.xReport;
+        setExpectedCash(
+          x ? (Number(x.expectedCashCents || 0) + Number(x.openingFloatCents || 0)) / minorFactor : null,
+        );
+      }
+      if (expRes.status === 'fulfilled') {
+        const totals = (expRes.value.data?.totals ?? []) as {
+          currency_code: string;
+          incurred_minor: number;
+        }[];
+        const own = totals.find((row) => row.currency_code === currentTenant?.currency) ?? totals[0];
+        setExpensesTotal(own ? Number(own.incurred_minor || 0) / minorFactor : 0);
+      }
+      if (brkRes.status === 'fulfilled') {
+        setDailyBreakdown(brkRes.value.data.salesBreakdown ?? null);
+      }
+      if (fulfilled === 0) toast.error(t('loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -324,11 +362,17 @@ export default function ReportsPage() {
   const fmtPct = (value: number) => `${Number(value ?? 0).toFixed(1)}%`;
 
   const metricCards: { label: string; value: string }[] =
-    tab === 'daily' && financial
+    tab === 'daily' && (financial || daySummary || dailyBreakdown)
       ? [
-          { label: t('collected'), value: fmt(financial.grossCollected) },
-          { label: t('refunds'), value: fmt(financial.refunded) },
-          { label: t('net'), value: fmt(financial.netCollected) },
+          // Financial cards render only when the financial summary loaded
+          // (it is owner-gated); the rest of the tab must still show.
+          ...(financial
+            ? [
+                { label: t('collected'), value: fmt(financial.grossCollected) },
+                { label: t('refunds'), value: fmt(financial.refunded) },
+                { label: t('net'), value: fmt(financial.netCollected) },
+              ]
+            : []),
           { label: t('discounts'), value: fmt(dailyBreakdown?.totals.discounts ?? 0) },
           { label: t('taxCollected'), value: fmt(dailyBreakdown?.totals.taxCollected ?? 0) },
           { label: t('serviceCharges'), value: fmt(dailyBreakdown?.totals.serviceCharges ?? 0) },
@@ -336,8 +380,12 @@ export default function ReportsPage() {
           { label: t('expectedCash'), value: expectedCash == null ? '—' : fmt(expectedCash) },
           { label: t('completedOrders'), value: String(statusCount('completed')) },
           { label: t('cancelledOrders'), value: String(statusCount('cancelled')) },
-          { label: t('averageTicket'), value: fmt(financial.averageOrderValue) },
-          { label: t('billCount'), value: String(financial.billCount) },
+          ...(financial
+            ? [
+                { label: t('averageTicket'), value: fmt(financial.averageOrderValue) },
+                { label: t('billCount'), value: String(financial.billCount) },
+              ]
+            : []),
         ]
       : tab === 'sales' && sales
         ? [
@@ -463,11 +511,11 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {!loading && tab === 'daily' && financial && (
+        {!loading && tab === 'daily' && (financial || daySummary) && (
           <Section title={t('paymentsByMethod')}>
             <SimpleTable
               head={[t('method'), t('count'), t('total')]}
-              rows={financial.paymentMethods.map((row) => [
+              rows={(financial?.paymentMethods ?? daySummary?.paymentMethods ?? []).map((row) => [
                 methodLabel(row.method),
                 String(row.count),
                 fmt(row.total),
@@ -573,6 +621,20 @@ export default function ReportsPage() {
 
         {!loading && tab === 'cash' && cash && (
           <>
+            <Section title={t('dailyCollections')}>
+              <SimpleTable
+                head={[t('businessDate'), t('billCount'), t('collected'), t('refunds'), t('net'), t('expectedCash')]}
+                rows={cash.days.map((d) => [
+                  d.business_date,
+                  String(d.bill_count),
+                  fmt(d.gross_collected),
+                  fmt(d.refunded),
+                  fmt(d.net_collected),
+                  fmt(d.expected_cash),
+                ])}
+                empty={t('noData')}
+              />
+            </Section>
             <Section title={t('sessions')}>
               <SimpleTable
                 head={[t('openedBy'), t('openedAt'), t('closedAt'), t('status'), t('openingFloat'), t('expectedCash'), t('countedCash'), t('variance')]}
@@ -689,6 +751,15 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
+              {cash.days.map((d) => (
+                <tr key={`day-${d.business_date}`}>
+                  <td>{d.business_date}</td>
+                  <td>{fmt(d.expected_cash)}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>{fmt(d.net_collected)}</td>
+                </tr>
+              ))}
               {cash.closures.map((c) => (
                 <tr key={c.id}>
                   <td>{c.business_date}</td>

@@ -1510,6 +1510,8 @@ router.get('/cash-summary', requirePermission('reports.view'), (req: Request, re
       ...range,
       windowStart,
       windowEnd,
+      timeZone: tenantTimezone(),
+      startTime: tenantStartTime(),
       minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
     });
     res.json({ cashSummary: dataset });
@@ -1540,6 +1542,8 @@ router.get(
         ...range,
         windowStart,
         windowEnd,
+        timeZone: tenantTimezone(),
+        startTime: tenantStartTime(),
         minorFactor: getCurrencyMinorUnitFactor(getTenantCurrency(db)),
       });
       const filename = `cash-report-${range.startDate}-to-${range.endDate}.${format}`;
