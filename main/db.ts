@@ -500,11 +500,27 @@ function sha256Hex(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+// Read-through cache keyed to settingsRevision: every settings write bumps
+// the revision, so a stale entry can never outlive the write that changed it.
+// The database instance is part of the key so reopened/swapped databases
+// never inherit values from a previous one.
+let settingValueCacheDb: Database.Database | null = null;
+let settingValueCacheRevision = -1;
+const settingValueCache = new Map<string, string | null>();
+
 export function getSettingValue(key: string): string | null {
+  if (settingValueCacheDb !== db || settingValueCacheRevision !== settingsRevision) {
+    settingValueCache.clear();
+    settingValueCacheDb = db;
+    settingValueCacheRevision = settingsRevision;
+  }
+  if (settingValueCache.has(key)) return settingValueCache.get(key) ?? null;
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
     | { value: string | null }
     | undefined;
-  return row?.value ?? null;
+  const value = row?.value ?? null;
+  settingValueCache.set(key, value);
+  return value;
 }
 
 /** Resolves the tenant's configured business day start time, holding it to the
