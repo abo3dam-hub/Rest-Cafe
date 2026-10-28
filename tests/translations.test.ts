@@ -8,9 +8,11 @@
  *   1. Registry ↔ file consistency: every language in
  *      `frontend/src/lib/i18n/languages.ts` has a message JSON file and vice
  *      versa; locale tags are valid BCP-47 and directions are ltr/rtl.
- *   2. Exact nested leaf key parity with `en.json` as the canonical schema:
- *      every leaf key path in en.json must exist in es/fr/pt/fa (zero missing)
- *      and no locale may carry orphan extra keys.
+ *   2. Exact nested leaf key parity with `en.json` as the canonical schema,
+ *      enforced for the selectable locales (ar): every leaf key path in
+ *      en.json must exist there (zero missing) with no orphan extra keys.
+ *      Non-selectable catalogues are frozen — new keys are not required in
+ *      them; their existing content is still validated by checks 3–6.
  *   3. String leaf validity: every leaf must be a non-empty string (reject
  *      null, boolean, numeric, object, array), with no corrupted leaf
  *      strings (raw newlines, trailing JSON syntax leftovers, unbalanced
@@ -2531,10 +2533,14 @@ async function run(): Promise<void> {
   if (!enKeys) throw new Error('languages registry must include the canonical en locale');
 
   // 2. Exact nested leaf key parity — en.json is canonical (zero missing,
-  // zero orphan extras) across all registered locales.
+  // zero orphan extras) across the selectable locales (en + ar). The other
+  // registered catalogues are frozen: they stay validated for structure and
+  // ICU on their existing content below, but new keys are not required there
+  // and their values render only via print labels / saved preferences.
   const parityErrors: string[] = [];
   for (const { lang } of FILES) {
     if (lang === 'en') continue;
+    if (!LANGUAGES[lang].selectable) continue;
     parityErrors.push(...keyParityErrors(enKeys, sets.get(lang)!, lang));
   }
   if (parityErrors.length) {
@@ -2543,7 +2549,7 @@ async function run(): Promise<void> {
     if (parityErrors.length > 100) console.error(`  … and ${parityErrors.length - 100} more`);
     assert(false, 'translation key parity vs en.json violated');
   }
-  console.log('  ✓ exact leaf key parity with en.json (no missing, no orphan keys)');
+  console.log('  ✓ exact leaf key parity with en.json in selectable locales (no missing, no orphan keys)');
 
   // 3a. Structural leaf validation: only non-empty string leaves, no empty
   // objects / arrays / null / booleans / numbers anywhere.
