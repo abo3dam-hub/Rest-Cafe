@@ -404,10 +404,25 @@ export function resolveStoredLocalePreference(
   return NEUTRAL_LOCALE_PREFERENCES[key];
 }
 
+// Intl.NumberFormat construction resolves locale data and is comparatively
+// expensive; formatters are stateless, so cache them by locale + options.
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+
+function cachedNumberFormat(locale: string, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${locale}|${options ? JSON.stringify(options) : ''}`;
+  let formatter = numberFormatCache.get(key);
+  if (!formatter) {
+    if (numberFormatCache.size >= 512) numberFormatCache.clear();
+    formatter = new Intl.NumberFormat(locale, options);
+    numberFormatCache.set(key, formatter);
+  }
+  return formatter;
+}
+
 export const getCurrencySymbol = (currency: string, locale = 'en-US'): string => {
   if (!currency) return currency;
   try {
-    const symbol = new Intl.NumberFormat(locale, {
+    const symbol = cachedNumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'narrowSymbol',
@@ -443,7 +458,7 @@ const normalizePreferences = (prefs?: LocalePreferences): Required<LocalePrefere
 export const formatCurrency = (amount: number, currency: string, locale = 'en-US'): string => {
   if (!currency) return amount.toFixed(2);
   try {
-    return new Intl.NumberFormat(locale, {
+    return cachedNumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'narrowSymbol',
@@ -477,7 +492,7 @@ export const formatMoney = (
   try {
     // Rial display is whole-unit text even though IRR arithmetic retains 2 digits.
     const fractionDigits = currency === IRAN_CURRENCY ? 0 : getCurrencyFractionDigits(currency);
-    const formatted = new Intl.NumberFormat(locale, {
+    const formatted = cachedNumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'narrowSymbol',
@@ -486,7 +501,7 @@ export const formatMoney = (
       maximumFractionDigits: fractionDigits,
     }).format(amount);
     if (!formatted.includes('¤')) return formatted;
-    return new Intl.NumberFormat(locale, {
+    return cachedNumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'code',
@@ -516,7 +531,7 @@ export function getCurrencyFractionDigits(currency: string): number {
   if (currency === 'COP') return 0;
   if (currency === 'IRR') return 2;
   try {
-    const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency });
+    const formatter = cachedNumberFormat('en-US', { style: 'currency', currency });
     return formatter.resolvedOptions().maximumFractionDigits ?? 2;
   } catch {
     return 2;
@@ -584,7 +599,7 @@ export const formatCurrencyForTenant = (
 // Formats a plain number using the given locale's digits and grouping.
 export const formatNumber = (value: number, locale = 'en-US', numberingSystem?: string): string => {
   try {
-    return new Intl.NumberFormat(locale, numberingSystem ? { numberingSystem } : undefined).format(
+    return cachedNumberFormat(locale, numberingSystem ? { numberingSystem } : undefined).format(
       value,
     );
   } catch {
@@ -627,7 +642,7 @@ export const formatDateForTenant = (
   try {
     // Tenant preferences belong to the tenant profile; resolve defaults before UI override.
     const tenantDateDefaults = new Intl.DateTimeFormat(tenantLocale).resolvedOptions();
-    const tenantNumberDefaults = new Intl.NumberFormat(tenantLocale).resolvedOptions();
+    const tenantNumberDefaults = cachedNumberFormat(tenantLocale).resolvedOptions();
     const numberingSystem = digits === 'latin' ? 'latn' : tenantNumberDefaults.numberingSystem;
     const calendarValue = calendarOption(calendar) || tenantDateDefaults.calendar;
     return new Intl.DateTimeFormat(locale, {
@@ -754,7 +769,7 @@ export interface RegionalSnapshot {
 // Whether the currency symbol renders before or after the amount for this locale/currency pair.
 function regionalCurrencyPosition(locale: string, currency: string): 'prefix' | 'suffix' {
   try {
-    const parts = new Intl.NumberFormat(locale, {
+    const parts = cachedNumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'narrowSymbol',
@@ -774,7 +789,7 @@ function regionalNumberSeparators(locale: string): {
   groupSeparator: string;
 } {
   try {
-    const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
+    const parts = cachedNumberFormat(locale).formatToParts(12345.6);
     return {
       decimalSeparator: parts.find((part) => part.type === 'decimal')?.value ?? '.',
       groupSeparator: parts.find((part) => part.type === 'group')?.value ?? '',
@@ -899,7 +914,7 @@ function hasValidLocaleGrouping(
   const rawDigits = digits.split(format.groupSeparator).join('');
   if (!/^\d+$/.test(rawDigits)) return false;
   try {
-    const regrouped = new Intl.NumberFormat(format.locale, {
+    const regrouped = cachedNumberFormat(format.locale, {
       useGrouping: true,
       numberingSystem: 'latn',
     }).format(BigInt(rawDigits));
