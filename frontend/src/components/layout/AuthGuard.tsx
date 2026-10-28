@@ -21,6 +21,7 @@ export const LANDING_PAGE_CANDIDATES = [
   ['expenses.view', '/expenses'],
   ['customers.view', '/customers'],
   ['staff.view', '/staff'],
+  ['reports.view', '/reports'],
   ['settings.view', '/settings'],
   ['support.use', '/support'],
   ['printers.manage', '/print-test'],
