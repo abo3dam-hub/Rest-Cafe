@@ -30,6 +30,7 @@ import {
   abortDatabaseReplacementJournal,
   getCurrentSchemaVersion,
   getDatabase,
+  MIGRATIONS,
   getDbPath,
   initDatabase,
   restoreBackup,
@@ -973,8 +974,8 @@ async function run() {
     initDatabase();
     assert.equal(
       getCurrentSchemaVersion(),
-      117,
-      'interrupted v114 replacement recovered and migrated to v117',
+      MIGRATIONS[MIGRATIONS.length - 1].version,
+      'interrupted v114 replacement recovered and migrated to the latest schema version',
     );
     assert.equal(
       fs.existsSync(journalPath),
