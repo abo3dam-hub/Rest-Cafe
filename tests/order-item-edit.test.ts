@@ -910,6 +910,15 @@ async function main() {
 
     console.log('\n─── Replacement (Pending vs Started) ───');
     {
+      // Print previews below run against a configured printer; the preview
+      // requests declare arabicShaping (the renderer shaping setting) so the
+      // Arabic-first receipt lines are emitted instead of being dropped by
+      // the generic fallback profile's shaping gate.
+      db.prepare(
+        `INSERT INTO printers (id, name, connection_type, ip_address, port, is_default, paper_width, created_at, updated_at)
+         VALUES ('printer-edit', 'Preview Printer', 'network', '127.0.0.1', 9100, 1, '80mm', ?, ?)`,
+      ).run(now(), now());
+
       // Pending replacement: restores original stock, cancels original as superseded, deducts replacement
       const pendingOrder = seedOrder(db, 'REPLACE-PENDING', 'pending', 2, 2);
       const pendingBill = seedBill(db, pendingOrder.orderId, 200, 0, 'unpaid');
@@ -1029,7 +1038,7 @@ async function main() {
       // Verify bill print preview excludes cancelled/voided/superseded lines and matches totals
       const printPreview = await api(baseUrl, '/api/printers/print-bill', {
         method: 'POST',
-        body: { billId: pendingBill.id, preview: true },
+        body: { billId: pendingBill.id, preview: true, arabicShaping: true },
         headers: ownerAuth,
       });
       assertEqualOrThrow(printPreview.status, 200, 'bill print preview succeeds after edit');
@@ -1063,7 +1072,7 @@ async function main() {
       const refundBill = seedBill(db, refundOrder.orderId, 250, 250, 'partially_refunded');
       const refundPrintPreview = await api(baseUrl, '/api/printers/print-bill', {
         method: 'POST',
-        body: { billId: refundBill.id, preview: true },
+        body: { billId: refundBill.id, preview: true, arabicShaping: true },
         headers: ownerAuth,
       });
       assertEqualOrThrow(refundPrintPreview.status, 200, 'refunded bill print preview succeeds');

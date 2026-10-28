@@ -6,8 +6,9 @@
  *    in the user's selected UI language rather than forcing the tenant country's language.
  * 2. Tenant timezone (e.g. America/Argentina/Buenos_Aires), calendar system, and digit
  *    preferences remain backend-authoritative and respected regardless of UI locale.
- * 3. Browser thermal receipts (web-print.ts / generateBillHtml) format receipt dates
- *    in the active UI language (including Albanian, Thai, and Urdu) for an Argentina tenant.
+ * 3. Browser thermal receipts (web-print.ts / generateBillHtml) render receipt dates
+ *    as numeric DD/MM/YYYY regardless of the UI language, while receipt labels
+ *    follow the active UI language (including Albanian, Thai, and Urdu).
  * 4. (Removed: WhatsApp sharing was removed from Rest&Cafe.)
  * 5. React useFormatDate hook correctly provides localized formatting based on useLocale().
  * 6. Reviewer-visible visual evidence artifacts (HTML & PNG screenshots) are generated
@@ -380,8 +381,8 @@ async function runTests() {
 
     if (lang === 'en') {
       assert.ok(
-        receiptHtml.includes('Aug') || receiptHtml.includes('August'),
-        `Receipt in English UI must contain English month, got: ${receiptHtml}`,
+        receiptHtml.includes('20/08/2026') && !receiptHtml.includes('August'),
+        `Receipt in English UI must render the date as numeric DD/MM/YYYY, got: ${receiptHtml}`,
       );
       assert.ok(
         receiptHtml.includes('Bill #'),
@@ -403,8 +404,8 @@ async function runTests() {
         `Receipt in Urdu UI must contain Urdu labels`,
       );
       assert.ok(
-        receiptHtml.includes('اگست') || receiptHtml.includes('ستمبر'),
-        `Receipt in Urdu UI must contain an Urdu month name`,
+        receiptHtml.includes('20/08/2026'),
+        `Receipt in Urdu UI must render the date as numeric DD/MM/YYYY`,
       );
     } else if (lang === 'ne') {
       assert.ok(
@@ -412,8 +413,8 @@ async function runTests() {
         `Receipt in Nepali UI must contain Devanagari labels`,
       );
       assert.ok(
-        receiptHtml.includes('अगस्ट'),
-        `Receipt in Nepali UI must contain a Nepali month name, got: ${receiptHtml}`,
+        receiptHtml.includes('20/08/2026'),
+        `Receipt in Nepali UI must render the date as numeric DD/MM/YYYY, got: ${receiptHtml}`,
       );
     }
 
@@ -458,8 +459,14 @@ async function runTests() {
     console.log(`  ✓ SSR rendered React component with [${code} (${info.locale})]: ${rendered}`);
   }
 
-  assert.ok(ssrRenderedLocales['en'].includes('Aug'), 'React hook in English UI must render Aug');
-  assert.ok(ssrRenderedLocales['es'].includes('ago'), 'React hook in Spanish UI must render ago');
+  assert.ok(
+    ssrRenderedLocales['en'].includes('20/08/2026'),
+    'React hook in English UI must render the business date as numeric DD/MM/YYYY',
+  );
+  assert.ok(
+    ssrRenderedLocales['es'].includes('20/08/2026'),
+    'React hook in Spanish UI must render the business date as numeric DD/MM/YYYY',
+  );
 
   // -------------------------------------------------------------------------
   // 5. Generate Master Visual Comparison Dashboard Artifact

@@ -120,10 +120,15 @@ async function main() {
 
     console.log('\n2. Electron preview honors the stored currency unit');
     upsertSetting(db, 'currency_symbol', '₹');
+    // arabicShaping declares the preview surface shapes Arabic (the renderer
+    // global setting), so the Arabic-first receipt lines are emitted instead
+    // of being skipped by the generic profile's shaping gate. Shaping
+    // emission itself is guarded by bills-print-api; this suite guards the
+    // currency unit.
     const madPreview = await api(baseUrl, '/api/printers/print-bill', {
       method: 'POST',
       headers: authHeader,
-      body: { billId, preview: true, useUnicode: false },
+      body: { billId, preview: true, useUnicode: false, arabicShaping: true },
     });
     assertEqual(madPreview.status, 200, 'MAD print preview succeeds');
     // The stored unit is the owner's explicit choice in Rest&Cafe: the
@@ -142,7 +147,7 @@ async function main() {
     const inrPreview = await api(baseUrl, '/api/printers/print-bill', {
       method: 'POST',
       headers: authHeader,
-      body: { billId, preview: true, useUnicode: false },
+      body: { billId, preview: true, useUnicode: false, arabicShaping: true },
     });
     assertEqual(inrPreview.status, 200, 'INR print preview succeeds');
     assertIncludes(inrPreview.data.text, 'Rs', 'INR ASCII fallback still uses Rs');

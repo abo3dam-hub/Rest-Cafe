@@ -1403,43 +1403,50 @@ console.log('\n✅ Test 3d: Trim decimals hides only trailing .00');
   );
 }
 
-console.log(
-  '\n✅ Test 3e: Thermal receipt ignores a stale stored currency symbol (docs/architecture/regional-settings.md, third surface)',
-);
+console.log("\n✅ Test 3e: Thermal receipt honors the owner's stored currency symbol");
 {
-  // country/currency say MAD, but a stale stored symbol from a prior INR
-  // configuration is still passed on the business object — the resolver's
-  // "no per-store override" rule means the CLDR-derived symbol must win,
-  // regardless of what a caller puts in currency_symbol.
-  const staleSymbolBusiness = {
+  // Rest&Cafe rule: the currency unit the owner stored (currency_symbol)
+  // wins on printed bills; a CLDR-derived symbol never overrides it. The
+  // MAD/MA context is kept deliberately: CLDR would derive the literal code
+  // "MAD" for this currency, so it is a strong counter-case — the receipt
+  // must still render the stored unit instead.
+  const storedSymbolBusiness = {
     ...fixtureBusiness,
     country: 'MA',
     currency: 'MAD',
     currency_symbol: '₹',
   };
-  // fr-MA (Morocco's configured locale) has no dedicated MAD symbol, so CLDR
-  // falls back to the literal code, with fr-MA's own comma decimal separator.
+  // The stored ₹ renders through the ASCII fallback ("Rs") in non-Unicode
+  // mode, with fr-MA's comma decimal separator on the amounts.
   const classicText = formatReceipt(
     fixtureOrder,
     fixtureBill,
-    staleSymbolBusiness,
+    storedSymbolBusiness,
     'classic',
     42,
     false,
   ).toString('utf8');
-  assert('classic receipt uses the CLDR-derived MAD symbol', classicText.includes('MAD950,00'));
-  assert('classic receipt does not use the stale stored ₹ symbol', !classicText.includes('₹'));
+  assert('classic receipt uses the stored currency symbol', classicText.includes('Rs950,00'));
+  assert(
+    'classic receipt does not use the CLDR-derived MAD code',
+    !classicText.includes('MAD950,00'),
+  );
+  assert('classic receipt does not use the raw stored ₹ symbol', !classicText.includes('₹'));
 
   const compactText = formatReceipt(
     fixtureOrder,
     fixtureBill,
-    staleSymbolBusiness,
+    storedSymbolBusiness,
     'compact',
     42,
     false,
   ).toString('utf8');
-  assert('compact receipt uses the CLDR-derived MAD symbol', compactText.includes('MAD950,00'));
-  assert('compact receipt does not use the stale stored ₹ symbol', !compactText.includes('₹'));
+  assert('compact receipt uses the stored currency symbol', compactText.includes('Rs950,00'));
+  assert(
+    'compact receipt does not use the CLDR-derived MAD code',
+    !compactText.includes('MAD950,00'),
+  );
+  assert('compact receipt does not use the raw stored ₹ symbol', !compactText.includes('₹'));
 }
 
 console.log('\n✅ Test 4: Classic receipt template');
@@ -1670,8 +1677,8 @@ console.log('\n✅ Test 7: Test page builder');
   const buf80 = buildTestPage('80mm');
   const buf58 = buildTestPage('58mm');
   const xprinter = buildTestPage('80mm', 'partial');
-  assert('80mm test page renders title', buf80.toString('utf8').includes('Flo Printer Test'));
-  assert('58mm test page renders title', buf58.toString('utf8').includes('Flo Printer Test'));
+  assert('80mm test page renders title', buf80.toString('utf8').includes('Rest&Cafe Printer Test'));
+  assert('58mm test page renders title', buf58.toString('utf8').includes('Rest&Cafe Printer Test'));
   assert(
     '80mm test page reports correct column width',
     buf80.toString('utf8').includes('Columns: 48'),

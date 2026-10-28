@@ -401,10 +401,14 @@ async function runTests() {
       .run(orderId);
     const billId = Number(billRes.lastInsertRowid);
 
-    // Preview request should succeed with fallback 80mm preview format
+    // Preview request should succeed with fallback 80mm preview format.
+    // arabicShaping declares the preview surface shapes Arabic (the renderer
+    // global setting); without it the generic profile's shaping gate skips
+    // the Arabic-first receipt's lines and refuses its financial rows, so
+    // there would be no preview text to assert on.
     const previewRes = await request(app)
       .post('/api/printers/print-bill')
-      .send({ billId, preview: true });
+      .send({ billId, preview: true, arabicShaping: true });
     assert(
       previewRes.status === 200,
       `preview generation with 0 printers succeeds (got ${previewRes.status})`,
@@ -423,7 +427,7 @@ async function runTests() {
     ).run(now());
     const arbitraryCurrencyPreview = await request(app)
       .post('/api/printers/print-bill')
-      .send({ billId, preview: true });
+      .send({ billId, preview: true, arabicShaping: true });
     assert(
       arbitraryCurrencyPreview.status === 200,
       `preview accepts a syntactically valid arbitrary currency code (got ${arbitraryCurrencyPreview.status})`,
@@ -479,7 +483,7 @@ async function runTests() {
 
     const previewRes = await request(app)
       .post('/api/printers/print-bill')
-      .send({ orderId, preview: true });
+      .send({ orderId, preview: true, arabicShaping: true });
     assert(
       previewRes.status === 200,
       `preview for an unbilled order succeeds (got ${previewRes.status})`,

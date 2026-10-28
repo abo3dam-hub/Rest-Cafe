@@ -1122,7 +1122,7 @@ function runServiceChecks(db: any): void {
     'a malformed currency code is rejected',
   );
 
-  // ── Unconfigured regional settings fail loudly instead of guessing ──
+  // ── Unconfigured regional settings resolve to the Syria defaults ──
   const savedRegion = {
     country: db.prepare(`SELECT value FROM settings WHERE key = 'country'`).get()?.value,
     currency: db.prepare(`SELECT value FROM settings WHERE key = 'currency'`).get()?.value,
@@ -1130,16 +1130,35 @@ function runServiceChecks(db: any): void {
   };
   for (const key of ['country', 'currency', 'timezone'])
     db.prepare('DELETE FROM settings WHERE key = ?').run(key);
-  expectError(
-    () => service.createExpense(db, createInput({ idempotencyKey: validationKey('unconfigured') })),
-    409,
-    'an unconfigured store cannot record an expense',
+  const unconfiguredContext = service.getExpenseContext(db);
+  assertEqualOrThrow(
+    unconfiguredContext.currency_code,
+    'SYP',
+    'an unconfigured store reports the default Syrian pound',
   );
-  expectError(
-    () => service.getExpenseContext(db),
-    409,
-    'context refuses to invent a currency before setup',
+  assertEqualOrThrow(
+    unconfiguredContext.business_date,
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Damascus' }).format(new Date()),
+    'an unconfigured store business date follows Asia/Damascus',
   );
+  const unconfiguredExpense = service.createExpense(
+    db,
+    createInput({
+      incurred_on: unconfiguredContext.business_date,
+      idempotencyKey: validationKey('unconfigured'),
+    }),
+  );
+  assertEqualOrThrow(unconfiguredExpense.status, 201, 'an unconfigured store records an expense');
+  assertEqualOrThrow(
+    unconfiguredExpense.body.expense.currency_code,
+    'SYP',
+    'an expense recorded while unconfigured snapshots SYP',
+  );
+  // Remove the probe expense so the ledger checks below see fixture rows only.
+  db.prepare('DELETE FROM expense_mutations WHERE resource_id = ?').run(
+    unconfiguredExpense.body.expense.id,
+  );
+  db.prepare('DELETE FROM expenses WHERE id = ?').run(unconfiguredExpense.body.expense.id);
   setSetting('country', savedRegion.country);
   setSetting('currency', savedRegion.currency);
   setSetting('timezone', savedRegion.timezone);

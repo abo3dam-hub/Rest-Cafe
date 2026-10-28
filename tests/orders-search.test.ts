@@ -164,6 +164,13 @@ test('OrdersPage renders Load More and fetches the next page when search is empt
     key,
   });
 
+  const authState = {
+    currentTenant: { id: 't-1', country: 'US', currency: 'USD', role: 'owner' },
+    user: { id: 'u-1', name: 'Owner' },
+  };
+  // Mirror the zustand store shape: a callable hook plus getState() over the same state.
+  const useAuthStore = Object.assign(() => authState, { getState: () => authState });
+
   const mocks: Record<string, unknown> = {
     react: reactHooks,
     'react/jsx-runtime': {
@@ -249,12 +256,7 @@ test('OrdersPage renders Load More and fetches the next page when search is empt
       createOperationReference: () => 'op-ref',
       operationHeaders: () => ({}),
     },
-    '@/store/auth': {
-      useAuthStore: () => ({
-        currentTenant: { id: 't-1', country: 'US', currency: 'USD', role: 'owner' },
-        user: { id: 'u-1', name: 'Owner' },
-      }),
-    },
+    '@/store/auth': { useAuthStore },
     '@/store/held-orders': {
       useHeldOrdersStore: () => ({
         orders: {},
@@ -570,6 +572,13 @@ test('FloorplanEditor View order navigates to /orders?table=<id> and OrdersPage 
     key,
   });
 
+  const authState = {
+    currentTenant: { id: 't-1', country: 'US', currency: 'USD', role: 'owner' },
+    user: { id: 'u-1', name: 'Owner' },
+  };
+  // Mirror the zustand store shape: a callable hook plus getState() over the same state.
+  const useAuthStore = Object.assign(() => authState, { getState: () => authState });
+
   const mocks: Record<string, unknown> = {
     react: reactHooks,
     'react/jsx-runtime': {
@@ -670,12 +679,7 @@ test('FloorplanEditor View order navigates to /orders?table=<id> and OrdersPage 
       createOperationReference: () => 'op-ref',
       operationHeaders: () => ({}),
     },
-    '@/store/auth': {
-      useAuthStore: () => ({
-        currentTenant: { id: 't-1', country: 'US', currency: 'USD', role: 'owner' },
-        user: { id: 'u-1', name: 'Owner' },
-      }),
-    },
+    '@/store/auth': { useAuthStore },
     '@/store/held-orders': {
       useHeldOrdersStore: () => ({
         orders: {},
@@ -764,6 +768,21 @@ test('FloorplanEditor View order navigates to /orders?table=<id> and OrdersPage 
     if (request in mocks) return mocks[request];
     return originalLoad.call(this, request, parent, isMain);
   };
+
+  const localStorageStub = {
+    getItem: () => null,
+    setItem: () => undefined,
+    removeItem: () => undefined,
+  };
+  const previousWindow = (globalThis as any).window;
+  const previousLocalStorage = (globalThis as any).localStorage;
+  (globalThis as any).window = {
+    location: { search: '' },
+    localStorage: localStorageStub,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  };
+  (globalThis as any).localStorage = localStorageStub;
 
   try {
     delete require.cache[
@@ -1085,6 +1104,10 @@ test('FloorplanEditor View order navigates to /orders?table=<id> and OrdersPage 
       }
     }
   } finally {
+    if (previousWindow === undefined) delete (globalThis as any).window;
+    else (globalThis as any).window = previousWindow;
+    if (previousLocalStorage === undefined) delete (globalThis as any).localStorage;
+    else (globalThis as any).localStorage = previousLocalStorage;
     moduleApi._load = originalLoad;
     moduleApi._resolveFilename = originalResolveFilename;
   }
