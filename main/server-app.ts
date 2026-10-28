@@ -18,7 +18,6 @@ import {
   createDatabaseMaintenanceHandoff,
   databaseMaintenanceMiddleware,
   getDatabase,
-  getSettingValue,
   isServerAppEnabled,
   revokeDatabaseMaintenanceHandoff,
 } from './db';
@@ -33,7 +32,6 @@ import {
 } from './services/self-order';
 import { getJWTSecret } from './security/jwt-secret';
 import {
-  authRateLimit,
   loginAuthRateLimit,
   checkLoginRateLimit,
   incrementFailedLogin,

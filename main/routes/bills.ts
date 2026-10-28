@@ -3409,15 +3409,6 @@ export function flushPendingExactBalanceAutomations(): void {
   for (const [billId, entry] of pendingExactBalanceAutomations.entries()) {
     if (entry.db.inTransaction) continue;
     pendingExactBalanceAutomations.delete(billId);
-    let isPaid = false;
-    try {
-      const current = entry.db
-        .prepare('SELECT payment_status FROM bills WHERE id = ?')
-        .get(billId) as { payment_status?: string } | undefined;
-      isPaid = current?.payment_status === 'paid';
-    } catch {
-      isPaid = false;
-    }
   }
 }
 

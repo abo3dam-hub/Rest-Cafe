@@ -568,7 +568,7 @@ export const corsOptions = {
       }
 
       callback(new Error('Not allowed by CORS'));
-    } catch (err) {
+    } catch {
       callback(new Error('Invalid origin format'));
     }
   },

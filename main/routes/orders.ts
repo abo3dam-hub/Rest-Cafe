@@ -7,7 +7,6 @@ import {
   parseItemJson,
   parseRowJson,
   withTxn,
-  verifyPin,
   verifyPinAsync,
   getSettingValue,
   insertOrderItemAddons,
@@ -2451,9 +2450,11 @@ router.post(
         }
         const stamp = order.bill_requested_at || now();
         if (!order.bill_requested_at) {
-          db.prepare(
-            'UPDATE orders SET bill_requested_at = ?, updated_at = ? WHERE id = ?',
-          ).run(stamp, now(), order.id);
+          db.prepare('UPDATE orders SET bill_requested_at = ?, updated_at = ? WHERE id = ?').run(
+            stamp,
+            now(),
+            order.id,
+          );
         }
         db.prepare('UPDATE tables SET status = ?, updated_at = ? WHERE id = ?').run(
           'bill_requested',
@@ -2543,7 +2544,9 @@ router.post(
       const db = getDatabase();
       const targetOrderId = req.body?.target_order_id;
       if (!targetOrderId) {
-        return res.status(400).json({ error: 'Target order ID is required', code: 'merge_target_required' });
+        return res
+          .status(400)
+          .json({ error: 'Target order ID is required', code: 'merge_target_required' });
       }
       if (String(targetOrderId) === String(req.params.id)) {
         return res
@@ -2561,7 +2564,10 @@ router.post(
         }
         const fail = (message: string, code: string) =>
           Object.assign(new Error(message), { statusCode: 409, code });
-        if (['completed', 'cancelled'].includes(source.status) || ['completed', 'cancelled'].includes(target.status)) {
+        if (
+          ['completed', 'cancelled'].includes(source.status) ||
+          ['completed', 'cancelled'].includes(target.status)
+        ) {
           throw fail('Only active orders can be merged', 'merge_order_not_active');
         }
         if (
@@ -2575,7 +2581,12 @@ router.post(
         if (String(source.table_id) === String(target.table_id)) {
           throw fail('Both orders are already on the same table', 'merge_same_table');
         }
-        if ((source.discount_amount || 0) > 0 || (target.discount_amount || 0) > 0 || source.discount_type || target.discount_type) {
+        if (
+          (source.discount_amount || 0) > 0 ||
+          (target.discount_amount || 0) > 0 ||
+          source.discount_type ||
+          target.discount_type
+        ) {
           throw fail(
             'Remove the order discount before merging; it can be applied again afterwards',
             'merge_discount_present',
@@ -2768,7 +2779,9 @@ router.post(
           .all(target.id)
           .map(parseItemJson);
         return {
-          source_order: parseRowJson(db.prepare('SELECT * FROM orders WHERE id = ?').get(source.id)),
+          source_order: parseRowJson(
+            db.prepare('SELECT * FROM orders WHERE id = ?').get(source.id),
+          ),
           target_order: Object.assign({}, updatedTarget, { items: targetItems }),
           moved_item_ids: movedItemIds,
         };
@@ -3116,8 +3129,6 @@ router.patch(
           minorFactor,
           roundCurrency,
           evaluatedBills,
-          orderTotalMinor,
-          payableBills,
           totalOutstandingMinor,
           totalCollectedMinor,
           paymentBlocksCompletion: rawPaymentBlocksCompletion,

@@ -1,7 +1,6 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import expressRateLimit from 'express-rate-limit';
-import { randomUUID } from 'crypto';
-import { getDatabase, getSettingValue, now, parseBackupPaginationQuery } from '../db';
+import { getDatabase, getSettingValue, now } from '../db';
 import {
   requireAnyPermission,
   requirePermission,
@@ -19,7 +18,6 @@ import {
   normalizeTokenLabel,
   revokeDisplayToken,
 } from '../services/customer-display-tokens';
-import { requireMasterPin } from '../middleware/master-pin';
 import { resolveTaxIdFormat, validateTaxRegistrationNumber } from '../services/tax';
 import {
   OFFLINE_MODE_SETTING,
@@ -36,8 +34,6 @@ import {
   resolveStoredLocalePreference,
   type LocalePreferenceKey,
 } from '../countries';
-import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
-import { asyncHandler } from '../middleware/async-handler';
 import { normalizeOptionalPhone } from '../lib/phone';
 import { isPosCategorySort, isPosItemSort, readPosSortSettings } from '../lib/pos-sort';
 import {
@@ -195,18 +191,8 @@ function boolFlag(value: unknown): string | undefined {
   return value ? 'true' : 'false';
 }
 
-// Flags stored as strict '1'/'0' to match cloud database conventions.
-function bool01Flag(value: unknown): string | undefined {
-  const flag = boolFlag(value);
-  return flag === undefined ? undefined : flag === 'true' ? '1' : '0';
-}
-
 function deriveCurrencySymbol(currency: string, country: string): string {
   return getCurrencySymbol(currency || '', getCountryByCode(country)?.locale) || currency || '';
-}
-
-function isMaskedSecret(value: unknown): boolean {
-  return typeof value === 'string' && value.startsWith('****');
 }
 
 function businessShape(s: Record<string, string>) {
@@ -401,7 +387,6 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       });
     }
     const effectiveCountry = country || currentSettings.country || '';
-    const effectiveCurrency = normalizedCurrency || currentSettings.currency || '';
     // The currency unit (symbol) is the owner's own setting in Rest&Cafe —
     // never derived from a country. '' clears it back to the CLDR symbol.
     const normalizedCurrencySymbol =

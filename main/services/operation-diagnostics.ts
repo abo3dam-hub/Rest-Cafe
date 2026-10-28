@@ -282,19 +282,6 @@ function addDiagnosticsDeliveryGap(
   `).run(reason, count, timestamp, timestamp, now());
 }
 
-function diagnosticPayloadCount(payload: string): number {
-  try {
-    const value = JSON.parse(payload) as { schema_version?: unknown; count?: unknown };
-    return value.schema_version === 2 &&
-      Number.isSafeInteger(value.count) &&
-      (value.count as number) > 0
-      ? (value.count as number)
-      : 1;
-  } catch {
-    return 1;
-  }
-}
-
 function canonicalDiagnosticFacts(
   facts: Record<string, number | string>,
 ): Record<string, number | string> {

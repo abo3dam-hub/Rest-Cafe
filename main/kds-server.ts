@@ -35,7 +35,6 @@ import { getJWTSecret } from './security/jwt-secret';
 import { normalizeEmail, parseCategoryIds } from './routes/auth';
 import {
   rateLimit,
-  authRateLimit,
   loginAuthRateLimit,
   checkLoginRateLimit,
   incrementFailedLogin,
@@ -187,7 +186,7 @@ export function startKdsServer(): Promise<void> {
           iat: decoded.iat,
         } satisfies KdsRequestUser;
         next();
-      } catch (error) {
+      } catch {
         return res.status(401).json({ error: 'Invalid token' });
       }
     };
@@ -349,7 +348,7 @@ export function startKdsServer(): Promise<void> {
             authorization_revision: effectivePermissionRevision(row.id),
           },
         });
-      } catch (error: any) {
+      } catch {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
@@ -535,7 +534,6 @@ export function startKdsServer(): Promise<void> {
           | undefined;
         if (!liveUser?.is_active)
           return res.status(403).json({ error: 'User account is not active' });
-        const categoryIds = categoryIdsForRole(liveUser.role, liveUser.category_ids);
         const stationIds = getUserKdsStationIds(db, kdsUser.userId);
         const stationAssignmentsConfigured = hasUserKdsStationAssignments(db, kdsUser.userId);
         if (!stationIds || stationAssignmentsConfigured === null)

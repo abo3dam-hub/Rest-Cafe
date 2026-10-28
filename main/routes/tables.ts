@@ -290,23 +290,21 @@ router.post('/', requirePermission('tables.manage'), (req: Request, res: Respons
     }
 
     const tableId = `tbl-${randomUUID().slice(0, 8)}`;
-    const result = db
-      .prepare(`
+    db.prepare(`
       INSERT INTO tables (id, number, capacity, floor, section, position_x, position_y, kitchen_station_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-      .run(
-        tableId,
-        tableNumber,
-        normalizedCapacity,
-        normalizedFloor,
-        normalizedSection,
-        normalizedX,
-        normalizedY,
-        kitchen_station_id || null,
-        now(),
-        now(),
-      );
+    `).run(
+      tableId,
+      tableNumber,
+      normalizedCapacity,
+      normalizedFloor,
+      normalizedSection,
+      normalizedX,
+      normalizedY,
+      kitchen_station_id || null,
+      now(),
+      now(),
+    );
 
     const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId);
     res.status(201).json({ table });
@@ -794,7 +792,14 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
       return res.status(400).json({ error: 'Status is required' });
     }
 
-    const validStatuses = ['available', 'occupied', 'reserved', 'cleaning', 'held', 'bill_requested'];
+    const validStatuses = [
+      'available',
+      'occupied',
+      'reserved',
+      'cleaning',
+      'held',
+      'bill_requested',
+    ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Use: ${validStatuses.join(', ')}` });
     }
@@ -848,9 +853,7 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
       ).run(
         status,
         normalizedReservationCustomerId,
-        hasReservationAt
-          ? normalizedReservationAt
-          : ((table as any).reservation_at ?? null),
+        hasReservationAt ? normalizedReservationAt : ((table as any).reservation_at ?? null),
         now(),
         req.params.id,
       );

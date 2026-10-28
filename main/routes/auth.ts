@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import { getCurrentSchemaVersion, getDatabase, getSettingValue, now } from '../db';
+import { getCurrentSchemaVersion, getDatabase, now } from '../db';
 import { getJWTSecret } from '../security/jwt-secret';
 import { seedSetupProfile } from '../setup/seed-data';
 import { authorizeMasterPin, isMasterPinAvailable, setMasterPin } from '../services/master-pin';
@@ -21,14 +21,12 @@ import {
 } from '../middleware/security';
 import {
   getCurrencySymbol,
-  getCountryByCode,
   isValidTimeZone,
   resolveRegionalSnapshot,
   type RegionalSnapshot,
 } from '../countries';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { asyncHandler } from '../middleware/async-handler';
-import { getHttpRequestSignal } from '../shutdown';
 import { PASSWORD_POLICY_MESSAGE } from '../../shared/password-policy';
 import { normalizeOptionalPhone } from '../lib/phone';
 import { isSupportedCurrencyCode } from '../../shared/currencies';
@@ -348,7 +346,7 @@ router.post('/tenants/select', (req: Request, res: Response) => {
       token_type: 'bearer',
       tenant,
     });
-  } catch (error: any) {
+  } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
 });
@@ -716,7 +714,6 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       language,
       business_name,
       store_name,
-      country,
       currency,
       currency_symbol,
       timezone,
@@ -733,10 +730,8 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       master_pin,
       owner_approval_pin,
       owner_approval_pin_confirmation,
-      cloud_server_url,
       email_product_updates,
       email_marketing,
-      product_analytics_level,
     } = req.body;
     // Rest&Cafe collects no analytics or telemetry: the setup wizard's
     // analytics choice is accepted in the payload and ignored.

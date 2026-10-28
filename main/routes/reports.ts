@@ -11,8 +11,6 @@ import {
   tenantBusinessDayStartTime,
 } from '../db';
 import { hasPermission, requirePermission } from '../services/authorization';
-import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
-import { parsePhoneE164 } from '../lib/phone';
 import { withUtf8Bom } from '../lib/csv';
 import { getOrdersWithItemsForBills } from './bills';
 import {
@@ -88,16 +86,6 @@ function captureReportsDateRangeRejection(
     // Diagnostics cannot change report validation responses.
   }
 }
-
-const WEEKDAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
 
 // Mirrors main/routes/tables.ts's ACTIVE_ORDER_STATUS_SQL — an order still
 // "occupying" its table until it's completed or cancelled.

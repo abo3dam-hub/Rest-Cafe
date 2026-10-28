@@ -4,7 +4,6 @@ import Decimal from 'decimal.js';
 import { getDatabase, getSettingValue, now, upsertSettings, withTxn } from '../db';
 import { requirePermission } from '../services/authorization';
 import { applyPayableRounding, TaxEngine } from '../services/tax-engine';
-import { resolveTaxIdFormat } from '../services/tax';
 import type {
   CountryPack,
   PluginPrintTemplate,
@@ -14,7 +13,6 @@ import type {
 } from '../tax-packs/types';
 import { BUNDLED_COUNTRY_PACKS } from '../tax-packs/bundled';
 import {
-  computeTaxPackUpdates,
   downloadAndVerifyTaxPack,
   fetchRemoteTaxPackCatalog,
   verifyTaxPackSignature,
@@ -1517,11 +1515,9 @@ router.post('/overrides', requirePermission('tax-packs.manage'), (req: Request, 
         categoryId: target.categoryId,
       });
     });
-    res
-      .status(201)
-      .json({
-        override: getDatabase().prepare('SELECT * FROM tax_overrides WHERE id = ?').get(id),
-      });
+    res.status(201).json({
+      override: getDatabase().prepare('SELECT * FROM tax_overrides WHERE id = ?').get(id),
+    });
   } catch (error: any) {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({

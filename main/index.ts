@@ -21,8 +21,6 @@ import {
   closeDatabase,
   waitForDatabaseRequests,
   beginDatabaseShutdown,
-  now,
-  withDatabaseRequest,
 } from './db';
 import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/catalog';
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
@@ -34,7 +32,6 @@ import { startServerApp, stopServerApp, getServerAppPort, isServerAppRunning } f
 import { initPrinter } from './printers/thermal';
 import { destroySharedRasterRenderer } from './printers/raster-renderer';
 import { isTrustedMainWindowSender, registerIpcHandlers } from './ipc';
-import { authorizeMasterPin } from './services/master-pin';
 import log from 'electron-log/main';
 import { isAllowedLocalWindowUrl, isSafeExternalUrl } from './security/url-allowlist';
 import { clearStaleRenderCachesOnVersionChange } from './startup-cache';
@@ -86,8 +83,6 @@ import {
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
 }
-
-const UNPACKED_DEV_MARKER = 'flo-unpacked-dev.marker';
 
 log.initialize();
 log.transports.file.level = 'info';

@@ -42,7 +42,6 @@ import { diagnosticsRoutes } from './diagnostics';
 import { authorizationRoutes } from './authorization';
 import { getDatabase, getSettingValue } from '../db';
 
-import { getActiveCountryPack } from '../services/tax';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { isOperationReference, serializeOperationFailure } from '../lib/operation-failure';
 import { parsePhoneE164, stripPhoneDigits } from '../lib/phone';
@@ -243,7 +242,7 @@ export function registerRoutes(app: Express): void {
     requirePermission('customers.view'),
     (req, res) => {
       try {
-        const { phone, country_code } = req.query;
+        const { phone } = req.query;
         if (!phone) {
           return res.status(400).json({ error: 'Phone number required' });
         }

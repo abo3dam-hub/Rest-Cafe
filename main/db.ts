@@ -487,15 +487,6 @@ export function withDatabaseMaintenanceLock<T>(
   });
 }
 
-function randomSecret(): string {
-  return crypto
-    .randomBytes(32)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
-
 function sha256Hex(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -1239,7 +1230,7 @@ function removeOlderReplacementJournals(
         throw new Error('invalid stale replacement journal');
       }
       removeReplacementArtifactsDurably(journalPath, journal.recoveryPath);
-    } catch (error) {
+    } catch {
       // Remove invalid stale journal and its snapshot without blocking startup.
       const fallbackRecovery = path.join(backupRoot, `${path.basename(journalPath, '.json')}.db`);
       removeReplacementArtifactsDurably(journalPath, fallbackRecovery);
@@ -1477,7 +1468,7 @@ export function initDatabase(
     const markerPath = getDbInitializedMarkerPath();
     try {
       fs.writeFileSync(markerPath, now());
-    } catch (err) {
+    } catch {
       // Retry writing marker once on transient filesystem errors.
       try {
         fs.writeFileSync(markerPath, now());
@@ -7754,9 +7745,7 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
     name: 'customers_country_code_default_syria',
     up: () => {
       const tableSql = db
-        .prepare(
-          `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'customers'`,
-        )
+        .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'customers'`)
         .get() as { sql: string } | undefined;
       if (!tableSql?.sql || !tableSql.sql.includes("country_code TEXT DEFAULT '+91'")) {
         return;
