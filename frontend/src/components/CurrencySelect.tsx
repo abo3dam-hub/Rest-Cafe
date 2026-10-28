@@ -40,7 +40,10 @@ export function CurrencySelect({
 
   const groups = useMemo(() => {
     const recommended = String(recommendedCurrency || '').toUpperCase();
-    const supported = new Set(currencyNames.keys());
+    // The product offers SYP and USD only. A stored value outside that pair
+    // (or the country-recommended currency) stays listed so it remains
+    // visible and can be changed away from, but nothing else is offered.
+    const supported = new Set<string>(['SYP', 'USD']);
     if (recommended) supported.add(recommended);
     if (/^[A-Z]{3}$/.test(value)) supported.add(value);
     const nameOf = (code: string) => currencyNames.get(code) || getCurrencyDisplayName(code, locale);
