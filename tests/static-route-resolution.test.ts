@@ -79,11 +79,16 @@ async function main() {
     assert.equal(kdsStandaloneSlashRes.status, 200);
     assert.equal(await kdsStandaloneSlashRes.text(), 'kds-standalone');
 
+    // The dashboard is served by this server, so the KDS page route resolves
+    // through the SPA fallback like any other app route (WebSocket upgrades
+    // on /kds are handled by the upgrade listener, not this GET handler).
     const kdsExactRes = await fetch(`${baseUrl}/kds`);
-    assert.equal(kdsExactRes.status, 404);
+    assert.equal(kdsExactRes.status, 200);
+    assert.equal(await kdsExactRes.text(), 'root');
 
     const kdsSubpathRes = await fetch(`${baseUrl}/kds/orders`);
-    assert.equal(kdsSubpathRes.status, 404);
+    assert.equal(kdsSubpathRes.status, 200);
+    assert.equal(await kdsSubpathRes.text(), 'root');
 
     const apiUnknownRes = await fetch(`${baseUrl}/api/auth/nonexistent`);
     assert.equal(apiUnknownRes.status, 404);
