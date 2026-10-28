@@ -33,20 +33,23 @@ cannot drift between the two.
 | `preferences.calendar` | The stored `calendar`, or the country profile's default. |
 
 Everything except the seven stored keys (`country`, `currency`, `timezone`, `currency_display`,
-`number_digits`, `calendar`) is computed. There is no per-store override for a derived value, and
-the fix for a wrong rendering is the country profile, which corrects every store in that country.
+`number_digits`, `calendar`) is computed. One deliberate per-store override exists on top of the
+derived values: the currency unit printed on bills (see Stored overrides).
 
 ## Invariants
 
-**No default country.** The resolver reads the store's country and has no fallback. A store without a
-resolvable country cannot produce a snapshot.
+**Generic fallback instead of a hard failure.** This build ships one bundled generic profile
+(country `*`, the `local-generic` pack: currency SYP, timezone Asia/Damascus). When a store has no
+configured country, `resolveRegionalSnapshot` resolves against that profile rather than failing, so
+an unconfigured store still produces a snapshot with the Syrian defaults.
 
-**No per-store override of a derived value.** Symbol, position, fraction digits, and separators
-come from the country profile and the currency, never from a store setting.
+**Per-store override of the printed currency unit.** Position, fraction digits, and separators come
+from the country profile and the currency. The currency *symbol printed on bills* is the exception:
+the owner's stored `settings.currency_symbol` wins over the derived symbol on printed receipts.
 
-**Fail closed.** A missing or unresolvable country raises `RegionalNotConfiguredError`, which
-carries `statusCode = 409`. Callers surface it rather than substituting a value, so a store with
-incomplete setup returns a 409 instead of silently rendering the wrong currency.
+**No 409 for missing regional setup.** Because the generic profile always resolves, consumers do
+not surface a `RegionalNotConfiguredError` for an unconfigured store; operations proceed with the
+Syrian defaults.
 
 ### The one deliberate exception
 
@@ -62,9 +65,12 @@ propagates the error.
 
 ## Stored overrides
 
-`settings.timezone` is the only legitimate stored override of a regional value. It selects a zone
-within the resolved country; it cannot substitute a country or a currency. An invalid or unparseable
-value is ignored in favour of the country profile's zone.
+`settings.timezone` selects a zone within the resolved country; it cannot substitute a country or a
+currency. An invalid or unparseable value is ignored in favour of the country profile's zone.
+
+`settings.currency_symbol` is the second stored override, and it applies to printed bills only: when
+set, it replaces the derived currency symbol on thermal and web-printed receipts. It changes the
+printed unit label, never the currency itself, its fraction digits, or any stored amount.
 
 A currency cannot be changed after setup. The only path is the owner-only, Master-PIN-gated reset
 at `POST /api/db-tools/currency-reset`, which is destructive by design; see
