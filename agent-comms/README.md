@@ -26,6 +26,10 @@ decisions relayed by Ted.
   Replies keep the same `Thread:` id.
 - When a thread is resolved, Ted moves its files to `closed/` in a cleanup
   commit. `open/` therefore always shows exactly what is still unanswered.
+  **Exception:** a decision that authorizes work not yet done stays in
+  `open/` as its own assignment thread until that work lands. `open/` is
+  the live queue (unanswered messages + unexecuted assignments); `closed/`
+  is history. On every check, read `open/` first.
 - With every stage hand-back, the Assistant adds a `status` message: what is
   done, what is next, any blockers. Ted answers `question`/`permission`
   messages in-thread before the next stage starts.
