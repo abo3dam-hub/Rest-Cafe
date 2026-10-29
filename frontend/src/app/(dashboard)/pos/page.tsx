@@ -44,13 +44,13 @@ import { usePosSortPreference } from '@/hooks/usePosSort';
 import { tenantCan } from '@/lib/permissions';
 import { CashDrawerMovementModal } from '@/components/dashboard/CashDrawerMovementModal';
 import { useCashDrawerMovements } from '@/hooks/useCashDrawerMovements';
-import { isPrintCancelledOnTenantChangeError, usePrinterStore } from '@/hooks/usePrinter';
+import { usePrinterStore } from '@/hooks/usePrinter';
 import { printerService } from '@/lib/printer/PrinterService';
 import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
-import { formatKotErrorToast, formatReceiptErrorToast } from '@/lib/printer/warnings';
 import { AI_HELP_PROVIDERS, copyPrinterDiagnostic } from '@/lib/printer/ai-help';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '@/hooks/usePosKeyboardShortcuts';
+import { usePosPrinting } from '@/hooks/usePosPrinting';
 import KeyboardShortcutsModal from '@/components/pos/KeyboardShortcutsModal';
 import { dispatchQuickSearchRequest } from '@/lib/quick-search';
 import { useTranslations } from 'use-intl';
@@ -115,10 +115,7 @@ export default function POSPage() {
   const heldOrders = useHeldOrdersStore();
   const {
     customerMandatory,
-    autoPrintKot,
-    autoPrintBill,
     billingType,
-    kotPrintingEnabled,
     gridDensity,
     setGridDensity,
     setBillingType,
@@ -817,7 +814,7 @@ export default function POSPage() {
     currentTenant?.currency || '',
     getCountryByCode(currentTenant?.country ?? '')?.locale,
   );
-  const { printBill, printKot } = usePrinterStore();
+  const { printBill } = usePrinterStore();
   const billingIsPrepaid = billingType === 'prepaid';
   // Roles without payments.take (e.g. the waiter, who orders for the
   // customer) never enter a payment flow: their orders are placed and
@@ -828,32 +825,9 @@ export default function POSPage() {
   // returns them straight to it (see the end of handlePlaceOrder).
   const isServerRole = currentTenant?.role === 'server';
 
-  const printKotIfEnabled = async (order: Order) => {
-    // Master kot_printing_enabled check gates both manual and automatic prints.
-    if (!kotPrintingEnabled) return;
-    if (!autoPrintKot) return;
-
-    try {
-      const printWarnings = await printKot(order, order.items ? { items: order.items } : undefined);
-      showPrintWarningsToast(printWarnings);
-    } catch (err) {
-      console.error('[POS] KOT print failed:', err);
-      const code = 'printer.queue_failed';
-      reportOrderFailure({
-        code,
-        title: t('printingFailed'),
-        message: t('saleCompletePrintFailed'),
-        nextStep: t('saleCompleteReprintNextStep'),
-        detail: 'Kitchen ticket printing failed after the order was created',
-        status: null,
-        operation: 'printer.print',
-        stage: 'printing',
-        outcome: 'unknown',
-        reasonCode: code,
-      });
-      toast.error(formatKotErrorToast(t('kotPrintFailed'), t('saleCompletePrintFailed')));
-    }
-  };
+  const { printKotIfEnabled, fetchLatestBill, printBillForTenant } = usePosPrinting({
+    reportOrderFailure,
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -905,45 +879,6 @@ export default function POSPage() {
       toast.error(t('fullscreenUnavailable'));
     }
   }, [t]);
-
-  const fetchLatestBill = async (billId: number): Promise<Bill> => {
-    const { data } = await api.get(`/bills/${billId}`);
-    return data.bill as Bill;
-  };
-
-  const printBillForTenant = async (bill: Bill, force = false, reservedWindow?: Window | null) => {
-    if (
-      !currentTenant ||
-      useAuthStore.getState().currentTenant?.id !== currentTenant.id ||
-      (!force && !autoPrintBill)
-    ) {
-      if (reservedWindow && !reservedWindow.closed) reservedWindow.close();
-      return;
-    }
-
-    try {
-      const printWarnings = await printBill(bill, currentTenant, undefined, reservedWindow);
-      showPrintWarningsToast(printWarnings);
-    } catch (err) {
-      if (isPrintCancelledOnTenantChangeError(err)) return;
-      // Non-fatal: print failure should not block the checkout flow.
-      const code = 'print.receipt.failed';
-      console.error('[POS] Receipt print failed:', err);
-      reportOrderFailure({
-        code,
-        title: t('printingFailed'),
-        message: t('saleCompletePrintFailed'),
-        nextStep: t('saleCompleteReprintNextStep'),
-        detail: 'Receipt printing failed after payment was completed',
-        status: null,
-        operation: 'printer.print',
-        stage: 'printing',
-        outcome: 'unknown',
-        reasonCode: code,
-      });
-      toast.error(formatReceiptErrorToast(t('receiptPrintFailed'), t('saleCompletePrintFailed')));
-    }
-  };
 
   const refreshTables = async () => {
     if (!isRestaurant) return;
