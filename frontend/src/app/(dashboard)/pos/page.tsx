@@ -89,152 +89,23 @@ import {
   persistOrderAttempt,
   readOrderAttempt,
 } from '@/lib/order-attempt';
+import {
+  OPERATION_REFERENCE_V4,
+  POSTPAID_ATTEMPT_STORAGE_KEY,
+  STRUCTURED_HELP_CAPTURE_POINTS,
+  isUsablePostpaidAttempt,
+  isUsablePrepaidAttempt,
+  parsePrepaidPaymentRequest,
+  type PostpaidAttempt,
+  type PrepaidAttempt,
+  type SupportOperationFailure,
+} from '@/lib/pos/order-attempts';
 
 // Loaded on demand: the menu printer pulls the thermal print kernel in, which the
 // POS has no use for until the merchant opens the dialog.
 const PrintMenuModal = dynamic(() => import('@/components/products/PrintMenuModal'), {
   ssr: false,
 });
-
-const POSTPAID_ATTEMPT_STORAGE_KEY = 'flo.postpaid.order.attempt';
-
-interface PostpaidAttempt {
-  userId: string;
-  fingerprint: string;
-  idempotencyKey: string;
-  operationId?: string;
-  order?: Order;
-}
-
-interface PrepaidAttempt {
-  userId: string;
-  cartFingerprint: string;
-  paymentFingerprint: string;
-  discount: PrepaidDiscount | null;
-  order?: Order;
-  bill?: Bill;
-  orderIdempotencyKey: string;
-  paymentIdempotencyKey: string;
-  operationId?: string;
-}
-
-interface PrepaidPaymentRequest {
-  payments: Array<{
-    method: string;
-    payment_method_id?: number;
-    amount: number;
-    transaction_id?: string;
-  }>;
-  customer_id: string | number | null;
-}
-
-type SupportOperationFailure = {
-  capture_point: string;
-  operation_id: string;
-  outcome: string;
-  facts?: { display_code?: string; failure_class?: string };
-};
-
-const OPERATION_REFERENCE_V4 =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STRUCTURED_HELP_CAPTURE_POINTS: Record<string, string> = {
-  'order.create:validation:order.quantity_invalid': 'fc.backend.order.create.quantity_validation',
-  'order.create:validation:order.stock_insufficient': 'fc.backend.order.create.stock_validation',
-  'order.create:validation:validation.rejected': 'fc.backend.order.create.other_validation',
-  'order.create:persistence:persistence.failed': 'fc.backend.order.create.persistence',
-  'order.create:persistence:server.internal_error': 'fc.backend.order.create.server_error',
-  'order.create:completion:operation.completion_failed': 'fc.backend.order.create.completion',
-  'order.create:retry_state:order.retry_state_failed': 'fc.client.order.create.retry_state_update',
-  'order.create:cleanup:order.held_state.cleanup_failed':
-    'fc.frontend.pos.order.create.held_cleanup',
-  'order.append:validation:validation.rejected': 'fc.backend.order.append.validation',
-  'order.append:persistence:persistence.failed': 'fc.backend.order.append.persistence',
-  'order.append:completion:operation.completion_failed': 'fc.backend.order.append.completion',
-  'payment.create:retry_state:payment.retry_state_failed':
-    'fc.client.payment.create.retry_state_update',
-  'payment.create:cleanup:order.held_state.cleanup_failed':
-    'fc.frontend.pos.payment.create.held_cleanup',
-  'order.discount:validation:discount.rejected': 'fc.backend.order.discount.validation',
-  'order.discount:persistence:persistence.failed': 'fc.backend.order.discount.persistence',
-  'order.discount:completion:operation.completion_failed': 'fc.backend.order.discount.completion',
-  'bill.discount:validation:discount.rejected': 'fc.backend.bill.discount.validation',
-  'bill.discount:persistence:persistence.failed': 'fc.backend.bill.discount.persistence',
-  'bill.discount:completion:operation.completion_failed': 'fc.backend.bill.discount.completion',
-  'payment.create:validation:payment.invalid': 'fc.backend.payment.create.validation',
-  'payment.create:persistence:persistence.failed': 'fc.backend.payment.create.persistence',
-  'payment.create:completion:operation.completion_failed': 'fc.backend.payment.create.completion',
-  'bill.generate:validation:bill.order_unavailable': 'fc.backend.bill.generate.validation',
-  'bill.generate:persistence:persistence.failed': 'fc.backend.bill.generate.failure',
-  'bill.generate:completion:operation.completion_failed': 'fc.backend.bill.generate.completion',
-  'bill.generate:retry_state:bill.retry_state_failed': 'fc.client.bill.generate.retry_state_update',
-  'bill.charge.update:validation:bill.charge_rejected': 'fc.backend.bill.charge.validation',
-  'bill.charge.update:persistence:persistence.failed': 'fc.backend.bill.charge.persistence',
-  'bill.charge.update:completion:operation.completion_failed': 'fc.backend.bill.charge.completion',
-};
-
-/** A stored attempt missing any of these is damaged, not absent: replacing it
- * with a fresh idempotency key could duplicate an order whose response was lost. */
-const isUsablePostpaidAttempt = (attempt: PostpaidAttempt): boolean =>
-  typeof attempt.fingerprint === 'string' && !!attempt.idempotencyKey;
-
-const isUsablePrepaidAttempt = (attempt: PrepaidAttempt): boolean =>
-  typeof attempt.cartFingerprint === 'string' &&
-  typeof attempt.paymentFingerprint === 'string' &&
-  !!attempt.orderIdempotencyKey &&
-  !!attempt.paymentIdempotencyKey;
-
-const parsePrepaidPaymentRequest = (serialized: string): PrepaidPaymentRequest | null => {
-  try {
-    const value: unknown = JSON.parse(serialized);
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    const record = value as Record<string, unknown>;
-    if (
-      Object.keys(record).sort().join(',') !== 'customer_id,payments' ||
-      !Array.isArray(record.payments) ||
-      record.payments.length === 0 ||
-      (record.customer_id !== null &&
-        typeof record.customer_id !== 'string' &&
-        typeof record.customer_id !== 'number')
-    )
-      return null;
-    const payments: PrepaidPaymentRequest['payments'] = [];
-    for (const line of record.payments) {
-      if (!line || typeof line !== 'object' || Array.isArray(line)) return null;
-      const payment = line as Record<string, unknown>;
-      const keys = Object.keys(payment).sort().join(',');
-      if (
-        ![
-          'amount,method',
-          'amount,method,payment_method_id',
-          'amount,method,transaction_id',
-          'amount,method,payment_method_id,transaction_id',
-        ].includes(keys) ||
-        typeof payment.method !== 'string' ||
-        payment.method.length === 0 ||
-        typeof payment.amount !== 'number' ||
-        !Number.isFinite(payment.amount) ||
-        payment.amount <= 0 ||
-        (payment.payment_method_id !== undefined &&
-          typeof payment.payment_method_id !== 'number') ||
-        (payment.transaction_id !== undefined && typeof payment.transaction_id !== 'string')
-      )
-        return null;
-      payments.push({
-        method: payment.method,
-        ...(payment.payment_method_id !== undefined
-          ? { payment_method_id: payment.payment_method_id as number }
-          : {}),
-        amount: payment.amount,
-        ...(payment.transaction_id !== undefined
-          ? { transaction_id: payment.transaction_id as string }
-          : {}),
-      });
-    }
-    return { payments, customer_id: record.customer_id as string | number | null };
-  } catch {
-    return null;
-  }
-};
 
 export default function POSPage() {
   const router = useRouter();
@@ -269,7 +140,6 @@ export default function POSPage() {
   // backend route gates (backend still enforces; this only hides the entry).
   const canUseShift = tenantCan(currentTenant, 'cash.shifts.view');
 
-
   const { categorySort, itemSort } = usePosSortPreference();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -283,9 +153,7 @@ export default function POSPage() {
   const [showSoldOutModal, setShowSoldOutModal] = useState(false);
   const [alertOrders, setAlertOrders] = useState<AlertableOrder[]>([]);
   // Sold-out («انتهاء الكمية») — manual per-product flag, independent of stock.
-  const soldOutProducts = products.filter(
-    (p) => p.is_sold_out === true || p.is_sold_out === 1,
-  );
+  const soldOutProducts = products.filter((p) => p.is_sold_out === true || p.is_sold_out === 1);
 
   const applySoldOutResponse = useCallback((updated: Product) => {
     setProducts((prev) =>
@@ -334,7 +202,9 @@ export default function POSPage() {
     soldOutReminderChecked.current = true;
     if (soldOutProducts.length === 0) return;
     try {
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Damascus' }).format(new Date());
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Damascus' }).format(
+        new Date(),
+      );
       const key = `restcafe:soldout-reminder:${today}`;
       if (window.localStorage.getItem(key)) return;
       window.localStorage.setItem(key, '1');
@@ -2849,9 +2719,7 @@ export default function POSPage() {
           <div className="hidden md:flex md:w-[148px] md:shrink-0 flex-col gap-2 rounded-2xl bg-neutral-800 p-2.5">
             <button
               type="button"
-              onClick={() =>
-                router.push(`/tables?hall=${encodeURIComponent(wsParams.hall)}`)
-              }
+              onClick={() => router.push(`/tables?hall=${encodeURIComponent(wsParams.hall)}`)}
               className="flex h-[52px] items-center justify-center rounded-xl bg-amber-500 text-[15px] font-extrabold text-neutral-900 hover:bg-amber-400"
             >
               {tTables('backToTables')}
@@ -3135,7 +3003,10 @@ export default function POSPage() {
         </button>
       )}
       {showSoldOutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSoldOutModal(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowSoldOutModal(false)}
+        >
           <div
             className="bg-card rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
@@ -3153,7 +3024,10 @@ export default function POSPage() {
             </div>
             <div className="overflow-y-auto p-2">
               {soldOutProducts.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-muted/50">
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-muted/50"
+                >
                   <span className="text-sm font-medium text-foreground">{p.name}</span>
                   <button
                     type="button"
@@ -3165,7 +3039,9 @@ export default function POSPage() {
                 </div>
               ))}
               {soldOutProducts.length === 0 && (
-                <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('soldOutSaved')}</p>
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {t('soldOutSaved')}
+                </p>
               )}
             </div>
             <div className="flex items-center gap-2 p-4 border-t border-border">
