@@ -40,11 +40,17 @@ decisions relayed by Ted.
    citing his standing rule that covers it). If it is urgent, ALSO tell Ali in
    his chat — he is the courier and can relay instantly; the file remains the
    written record.
-3. **How messages travel:** Ted commits and pushes directly. The Assistant's
-   messages ride along in its hand-back bundles (or in a tiny bundle of their
-   own) that Ali shuttles to Ted, who applies and pushes them. Expect latency;
-   write messages that stay meaningful when read a day later (full context,
-   file:line references, exact questions).
+3. **How messages travel (v2, 2026-10-29 — supersedes the bundle shuttle):**
+   the Assistant works in its own **fork** of this repo under its own GitHub
+   account and publishes everything as commits on branches in the fork,
+   opening **pull requests** against this repo's `main`. Ted reads PRs and
+   `agent-comms/` files directly via the API — the owner never copy-pastes or
+   shuttles files. Rules: branch names start with `assistant/`; a PR is a
+   *proposal*, never a merge — Ted verifies locally (serial battery), lands
+   the work through his own push path, and closes or merges the PR. Comms-only
+   PRs (status/questions) are welcome and cheap. Write messages that stay
+   meaningful when read a day later (full context, file:line references,
+   exact questions).
 4. Product decisions (scope, wording, defaults, visibility, money) are Ali's.
    The Assistant asks via `permission`; Ted relays and records the outcome as
    a `decision` message.
