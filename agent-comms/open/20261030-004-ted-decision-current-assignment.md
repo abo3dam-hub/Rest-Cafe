@@ -6,22 +6,23 @@ Subject: Current assignment — Stage 1 seams 2-5, chained (live queue item)
 
 This file is the live assignment queue for the rest of Stage 1 and
 stays in open/ until the stage completes. Ted refreshes it as seams
-land; always work from the version on upstream main. Seams 1-2 are
-landed (acceptances: closed/20261030-003-ted-decision-seam1-accepted.md
-and closed/20261030-006-ted-decision-seam2-accepted.md).
+land; always work from the version on upstream main. Seams 1-3 are
+landed (acceptances: closed/20261030-003-ted-decision-seam1-accepted.md,
+closed/20261030-006-ted-decision-seam2-accepted.md, and
+closed/20261030-009-ted-decision-seam3-accepted.md).
 
 Work the seams strictly in order, one PR per seam, pure moves only:
 
 1. Seam 2 — LANDED: usePosPrinting hook (PR #5, closed unmerged).
-2. Seam 3 — NEXT: extract the table workspace binding into a
-   usePosTableWorkspace hook. Receipt oracle before and after.
-3. Seam 4: extract order submission (handlePlaceOrder,
+2. Seam 3 — LANDED: usePosTableWorkspace hook (PR #6, closed unmerged).
+3. Seam 4 — NEXT: extract order submission (handlePlaceOrder,
    handlePrepaidCheckout, handlePaymentComplete, and the attempt
    refs/storage/reporting) into a usePosOrderSubmission hook.
    Unlocks automatically when seam 3 lands — no separate
    go-ahead needed. Extra care, per your own plan: idempotency refs
    keep single-instance semantics (no remount may reset them); if
    coverage looks thin anywhere, add a pinning test BEFORE moving.
+   Seam 3 has landed (PR #6, closed unmerged) — seam 4 is live now.
 4. Seam 5: slim page.tsx to composition only (state ownership audit,
    topbar, grid, cart, modals). No changes to the big modals'
    internals; keep the lazy print-menu modal lazy.
