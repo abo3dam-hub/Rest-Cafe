@@ -46,11 +46,11 @@ import { CashDrawerMovementModal } from '@/components/dashboard/CashDrawerMoveme
 import { useCashDrawerMovements } from '@/hooks/useCashDrawerMovements';
 import { usePrinterStore } from '@/hooks/usePrinter';
 import { printerService } from '@/lib/printer/PrinterService';
-import { showPrintWarningsToast } from '@/lib/printer/warnings-toast';
 import { AI_HELP_PROVIDERS, copyPrinterDiagnostic } from '@/lib/printer/ai-help';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '@/hooks/usePosKeyboardShortcuts';
 import { usePosPrinting } from '@/hooks/usePosPrinting';
+import { usePosTableWorkspace } from '@/hooks/usePosTableWorkspace';
 import KeyboardShortcutsModal from '@/components/pos/KeyboardShortcutsModal';
 import { dispatchQuickSearchRequest } from '@/lib/quick-search';
 import { useTranslations } from 'use-intl';
@@ -265,33 +265,6 @@ export default function POSPage() {
   const [cardTransactionIdRequired, setCardTransactionIdRequired] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
-  // Cashier table workspace: POS opened from the table map carries the
-  // table (and its active order) in the query string.
-  const [wsParams, setWsParams] = useState(() => {
-    if (typeof window === 'undefined') return { table: '', hall: '', order: '' };
-    const q = new URLSearchParams(window.location.search);
-    return {
-      table: q.get('table') || '',
-      hall: q.get('hall') || '',
-      order: q.get('order') || '',
-    };
-  });
-  // The one-shot capture above can run before the router has applied the
-  // workspace URL (prerender/hydration in the static export); if it came up
-  // empty, re-read the query once the real URL is visible so the workspace
-  // binding is never silently lost.
-  useEffect(() => {
-    if (wsParams.table || typeof window === 'undefined') return;
-    const q = new URLSearchParams(window.location.search);
-    const table = q.get('table') || '';
-    if (table) {
-      setWsParams({ table, hall: q.get('hall') || '', order: q.get('order') || '' });
-    }
-  }, [wsParams.table]);
-  const [wsTable, setWsTable] = useState<Table | null>(null);
-  const [wsOrder, setWsOrder] = useState<Order | null>(null);
-  const [wsBillBusy, setWsBillBusy] = useState(false);
-  const wsInitRef = useRef(false);
   const [supportError, setSupportError] = useState<{
     title: string;
     subject: string;
@@ -814,7 +787,6 @@ export default function POSPage() {
     currentTenant?.currency || '',
     getCountryByCode(currentTenant?.country ?? '')?.locale,
   );
-  const { printBill } = usePrinterStore();
   const billingIsPrepaid = billingType === 'prepaid';
   // Roles without payments.take (e.g. the waiter, who orders for the
   // customer) never enter a payment flow: their orders are placed and
@@ -2125,88 +2097,12 @@ export default function POSPage() {
     });
   };
 
-  // Workspace entry: bind the cart to the table from the map, and when the
-  // table already has an active order, switch the cart into append mode on
-  // that order through the same path the table checkout modal uses.
-  useEffect(() => {
-    if (wsInitRef.current || !wsParams.table || tables.length === 0) return;
-    const table = tables.find((tb) => String(tb.id) === wsParams.table);
-    if (!table) {
-      // The linked table no longer exists: say so and return to the map
-      // instead of stranding the user in an unbound POS.
-      wsInitRef.current = true;
-      toast.error(t('noTablesFound'));
-      router.replace(
-        wsParams.hall ? `/tables?hall=${encodeURIComponent(wsParams.hall)}` : '/tables',
-      );
-      return;
-    }
-    wsInitRef.current = true;
-    setWsTable(table);
-    cart.setOrderType('dine_in');
-    cart.setTableId(table.id);
-    if (wsParams.order) {
-      void (async () => {
-        try {
-          const { data } = await api.get(`/orders/${wsParams.order}`);
-          const order = data.order as Order;
-          setWsOrder(order);
-          handleAddItemsToOrder(table, order);
-        } catch {
-          toast.error(t('loadOrderFailed'));
-        }
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tables, wsParams]);
-
-  const handleWsRequestBill = async () => {
-    if (!wsOrder || !wsTable || wsBillBusy) return;
-    setWsBillBusy(true);
-    try {
-      const { data } = await api.post('/bills/generate', { order_id: wsOrder.id });
-      const bill = data.bill as Bill;
-      const isReprint = Boolean(bill.printed_at);
-      const warnings = await printBill(
-        bill,
-        {
-          business_name: currentTenant?.business_name || tCommon('businessNameFallback'),
-          currency: currentTenant?.currency || '',
-          country: currentTenant?.country || '',
-          timezone: currentTenant?.timezone || 'UTC',
-          currency_display: currentTenant?.currency_display,
-          number_digits: currentTenant?.number_digits,
-          calendar: currentTenant?.calendar,
-        },
-        { isReprint },
-      );
-      showPrintWarningsToast(warnings);
-      try {
-        await api.post(`/bills/${bill.id}/print`, {
-          print_type: isReprint ? 'reprint' : 'receipt',
-        });
-      } catch {
-        /* best-effort history tracking */
-      }
-      await api.post(`/orders/${wsOrder.id}/request-bill`, {});
-      toast.success(tTables('statusBillRequested'));
-      setWsTable((cur) => (cur ? { ...cur, status: 'bill_requested' } : cur));
-      await refreshTables();
-    } catch {
-      toast.error(t('printingFailed'));
-    } finally {
-      setWsBillBusy(false);
-    }
-  };
-
-  const goWsTable = (tb: Table) => {
-    const active = tb.current_order || tb.activeOrder || null;
-    cart.clearCart();
-    const url = `/pos?table=${encodeURIComponent(String(tb.id))}&hall=${encodeURIComponent(tb.floor || '')}${
-      active ? `&order=${active.id}` : ''
-    }`;
-    window.location.assign(url);
-  };
+  const { wsParams, wsTable, wsOrder, wsBillBusy, handleWsRequestBill, goWsTable } =
+    usePosTableWorkspace({
+      tables,
+      refreshTables,
+      handleAddItemsToOrder,
+    });
 
   // Add cart items directly to existing order
   const handleAddCartToOrder = async (table: Table, order: Order) => {
