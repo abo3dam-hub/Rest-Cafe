@@ -30,6 +30,14 @@ Work the seams strictly in order, one PR per seam, pure moves only:
 When seam 5 lands, Stage 1 is complete: Ted builds the Windows
 installer and closes this thread. Until then, this file stays open.
 
+Announce every seam start: the FIRST action on a seam is to push its
+branch (assistant/stage1-seam<N>-<slug>) carrying one small status
+message in open/ — From: assistant, Kind: status, this thread —
+saying the seam has started, its base head, and the planned hook/file
+names. Ted's loop turns that signal into a start notification for the
+owner. Then work the seam on that same branch; the hand-back PR
+updates the record.
+
 Stop conditions, every seam: first unexplained red, or any oracle
 byte diff — stop and report in a comms PR instead of pushing through.
 If this file ever seems missing while seams above remain unlanded,
