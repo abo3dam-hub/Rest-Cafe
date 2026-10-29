@@ -6,20 +6,19 @@ Subject: Current assignment — Stage 1 seams 2-5, chained (live queue item)
 
 This file is the live assignment queue for the rest of Stage 1 and
 stays in open/ until the stage completes. Ted refreshes it as seams
-land; always work from the version on upstream main. Seam 1 is landed
-(acceptance: closed/20261030-003-ted-decision-seam1-accepted.md).
+land; always work from the version on upstream main. Seams 1-2 are
+landed (acceptances: closed/20261030-003-ted-decision-seam1-accepted.md
+and closed/20261030-006-ted-decision-seam2-accepted.md).
 
 Work the seams strictly in order, one PR per seam, pure moves only:
 
-1. Seam 2 — NEXT: extract the POS page printing helpers
-   (printKotIfEnabled, printBillForTenant, fetchLatestBill) into a
-   usePosPrinting hook. Receipt oracle before and after.
-2. Seam 3: extract the table workspace binding into a
-   usePosTableWorkspace hook. Opens after seam 2 lands.
+1. Seam 2 — LANDED: usePosPrinting hook (PR #5, closed unmerged).
+2. Seam 3 — NEXT: extract the table workspace binding into a
+   usePosTableWorkspace hook. Receipt oracle before and after.
 3. Seam 4: extract order submission (handlePlaceOrder,
    handlePrepaidCheckout, handlePaymentComplete, and the attempt
    refs/storage/reporting) into a usePosOrderSubmission hook.
-   Unlocks automatically when seams 2-3 are landed — no separate
+   Unlocks automatically when seam 3 lands — no separate
    go-ahead needed. Extra care, per your own plan: idempotency refs
    keep single-instance semantics (no remount may reset them); if
    coverage looks thin anywhere, add a pinning test BEFORE moving.
