@@ -2,24 +2,35 @@ From: ted
 To: assistant
 Kind: decision
 Thread: 20261030-004
-Subject: Current assignment — Stage 1 seams 2 and 3 (live queue item)
+Subject: Current assignment — Stage 1 seams 2-5, chained (live queue item)
 
-This file is the live assignment and stays in open/ until both seams
-have landed. The seam 1 acceptance lives in
-closed/20261030-003-ted-decision-seam1-accepted.md; this file restates
-its forward authorization here so the live queue is unambiguous —
-open/ is the queue, closed/ is history.
+This file is the live assignment queue for the rest of Stage 1 and
+stays in open/ until the stage completes. Ted refreshes it as seams
+land; always work from the version on upstream main. Seam 1 is landed
+(acceptance: closed/20261030-003-ted-decision-seam1-accepted.md).
 
-Assignment, in order:
+Work the seams strictly in order, one PR per seam, pure moves only:
 
-1. Seam 2: extract the POS page printing helpers (printKotIfEnabled,
-   printBillForTenant, fetchLatestBill) into a usePosPrinting hook.
-   One PR, full protecting battery, receipt oracle before and after.
+1. Seam 2 — NEXT: extract the POS page printing helpers
+   (printKotIfEnabled, printBillForTenant, fetchLatestBill) into a
+   usePosPrinting hook. Receipt oracle before and after.
 2. Seam 3: extract the table workspace binding into a
-   usePosTableWorkspace hook. One PR, opened after seam 2 lands.
+   usePosTableWorkspace hook. Opens after seam 2 lands.
+3. Seam 4: extract order submission (handlePlaceOrder,
+   handlePrepaidCheckout, handlePaymentComplete, and the attempt
+   refs/storage/reporting) into a usePosOrderSubmission hook.
+   Unlocks automatically when seams 2-3 are landed — no separate
+   go-ahead needed. Extra care, per your own plan: idempotency refs
+   keep single-instance semantics (no remount may reset them); if
+   coverage looks thin anywhere, add a pinning test BEFORE moving.
+4. Seam 5: slim page.tsx to composition only (state ownership audit,
+   topbar, grid, cart, modals). No changes to the big modals'
+   internals; keep the lazy print-menu modal lazy.
 
-Seam 4 (order submission) is NOT assigned yet. It unlocks only after
-seams 2–3 have landed and a new decision in open/ says so.
+When seam 5 lands, Stage 1 is complete: Ted builds the Windows
+installer and closes this thread. Until then, this file stays open.
 
-Pure moves only, one seam per PR. Stop at the first unexplained red
-or any oracle byte diff and report instead of pushing through.
+Stop conditions, every seam: first unexplained red, or any oracle
+byte diff — stop and report in a comms PR instead of pushing through.
+If this file ever seems missing while seams above remain unlanded,
+say so in a comms PR — the queue is Ted's to keep filled.
