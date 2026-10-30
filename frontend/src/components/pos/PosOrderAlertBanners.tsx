@@ -32,17 +32,18 @@ export default function PosOrderAlertBanners({
         </button>
       )}
       {alert && (
-        <button
-          type="button"
-          onClick={onDismissAlert}
-          className="fixed top-4 inset-x-0 mx-auto w-fit z-50 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg"
-          role="status"
-        >
-          <Bell size={16} />
-          {alert.latestTableLabel
-            ? tKds('newOrderAlertTable', { table: alert.latestTableLabel })
-            : tKds('newOrderAlert', { count: alert.count })}
-        </button>
+        <div role="status" className="fixed top-4 inset-x-0 mx-auto w-fit z-50">
+          <button
+            type="button"
+            onClick={onDismissAlert}
+            className="flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg"
+          >
+            <Bell size={16} />
+            {alert.latestTableLabel
+              ? tKds('newOrderAlertTable', { table: alert.latestTableLabel })
+              : tKds('newOrderAlert', { count: alert.count })}
+          </button>
+        </div>
       )}
     </>
   );
