@@ -29,8 +29,13 @@ reported as measurements only, never as numbered defects.
   renders and all live second measurements; Google Chrome stable
   (`/opt/google/chrome`) for the five re-run gate families (see below).
 - App: built from the head (`build:frontend` + `npm run build`, both exit
-  0); dev server `http://127.0.0.1:3001` with isolated appdata. Seeded
-  through the real setup wizard in the production Syrian shape: ar,
+  0); dev server `http://127.0.0.1:3001` with isolated appdata. The dev
+  server stopped once mid-audit and was restarted with the same
+  `FLO_DEV_USER_DATA`; the stored owner token then stopped validating
+  (it had been signed with a superseded JWT secret), so the fixture
+  owner's password was reset in the isolated audit database and a fresh
+  token minted via `POST /api/auth/login`. No product code changed.
+  Seeded through the real setup wizard in the production Syrian shape: ar,
   SYP / symbol SP, Asia/Damascus, finedine + demo (4 categories,
   8 products, 4 tables). Live dine-in order `ORD-20261030-0001` on T1
   (3 items) created for KDS / tables / POS content.
@@ -63,20 +68,26 @@ Counts are verbatim gate output. "fails" = gate exit 1 with findings.
 
 | Screen | axe (WCAG 2.2 A/AA) | states (contrast) | target size | keyboard | overflow | responsive | reduced motion |
 |---|---|---|---|---|---|---|---|
-| POS ar 1366x768 | 3 violations | 18 fail / 183 checked | 116 targets @1366/1920, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10, §5 D4) | pass (EXIT=0) | FAIL (see §3 U11, §5 D5) |
-| POS en 1366x768 | 3 violations | 18 fail / 183 checked | 116 targets, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (same as POS ar) | pass (EXIT=0) | FAIL (same) |
-| Tables ar 1366x768 | 1 violation | 30 fail / 143 checked | 82 targets @1366/1920, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
-| KDS ar 1366x768 | 4 violations | 5 fail / 65 checked | 40 targets @1366/1920, all >= 24x24 (EXIT=0) | FAIL (see §3 U2) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
-| Settings ar 1366x768 | 3 violations | 3 fail / 174 checked | 102 targets @1366/1920, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
-| Settings en 1366x768 | 4 violations | 3 fail / 174 checked | 102 targets, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
-| Settings-tax ar 1366x768 | 1 violation | 7 fail / 142 checked | 76 targets @1366/1920, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
-| Settings-tax en 1366x768 | 2 violations | 7 fail / 142 checked | 76 targets, all >= 24x24 (EXIT=0) | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| POS ar 1366x768 | 3 violations | 18 fail / 183 checked | 116 targets @1366/1920, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10, §5 D2) | pass (EXIT=0) | FAIL (see §3 U11, §5 D3) |
+| POS en 1366x768 | 3 violations | 18 fail / 183 checked | 116 targets, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (same as POS ar) | pass (EXIT=0) | FAIL (same) |
+| Tables ar 1366x768 | 1 violation | 30 fail / 143 checked | 82 targets @1366/1920, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| KDS ar 1366x768 | 4 violations | 5 fail / 65 checked | 40 targets @1366/1920, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | FAIL (see §3 U2) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| Settings ar 1366x768 | 3 violations | 3 fail / 174 checked | 102 targets @1366/1920, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| Settings en 1366x768 | 4 violations | 3 fail / 174 checked | 102 targets, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| Settings-tax ar 1366x768 | 1 violation | 7 fail / 142 checked | 76 targets @1366/1920, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
+| Settings-tax en 1366x768 | 2 violations | 7 fail / 142 checked | 76 targets, pass via spacing exception (EXIT=0); live sub-24px targets: §4 | pass (EXIT=0) | FAIL (see §3 U10) | pass (EXIT=0) | FAIL (see §3 U11) |
 
 Width-faithful 1920 runs (overflow / target size / responsive on the
 1920 captures): target size all pass (POS 58, tables 41, KDS 20,
 settings 51, settings-tax 38 targets @1920px); overflow same findings
-as the 1366 runs plus the POS 1920 overlap (§5 D4); responsive 23/24
-pass, 1 inconclusive (§5 D6).
+as the 1366 runs plus the POS 1920 overlap (§5 D2); responsive 23/24
+pass, 1 inconclusive (§5 D4).
+
+Live axe (second measurement) agrees with the snapshot gate everywhere
+except tables-ar, where it finds 3 contrast nodes the snapshot gate
+missed (view toggle 4.34:1 + two table action buttons 3.58:1), and
+POS-en, where it finds 24 contrast nodes (snapshot: 23) — see §3 U8 /
+U14 and §5 D6.
 
 Axe violation detail (verbatim, per snapshot):
 - POS ar: `CRITICAL button-name .top-4`; `SERIOUS color-contrast .ms-1`;
@@ -149,8 +160,11 @@ Axe violation detail (verbatim, per snapshot):
   (`frontend/src/components/settings/GeneralSettingsTab.tsx` area).
 - Live second measurement: `INPUT type=text, id: null, value: "مطعم التدقيق",
   ariaLabel: null, ariaLabelledBy: null, labels: [], title: null,
-  placeholder: null` — no programmatic label of any kind. (A sighted
-  user sees nearby heading text; a screen reader gets nothing.)
+  placeholder: null` — no programmatic label of any kind. A visible
+  `<label>` with the text "businessName" does sit above the input
+  (`GeneralSettingsTab.tsx:179`), but it has no `htmlFor` and the input
+  has no `id`, so it is not programmatically associated; a screen
+  reader gets nothing.
 - Snapshot method: axe on the settings snapshots; live DOM on `/settings`.
 - Confidence: `verified-by-second-measurement`.
 
@@ -165,7 +179,8 @@ Axe violation detail (verbatim, per snapshot):
   - tax registered, current value `no` — visible label: "مسجل ضريبيًّا";
   - sequence-reset period, current value `daily` — visible label:
     "فترة إعادة تعيين التسلسل";
-  - language, current value `ar` — no adjacent visible label found.
+  - language, current value `ar` — visible text "Languages" exists as a
+    `<p>`, not a `<label>`, and is not programmatically associated.
   Each has `aria-label: null`, `aria-labelledby: null`, `labels: []`,
   `title: null`. The visible label texts above exist as headings, but
   are not programmatically associated.
@@ -192,14 +207,15 @@ Axe violation detail (verbatim, per snapshot):
 - Snapshot method: axe + states on the POS snapshots; live DOM on `/pos`.
 - Confidence: `verified-by-second-measurement`.
 
-### U6 — "حجز" (Reserve) amber text at 2.95:1, three instances
+### U6 — "حجز" (Reserve) amber text at 2.93:1, three instances
 - Screen: Tables ar. Gate: `verify_states`.
 - Verbatim gate output: `x default "حجز" 2.94:1 (need 4.5)
   [rgb(208,135,0) on rgb(255,255,255)]` (repeated for default/focus).
 - Element: the Reserve button on each table card,
   `BUTTON.text-xs.text-yellow-600`, 12px / 500.
 - Live second measurement: three "حجز" buttons, all color
-  `oklch(0.681 0.162 75.834)` on white, ratio **2.95** each.
+  `oklch(0.681 0.162 75.834)` on white, ratio **2.93** each (gate 2.94:1;
+  the 0.01 spread is oklch→sRGB conversion rounding).
 - Snapshot method: states gate on the tables ar snapshot; live DOM on
   `/tables`.
 - Confidence: `verified-by-second-measurement`.
@@ -228,10 +244,14 @@ Axe violation detail (verbatim, per snapshot):
 - Live second measurement, all **4.34**: KDS "كانبان" (BUTTON);
   Tables "مخطط الصالة" (BUTTON); Settings-tax "معدلات الضرائب اليدوية"
   (BUTTON) and "رسم الإنفاق الاستهلاكي" (BUTTON). Same token also
-  covers the gate's "جميع الصالات" / "إضافة صالة" (tables),
-  "سفري" / "توصيل" / "Takeaway" / "Delivery" (POS) and
-  "Manual Tax Rates" / "Consumption Fee" (settings-tax en) — gate-only
-  for those instances, same token.
+  covers "سفري" / "توصيل" / "Takeaway" / "Delivery" (POS),
+  "Manual Tax Rates" / "Consumption Fee" (settings-tax en) and
+  "Open shift" (10px, `.ring-1 > span`, live axe on POS-en and
+  settings-en) — gate-only for those instances, same token. Two
+  instances the gate lists under this token do NOT belong here:
+  "جميع الصالات" is white text on brand orange (3.58:1, §6), and
+  "إضافة صالة" measures 4.73:1 PASS live in its default state (see
+  §5 D5).
 - Snapshot method: states gate on the snapshots; live DOM on
   `/kds`, `/tables`, `/settings?tab=tax`.
 - Confidence: `verified-by-second-measurement` (four surfaces);
@@ -272,7 +292,7 @@ Axe violation detail (verbatim, per snapshot):
   `[10] a.peer/menu-button "مطعم التدقيق": transition width, height,
   padding 0.15s`.
 - The gate's companion claim "[A no-policy] page animates but has no
-  @media (prefers-reduced-motion: reduce)" is FALSE — see §5 D5. What
+  @media (prefers-reduced-motion: reduce)" is FALSE — see §5 D3. What
   stands: the policy at `frontend/src/app/globals.css:557` only disables
   `.animate-shake`, `.animate-shake-centered` (and `.shimmer` in the
   built CSS); the 0.15–0.2s sidebar/menu transitions are not covered.
@@ -280,15 +300,111 @@ Axe violation detail (verbatim, per snapshot):
   animation; no content depends on animation to appear.
 - Snapshot method: reduced-motion gate on the 8 snapshots; source + built
   CSS read directly (`globals.css:557`, built
-  `out/_next/static/css/bf08f2f0ac659a1b.css`).
-- Confidence: `verified-by-second-measurement` for the narrow-policy fact;
-  `gate-only` for the per-screen element counts.
+  `out/_next/static/css/bf08f2f0ac659a1b.css`). Live under emulated
+  `prefers-reduced-motion: reduce`: the sidebar `div.fixed` still
+  reports `transition-duration: 0.2s`, and 52 elements on POS (22 on
+  KDS) still have non-zero transition/animation durations.
+- Confidence: `verified-by-second-measurement`.
 
-## 4. Advisory list — interactive targets 24–44px (operational screens)
+### U12 — New-order alert banner button has no accessible name (POS + KDS)
+- Screens: POS ar + en, KDS ar. Gate: `axe_audit`, CRITICAL button-name.
+- Verbatim gate output: `CRITICAL button-name: Buttons must have
+  discernible text (1 node) .top-4` — on the POS ar, POS en and KDS ar
+  snapshots, and identically on the live app.
+- Element: the "new order" toast button,
+  `<button type="button" class="fixed top-4 inset-x-0 mx-auto w-fit z-50
+  flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm
+  font-semibold text-white shadow-lg" role="status">` with an
+  `aria-hidden` bell icon and visible text "طلب جديد · طاولة T1".
+  File:line: `frontend/src/components/pos/PosOrderAlertBanners.tsx:35-46`
+  (`role="status"` at :39) and
+  `frontend/src/components/kds/KdsWorkspace.tsx:66-77` (`role="status"`
+  at :71).
+- Live second measurement: the accessibility tree exposes the element as
+  `role: "status"` with an EMPTY accessible name (`name: ""`); the text
+  "طلب جديد · طاولة T1" exists only as a `StaticText` child. The
+  `role="status"` override replaces the button's native semantics, so
+  the element is not exposed as a button at all and `name from content`
+  does not apply to the `status` role — that is why axe reports
+  "Element does not have inner text that is visible to screen readers"
+  despite the visible text. A screen-reader user gets no actionable
+  button for new orders.
+- Snapshot method: axe on the POS/KDS snapshots; live DOM + live
+  accessibility tree (CDP `Accessibility.getFullAXTree`) on `/pos`.
+- Confidence: `verified-by-second-measurement`.
 
-No target under 24px exists anywhere (WCAG 2.5.8 minimum): all 16
-`verify_target_size` runs pass, e.g. `verify_target_size: OK: 1 file(s),
-116 targets @1366/1920px, all >= 24x24 or exception-covered` (POS ar).
+### U13 — KDS "Ready" filter pill renders at 2.09:1 (opacity-50)
+- Screen: KDS ar. Gate: `axe_audit` (SERIOUS color-contrast, node
+  `.bg-green-50`).
+- Verbatim gate output (live axe): `Element has insufficient color
+  contrast of 2.09 (foreground color: #74c098, background color:
+  #f8fdf8, font size: 10.5pt (14px), font weight: normal). Expected
+  contrast ratio of 4.5:1`.
+- Element: the "جاهز0" (Ready, 0 orders) status filter button,
+  `BUTTON.px-3.py-1.5.rounded-lg.text-sm.font-medium.bg-green-50.
+  text-green-700.opacity-50.hover:opacity-80`.
+- Live second measurement: the button's raw computed colours are
+  `oklch(0.527 0.154 150.069)` (green-700) on
+  `oklch(0.982 0.018 155.826)` (green-50) — 4.76:1 if opacity is
+  ignored. But the button carries `opacity-50` (inactive filter), so
+  as rendered the text blends to `#74c098` on `#f8fdf8` — **2.09:1**,
+  exactly as axe reports. The rendered ratio is what the user sees.
+- Snapshot method: axe on the KDS ar snapshot; live DOM on `/kds`.
+- Confidence: `verified-by-second-measurement`.
+
+### U14 — Product-tile initials at 1.63–2.65:1 (need 3:1, large text)
+- Screen: POS en (same tiles in ar). Gate: `axe_audit` (SERIOUS
+  color-contrast, part of the 24 live nodes).
+- Verbatim gate output (live axe, samples): `Element has insufficient
+  color contrast of 2.65 (foreground color: #e5e8f5, background color:
+  #7e8bce, font size: 18.0pt (24px), font weight: bold). Expected
+  contrast ratio of 3:1` ("حل"); `1.63 (#e5f5f1 on #7eceba)` ("فت");
+  `2.42 (#f3e5f5 on #c17ece)` ("أج"); `2.47 (#f1e5f5 on #ba7ece)`
+  ("مش"); `2.44 (#f5e5ea on #ce7e98)` ("رز").
+- Element: the two-letter product initials (`SPAN.text-2xl.font-bold.
+  text-white/80`) centred on the coloured placeholder tiles of
+  photo-less products. The initials are the product's visual identifier
+  on the tile, not decoration.
+- Snapshot method: axe on the POS-en snapshot (23 nodes); live axe on
+  `/pos` (24 nodes). Note the ar/en asymmetry: live axe flags 1
+  contrast node in AR vs 24 in EN (see §5 D6) — the tiles are identical
+  across languages, so the defect stands on the EN live run.
+- Confidence: `verified-by-second-measurement` (live axe).
+
+### U15 — F2 shortcut badge at 3.49:1
+- Screen: POS ar + en. Gate: `axe_audit` (SERIOUS color-contrast, node
+  `.ms-1`).
+- Verbatim gate output (live axe): `Element has insufficient color
+  contrast of 3.49 (foreground color: #c8701a, background color:
+  #fffbeb, font size: 7.5pt (10px), font weight: normal). Expected
+  contrast ratio of 4.5:1`.
+- Element: the "F2" keyboard-hint badge,
+  `SPAN.hidden.sm:inline-flex.ms-1.px-1.py-0.2.rounded.border.
+  border-current.text-[10px].font-mono.opacity-80` with
+  `aria-hidden="true"`. It is hidden from screen readers but visible
+  to sighted keyboard users.
+- Snapshot method: axe on the POS snapshots; live axe on `/pos`.
+- Confidence: `verified-by-second-measurement`.
+
+## 4. Targets under 24px, and advisory list 24–44px (operational screens)
+
+The assignment says any target under 24px is a DEFECT. The live
+measurement finds targets under 24px, but the snapshot gate passes them
+all via the WCAG 2.5.8 spacing exception (no other target's centre lies
+within 24px). These are listed here, not numbered as defects, for Ted
+to rule on the tiering — the assignment's rule and the WCAG exception
+point in different directions:
+
+- Tables (16 sub-24px targets, all 16px tall, live at 1366x768): the
+  12px row action buttons تعديل الطاولة 79×16, إلغاء التنشيط 61×16,
+  عرض الطلب 73×16, نقل الطاولة 69×16, تعيين كمتوفرة 64×16, حجز 20×16
+  — centres ≥75px apart; a 16×16 checkbox input ("on"); the sidebar
+  resize handle 16×768 (shared sidebar, present on every screen — the
+  only sub-24px target on POS/KDS/settings).
+- All 16 `verify_target_size` runs pass, e.g.
+  `verify_target_size: OK: 1 file(s), 116 targets @1366/1920px, all >=
+  24x24 or exception-covered` (POS ar).
+
 The items below are 24–44px, live-measured at 1366x768, listed so the
 owner can judge them for a cashier in a rush. Heights are the short side.
 
@@ -316,18 +432,7 @@ owner can judge them for a cashier in a rush. Heights are the short side.
 
 ## 5. Disputed / likely-false-positive list
 
-- D1 — axe `button-name` on `.top-4` (POS ar/en, KDS ar). Gate:
-  `CRITICAL button-name: Buttons must have discernible text (1 node)
-  .top-4`. Live: the element is the new-order toast button,
-  `BUTTON.fixed.top-4… role="status"`, with visible text
-  "طلب جديد · طاولة T1" — `textContent` and `innerText` both return the
-  full label; only the bell SVG icon is `aria-hidden`. Files:
-  `frontend/src/components/pos/PosOrderAlertBanners.tsx:38`,
-  `frontend/src/components/kds/KdsWorkspace.tsx:70`. The toast is
-  transient (a `role="status"` live region that appears and dismisses),
-  which is the likely reason the snapshot and the live app disagree.
-  DISPUTED — do not fix on the gate alone.
-- D2 — states-gate 1.00:1 on the settings nav headings. Gate:
+- D1 — states-gate 1.00:1 on the settings nav headings. Gate:
   `x default "تفاصيل المطعم" 1.00:1 (need 3) [rgb(232,89,12) on
   rgb(232,89,12)]` (same for "Store Details", "إعدادات الضرائب",
   "Tax Config"). Live: the element is a nav BUTTON with
@@ -337,11 +442,7 @@ owner can judge them for a cashier in a rush. Heights are the short side.
   as solid brand. Corrected to 3.53:1 — still below 4.5:1, but the
   combination is brand orange, i.e. locked (see §6), so it is a
   measurement, not a defect.
-- D3 — axe `color-contrast` node `.bg-green-50` (KDS ar). Live: the only
-  element with that class carrying text is the "جاهز0" (Ready) button,
-  text-green-700 on `rgb(240,253,244)`, ratio **4.76:1** — a pass.
-  DISPUTED.
-- D4 — overflow-gate 1920px product-button overlap (POS ar/en). Gate:
+- D2 — overflow-gate 1920px product-button overlap (POS ar/en). Gate:
   `x pos-ar-1366x768.html @1920px [B overlap] button.w-full
   "مشمشاوي مشكلة£220" overlaps button.fixed "اضغط هنا لتفعيل صوت تنبيه "
   by 70%` (also 26% "صوصودا الليمون£70", 100% "رزرز بشعيرية£150").
@@ -350,13 +451,13 @@ owner can judge them for a cashier in a rush. Heights are the short side.
   h38, visible) overlaps **0** product buttons. The static snapshot
   lays the fixed button out differently from the live scrolling grid.
   DISPUTED.
-- D5 — reduced-motion "[A no-policy]" (all 8 screens). Gate:
+- D3 — reduced-motion "[A no-policy]" (all 8 screens). Gate:
   `x pos-ar-1366x768.html [A no-policy] page animates but has no @media
   (prefers-reduced-motion: reduce)`. False: the policy exists at
   `frontend/src/app/globals.css:557` and in the built CSS
   (`out/_next/static/css/bf08f2f0ac659a1b.css`). What is true is §3 U11
   (the policy is narrow).
-- D6 — responsive `settings-en-1366x768-scale125` "folded". Gate:
+- D4 — responsive `settings-en-1366x768-scale125` "folded". Gate:
   `verify_responsive: FAIL (1366/1920px @ 1.25x root font)` /
   `x settings-en-1366x768.html folded: the flat layout differs between
   two identical loads, so whether the page answers the fold could not be
@@ -364,6 +465,19 @@ owner can judge them for a cashier in a rush. Heights are the short side.
   invocation, not a defect. (All other 23 responsive runs pass,
   including the 125% runs; the fold check at 951px concerns a phone
   hinge, not this Windows desktop app.)
+- D5 — states-gate "إضافة صالة" (Tables ar). Gate: default 4.35:1
+  FAIL [rgb(115,115,115) on rgb(245,245,245)], hover 3.58:1 FAIL
+  [rgb(232,89,12) on rgb(255,255,255)]. Live: default
+  `oklch(0.556 0 0)` on `oklch(1 0 0)` — **4.73:1 PASS** (the live app
+  renders the button on white, not on the muted page background the
+  snapshot used). Hover was not re-measured live (3.58:1 gate-only,
+  brand orange — locked in any case). DISPUTED for the default state.
+- D6 — axe under-reports contrast in Arabic. Live axe flags 1 contrast
+  node on POS-ar vs 24 on POS-en, and the snapshot gate misses 3 nodes
+  on tables-ar that the live run finds. Direct measurement confirms the
+  EN findings also hold in AR (same tiles, same tokens, same colours).
+  Where a defect is evidenced only by the EN live run (e.g. §3 U14),
+  that is noted there; it is not a reason to doubt the finding.
 
 ## 6. Locked-decision measurements (numbers only, NOT defects)
 
@@ -404,18 +518,25 @@ verified live:
 2. Fix the KDS view switcher: either a real tab pattern with arrow-key
    navigation, or drop `role="tablist"` and keep plain toggle buttons —
    U2. NOT DONE.
-3. Associate labels with the Settings business-name input and the five
+3. Give the new-order alert button a real accessible name: remove
+   `role="status"` from the button (or add an `aria-label`) so it is
+   exposed as a button with a name — U12. NOT DONE.
+4. Associate labels with the Settings business-name input and the five
    visible selects (label `for`/`id` or `aria-label`) — U3, U4. NOT DONE.
-4. Darken the failing non-brand text to >= 4.5:1: "No Printer" grey
-   (2.56), "حجز" amber (2.95), "إلغاء التنشيط" red (3.82), the
-   muted-foreground token (4.34), the KDS timer grey (2.60) — U5–U9.
+5. Darken the failing non-brand text to >= 4.5:1: "No Printer" grey
+   (2.56), "حجز" amber (2.93), "إلغاء التنشيط" red (3.82), the
+   muted-foreground token (4.34), the KDS timer grey (2.60), the KDS
+   "Ready" pill as rendered (2.09 — drop `opacity-50` on the text or
+   darken it), the product-tile initials (1.63–2.65 — solid white
+   initials or darker tiles), the F2 badge (3.49) — U5–U9, U13–U15.
    Brand orange is untouched (locked). NOT DONE.
-5. Give the sidebar brand span room (line-height above the 14px font
+6. Give the sidebar brand span room (line-height above the 14px font
    size) so the 2px clip disappears — U10. NOT DONE.
-6. Widen the reduced-motion policy to cover the sidebar/menu transitions
+7. Widen the reduced-motion policy to cover the sidebar/menu transitions
    (0.15–0.2s), not just shake/shimmer — U11. NOT DONE.
-7. Re-verify the disputed items (toast button-name D1, 1920 overlap D4)
-   before acting on them; do not fix on the gate alone. NOT DONE.
+8. Re-verify the disputed items (1920 overlap D2, "إضافة صالة"
+   default D5) before acting on them; do not fix on the gate alone.
+   NOT DONE.
 
 ## 9. Method notes and limits
 
@@ -424,7 +545,7 @@ verified live:
   guesses. `accuracy_report.mjs` was not run (kit self-test, per the
   assignment).
 - Snapshot gates can disagree with the live app (see §5): every
-  defect above U1–U11 was second-measured live except the same-token
+  defect above U1–U15 was second-measured live except the same-token
   instances of U8, which are marked `gate-only`.
 - Out of scope, not reported as defects: kit house rules (no-emoji ban,
   native `<select>` ban, mobile-first gate, dark-mode checks via the
