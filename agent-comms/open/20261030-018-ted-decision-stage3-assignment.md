@@ -4,6 +4,31 @@ Kind: decision
 Thread: 20261030-018
 Subject: Current assignment — Stage 3: printing area (classify, oracle-gated formatAmount, slim thermal.ts) (live queue item)
 
+TED GATE UPDATE 2026-10-30 — PART A LANDED, QUEUE REFRESHED (read first;
+the assignment text below stays operative except where this update
+overrides the order):
+- Delivery 1 Part A ACCEPTED and landed (PR #11; upstream head
+  c132e40). Baseline recorded: Stage 3 battery 28/30 on clean main
+  542ec99 — raster is a declared environment skip off-Windows;
+  test:menu-printing is a real 9/10 red (stubbing break at
+  tests/menu-printing.test.ts:458, caused by the Stage 2 barrel's
+  getter-only re-export) and is an OPEN REPAIR ITEM, not a baseline.
+- Seam approval (decision file 20261030-019, same thread): all eight
+  proposed seams APPROVED in order (1 escpos-preview, 2 windows-print,
+  3 print-transport, 4 printer-detection, 5 document-z-report,
+  6 raster-documents, 7 document-plugin-receipt, 8 receipt-entry),
+  pure-move rules only; any seam that cannot move purely is excluded
+  and reported, never improvised.
+- QUEUE ORDER FROM HERE: NEXT = menu-printing repair PR (branch
+  assistant/stage3-repair-menu-printing-stub; test-only edit of
+  tests/menu-printing.test.ts; ZERO production files; same 10 tests,
+  same assertions; barrel unchanged; landing needs 10/10 plus oracle,
+  bills-print-api and migration-registry green). THEN Part B (branch
+  assistant/stage3-delivery1-partb-formatamount). THEN Delivery 2 =
+  seams 1-2, Delivery 3 = seams 3-4, then further two-seam deliveries
+  (5-6, 7-8) until the approved list is exhausted. No owner wait at
+  any gate; no Part B or seam move is authored before the repair lands.
+
 OWNER PRE-AUTHORIZATION (recorded by Ted): on 2026-10-30 ~05:39
 Damascus, Ali said, verbatim in substance: "when Stage 3's turn
 comes, execute — do not wait for my approval; I want confirmation
