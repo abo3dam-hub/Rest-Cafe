@@ -1396,7 +1396,7 @@ router.post(
         });
       });
 
-      upsertSettings({ taxes_enabled: 'true' });
+      upsertSettings({ taxes_enabled: 'true', tax_profile: 'manual' });
       return res.json({
         pack_id: pack.id,
         version_id: versionId,
@@ -1409,6 +1409,282 @@ router.post(
       return res
         .status(statusCode)
         .json({ error: error.message || 'Could not save manual tax configuration' });
+    }
+  },
+);
+
+// ── Syria tax profiles ─────────────────────────────────────────────────────
+// One-question profiles over the standard pack machinery: a single category
+// covering the whole bill, one percent rule, exclusive (added on top). The
+// consumption-spending fee follows Decree 11/2015 as amended by Law 15/2024;
+// rates stay editable so a future amendment is a number change, not a
+// rebuild. The announced sales tax ships dormant until it enters into force.
+const SYRIA_PROFILES = {
+  consumption: {
+    packId: 'syria-consumption',
+    categoryId: 'establishment-services',
+    categoryLabel: 'خدمات المنشأة',
+    ruleId: 'consumption-fee',
+    ruleLabel: 'رسم الإنفاق الاستهلاكي',
+    settingValue: 'syria_consumption',
+  },
+  sales: {
+    packId: 'syria-sales',
+    categoryId: 'establishment-services',
+    categoryLabel: 'خدمات المنشأة',
+    ruleId: 'sales-tax',
+    ruleLabel: 'ضريبة المبيعات',
+    settingValue: 'syria_sales',
+  },
+} as const;
+
+type SyriaProfileId = keyof typeof SYRIA_PROFILES;
+
+// Legal default rates (percent) by establishment classification.
+const SYRIA_CONSUMPTION_CLASS_RATES: Record<string, number> = {
+  unrated: 0,
+  rated_2_3: 5,
+  rated_4_5: 10,
+  nightclub: 20,
+};
+const SYRIA_SALES_DEFAULT_RATE = 5;
+// Flip when the announced sales tax is published as in-force law.
+const SYRIA_SALES_TAX_IN_FORCE = false;
+
+function buildSyriaProfilePack(
+  profile: SyriaProfileId,
+  ratePercent: number,
+  currency: string,
+): CountryPack {
+  const definition = SYRIA_PROFILES[profile];
+  const effectiveFrom = new Date().toISOString().slice(0, 10);
+  return {
+    schemaVersion: 1,
+    id: definition.packId,
+    publisher: 'local',
+    version: `1.0.${Date.now()}`,
+    // '*' like the bundled generic pack: Rest&Cafe has no country profiles,
+    // and order-time pack resolution matches the store's (empty) country only
+    // against '*' packs.
+    country: '*',
+    jurisdiction: 'SY',
+    currency,
+    effectiveFrom,
+    publishedAt: effectiveFrom,
+    minFloVersion: '1.0.0',
+    taxPoint: 'finalized_at',
+    inclusivePricingDefault: false,
+    registrationNumberLabel: 'Tax registration',
+    categories: [
+      {
+        id: definition.categoryId,
+        label: definition.categoryLabel,
+        ruleIds: [definition.ruleId],
+        defaultBehavior: 'exclusive',
+      },
+      { id: 'unclassified', label: 'Unclassified', ruleIds: [] },
+    ],
+    applyDefaultCategoryToUncategorized: true,
+    defaultCategories: {
+      product: definition.categoryId,
+      packaging: definition.categoryId,
+      delivery: definition.categoryId,
+      service_charge: definition.categoryId,
+      addon: definition.categoryId,
+    },
+    unclassifiedCategoryId: 'unclassified',
+    rules: [
+      {
+        id: definition.ruleId,
+        label: definition.ruleLabel,
+        type: 'percent',
+        categoryIds: [definition.categoryId],
+        rate: String(ratePercent),
+      },
+    ],
+    taxRounding: {
+      scope: 'line',
+      method: 'half_up',
+      decimalPlaces: 2,
+      remainderAllocation: 'largest_remainder',
+    },
+    payableRounding: { increment: '0.01', method: 'half_up' },
+  };
+}
+
+router.post(
+  '/syria-profile',
+  requirePermission('tax-packs.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const profile = req.body?.profile as SyriaProfileId;
+      if (profile !== 'consumption' && profile !== 'sales') {
+        return res.status(400).json({ error: 'Unknown Syria tax profile' });
+      }
+      if (profile === 'sales' && !SYRIA_SALES_TAX_IN_FORCE) {
+        return res
+          .status(400)
+          .json({ error: 'The sales tax is not in force yet and cannot be activated' });
+      }
+      const classification =
+        typeof req.body?.classification === 'string' ? req.body.classification : 'unrated';
+      if (
+        profile === 'consumption' &&
+        !(classification in SYRIA_CONSUMPTION_CLASS_RATES)
+      ) {
+        return res.status(400).json({ error: 'Unknown establishment classification' });
+      }
+      let rate: number;
+      if (req.body?.rate !== undefined && req.body?.rate !== null && req.body?.rate !== '') {
+        rate = Number(req.body.rate);
+        if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+          return res.status(400).json({ error: 'Rate must be a number between 0 and 100' });
+        }
+      } else if (profile === 'consumption') {
+        rate = SYRIA_CONSUMPTION_CLASS_RATES[classification];
+      } else {
+        rate = SYRIA_SALES_DEFAULT_RATE;
+      }
+
+      const db = getDatabase();
+      const currency = String(getSettingValue('currency') || 'SYP').toUpperCase();
+      const pack = buildSyriaProfilePack(profile, rate, currency);
+      const packJson = JSON.stringify(pack);
+      const digest = createHash('sha256').update(packJson, 'utf8').digest('hex');
+      const installedAt = now();
+      const versionId = `${pack.id}@${pack.version}`;
+      const version: VersionRow = {
+        id: versionId,
+        pack_id: pack.id,
+        version: pack.version,
+        schema_version: 1,
+        manifest_json: JSON.stringify({
+          id: pack.id,
+          publisher: 'local',
+          country: pack.country,
+          jurisdiction: pack.jurisdiction,
+          version: pack.version,
+          publishedAt: pack.publishedAt,
+        }),
+        pack_json: packJson,
+        digest,
+        signature: null,
+        effective_from: pack.effectiveFrom,
+        effective_to: null,
+        min_flo_version: pack.minFloVersion,
+        published_at: pack.publishedAt,
+        status: 'installed',
+        created_at: installedAt,
+      };
+      const validation = validationChecklist(version);
+      if (!validation.valid) {
+        return res
+          .status(400)
+          .json({ error: 'Syria tax profile failed validation', validation });
+      }
+
+      const definition = SYRIA_PROFILES[profile];
+      let remapped: Array<{ entity: string; count: number }> = [];
+      withTxn(() => {
+        const existingPackRow = db
+          .prepare('SELECT * FROM country_packs WHERE id = ?')
+          .get(pack.id) as PackRow | undefined;
+        if (!existingPackRow) {
+          db.prepare(`
+            INSERT INTO country_packs (id, publisher, country, jurisdiction, active_version_id, status, created_at, updated_at)
+            VALUES (?, 'local', ?, ?, NULL, 'installed', ?, ?)
+          `).run(pack.id, pack.country, pack.jurisdiction, installedAt, installedAt);
+        } else {
+          db.prepare('UPDATE country_packs SET updated_at = ? WHERE id = ?').run(
+            installedAt,
+            pack.id,
+          );
+        }
+        persistPackArtifacts(version, pack, installedAt);
+
+        const packRow = db
+          .prepare('SELECT * FROM country_packs WHERE id = ?')
+          .get(pack.id) as PackRow;
+        activateInstalledPack(packRow, version, actorUserId(req));
+
+        // Every product and add-on joins the single establishment category.
+        const categoryIds = pack.categories.map((category) => category.id);
+        const placeholders = categoryIds.map(() => '?').join(',');
+        const staleProducts = db
+          .prepare(
+            `SELECT COUNT(*) AS total FROM products WHERE deleted_at IS NULL AND tax_category_id IS NOT NULL AND tax_category_id NOT IN (${placeholders})`,
+          )
+          .get(...categoryIds) as { total: number };
+        const staleAddons = db
+          .prepare(
+            `SELECT COUNT(*) AS total FROM addons WHERE tax_category_id IS NOT NULL AND tax_category_id NOT IN (${placeholders})`,
+          )
+          .get(...categoryIds) as { total: number };
+        db.prepare(
+          `UPDATE products SET tax_category_id = ?, updated_at = ? WHERE deleted_at IS NULL AND (tax_category_id IS NULL OR tax_category_id NOT IN (${placeholders}))`,
+        ).run(definition.categoryId, installedAt, ...categoryIds);
+        db.prepare(
+          `UPDATE addons SET tax_category_id = ? WHERE tax_category_id IS NULL OR tax_category_id NOT IN (${placeholders})`,
+        ).run(definition.categoryId, ...categoryIds);
+        remapped = [
+          ...(staleProducts.total > 0 ? [{ entity: 'product', count: staleProducts.total }] : []),
+          ...(staleAddons.total > 0 ? [{ entity: 'addon', count: staleAddons.total }] : []),
+        ];
+
+        // Charges (packaging / delivery / service) join the same category so
+        // the levy covers the whole bill, via the store-wide override rows
+        // the calculation path already reads.
+        for (const kind of ['packaging', 'delivery', 'service_charge'] as const) {
+          const existing = db
+            .prepare(
+              `SELECT id FROM tax_overrides WHERE pack_version_id = ? AND entity_type = ? AND entity_id IS NULL AND field_name = 'tax_category_id'`,
+            )
+            .get(versionId, kind) as { id: string } | undefined;
+          if (!existing) {
+            db.prepare(`
+              INSERT INTO tax_overrides (
+                id, pack_version_id, entity_type, entity_id, field_name, value_json,
+                created_by_user_id, created_at, updated_at
+              ) VALUES (?, ?, ?, NULL, 'tax_category_id', ?, ?, ?, ?)
+            `).run(
+              randomUUID(),
+              versionId,
+              kind,
+              JSON.stringify({ categoryId: definition.categoryId }),
+              actorUserId(req),
+              installedAt,
+              installedAt,
+            );
+          }
+        }
+
+        audit('activate_syria_profile', actorUserId(req), pack.id, versionId, null, {
+          profile,
+          classification: profile === 'consumption' ? classification : null,
+          rate,
+          remapped,
+        });
+      });
+
+      upsertSettings({
+        taxes_enabled: 'true',
+        tax_profile: definition.settingValue,
+        syria_tax_classification: profile === 'consumption' ? classification : '',
+        syria_tax_rate: String(rate),
+      });
+      return res.json({
+        pack_id: pack.id,
+        version_id: versionId,
+        version: pack.version,
+        rate,
+        remapped,
+        validation,
+      });
+    } catch (error: any) {
+      const statusCode = error.statusCode || 500;
+      return res
+        .status(statusCode)
+        .json({ error: error.message || 'Could not activate the Syria tax profile' });
     }
   },
 );

@@ -410,7 +410,7 @@ export function calculateDocumentTaxes(
         ? getActiveTaxOverride('product', entry.product.id, pack.id)
         : null;
 
-    if (!taxCategoryId && !merchantOverride) {
+    if (!taxCategoryId && !merchantOverride && !pack?.applyDefaultCategoryToUncategorized) {
       continue;
     }
 

@@ -61,6 +61,9 @@ export interface CountryPack {
   // Optional merchant-facing registration-number validation pattern; falls back to static format.
   registrationNumberFormat?: TaxIdFormat;
   categories: TaxCategory[];
+  // When true, document calculation assigns lines with no stored category to
+  // the pack default instead of leaving them untaxed (single-levy packs).
+  applyDefaultCategoryToUncategorized?: boolean;
   defaultCategories: Record<TaxLineKind, string>;
   unclassifiedCategoryId: string;
   rules: TaxRule[];
