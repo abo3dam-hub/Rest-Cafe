@@ -298,7 +298,9 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   const [manualLoaded, setManualLoaded] = useState(false);
   const [manualOverrideConfirm, setManualOverrideConfirm] = useState<string | null>(null);
   const [manualBuilderOpen, setManualBuilderOpen] = useState(false);
+  const [manualAdvancedOpen, setManualAdvancedOpen] = useState(false);
   const [syriaBuilderOpen, setSyriaBuilderOpen] = useState(false);
+  const [syriaProfile, setSyriaProfile] = useState<'consumption' | 'sales'>('consumption');
   const [syriaClassification, setSyriaClassification] = useState('unrated');
   const [syriaRate, setSyriaRate] = useState('0');
   const [syriaSaving, setSyriaSaving] = useState(false);
@@ -354,9 +356,10 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
 
   const loadSyriaSettings = useCallback(async () => {
     try {
-      const [classRes, rateRes] = await Promise.all([
+      const [classRes, rateRes, profileRes] = await Promise.all([
         api.get('/settings/syria_tax_classification').catch(() => null),
         api.get('/settings/syria_tax_rate').catch(() => null),
+        api.get('/settings/tax_profile').catch(() => null),
       ]);
       const storedClass = classRes?.data?.setting?.value;
       if (typeof storedClass === 'string' && storedClass in SYRIA_CLASS_RATES) {
@@ -364,6 +367,9 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       }
       const storedRate = rateRes?.data?.setting?.value;
       if (typeof storedRate === 'string' && storedRate !== '') setSyriaRate(storedRate);
+      const storedProfile = profileRes?.data?.setting?.value;
+      if (storedProfile === 'syria_sales') setSyriaProfile('sales');
+      if (storedProfile === 'syria_consumption') setSyriaProfile('consumption');
     } catch {}
   }, []);
 
@@ -476,12 +482,32 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   // Real backend tax state; only changes once configuration is activated.
   const taxMode: 'off' | 'official' | 'manual' | 'syria' = !taxesEnabled
     ? 'off'
-    : activePack?.id === 'syria-consumption'
+    : activePack?.id === 'syria-consumption' || activePack?.id === 'syria-sales'
       ? 'syria'
       : activePackPublisher === 'local'
         ? 'manual'
         : 'official';
   const manualBuilderVisible = manualBuilderOpen || taxMode === 'manual';
+  const primaryManualCategory =
+    manualCategories.find((category) => category.tempId === manualDefaults.product) ||
+    manualCategories[0];
+  const manualExampleTax = (() => {
+    if (!primaryManualCategory) return null;
+    let percent = 0;
+    let fixed = 0;
+    for (const component of primaryManualCategory.components) {
+      const value = Number(component.value);
+      if (!Number.isFinite(value)) continue;
+      if (component.type === 'percent') percent += value;
+      else fixed += value;
+    }
+    if (percent === 0 && fixed === 0) return null;
+    return Math.round(100000 * (percent / 100) + fixed).toLocaleString('en-US');
+  })();
+  const manualDefaultsAllSame =
+    manualDefaults.packaging === manualDefaults.product &&
+    manualDefaults.delivery === manualDefaults.product &&
+    manualDefaults.service_charge === manualDefaults.product;
   const syriaBuilderVisible = syriaBuilderOpen || taxMode === 'syria';
   const activeSegment: 'off' | 'manual' | 'syria' =
     syriaBuilderOpen || taxMode === 'syria'
@@ -625,13 +651,13 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
     setSyriaSaving(true);
     try {
       await api.post('/tax-packs/syria-profile', {
-        profile: 'consumption',
-        classification: syriaClassification,
+        profile: syriaProfile,
+        ...(syriaProfile === 'consumption' ? { classification: syriaClassification } : {}),
         rate: rateNum,
       });
       setTaxesEnabled(true);
       setSyriaBuilderOpen(false);
-      toast.success(t('syriaApplied'));
+      toast.success(t(syriaProfile === 'sales' ? 'syriaSalesApplied' : 'syriaApplied'));
       await refreshAll();
     } catch (error) {
       toast.error(apiMessage(error, t('syriaApplyFailed')));
@@ -884,30 +910,64 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Calculator size={20} className="text-brand" />
-            <h3 className="font-semibold text-foreground">{t('modeSyria')}</h3>
+            <h3 className="font-semibold text-foreground">
+              {syriaProfile === 'sales' ? t('syriaSalesOption') : t('modeSyria')}
+            </h3>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{t('syriaBuilderHint')}</p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-foreground">
-                {t('syriaClassification')}
-              </span>
-              <select
-                value={syriaClassification}
-                disabled={!isOwner}
-                onChange={(event) => {
-                  setSyriaClassification(event.target.value);
-                  setSyriaRate(SYRIA_CLASS_RATES[event.target.value] ?? '0');
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={syriaProfile === 'consumption'}
+                onChange={() => {
+                  setSyriaProfile('consumption');
+                  setSyriaRate(SYRIA_CLASS_RATES[syriaClassification] ?? '0');
                 }}
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
-              >
-                <option value="unrated">{t('syriaClassUnrated')}</option>
-                <option value="rated_2_3">{t('syriaClassRated23')}</option>
-                <option value="rated_4_5">{t('syriaClassRated45')}</option>
-                <option value="nightclub">{t('syriaClassNightclub')}</option>
-              </select>
+                disabled={!isOwner}
+              />
+              {t('modeSyria')}
             </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={syriaProfile === 'sales'}
+                onChange={() => {
+                  setSyriaProfile('sales');
+                  setSyriaRate('5');
+                }}
+                disabled={!isOwner}
+              />
+              {t('syriaSalesOption')}
+            </label>
+          </div>
+          {syriaProfile === 'sales' && (
+            <p className="mt-2 text-sm text-muted-foreground">{t('syriaSalesHint')}</p>
+          )}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {syriaProfile === 'consumption' && (
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-foreground">
+                  {t('syriaClassification')}
+                </span>
+                <select
+                  value={syriaClassification}
+                  disabled={!isOwner}
+                  onChange={(event) => {
+                    setSyriaClassification(event.target.value);
+                    setSyriaRate(SYRIA_CLASS_RATES[event.target.value] ?? '0');
+                  }}
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+                >
+                  <option value="unrated">{t('syriaClassUnrated')}</option>
+                  <option value="rated_2_3">{t('syriaClassRated23')}</option>
+                  <option value="rated_4_5">{t('syriaClassRated45')}</option>
+                  <option value="nightclub">{t('syriaClassNightclub')}</option>
+                </select>
+              </label>
+            )}
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-foreground">
                 {t('syriaRate')}
@@ -934,10 +994,6 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
               {syriaSaving ? t('saving') : t('syriaApply')}
             </Button>
           </div>
-
-          <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
-            {t('syriaSalesNote')}
-          </p>
         </section>
       )}
 
@@ -1083,39 +1139,93 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                 {t('inclusiveLabel')}
               </label>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">{t('menuPricesHint')}</p>
           </div>
 
           <div className="mt-5 border-t border-border pt-4">
-            <p className="text-sm font-medium text-foreground">{t('defaultCategory')}</p>
-            <p className="text-xs text-muted-foreground mb-2">{t('defaultCategoryHint')}</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {(
-                [
-                  ['product', t('defaultNewProducts')],
-                  ['packaging', t('defaultPackaging')],
-                  ['delivery', t('defaultDelivery')],
-                  ['service_charge', t('defaultServiceCharge')],
-                ] as Array<[keyof ManualDefaults, string]>
-              ).map(([key, label]) => (
-                <label key={key} className="block">
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                  <select
-                    value={manualDefaults[key]}
-                    onChange={(event) =>
-                      setManualDefaults((current) => ({ ...current, [key]: event.target.value }))
-                    }
-                    disabled={!isOwner}
-                    className="mt-1 w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted"
-                  >
-                    {manualCategories.map((category) => (
-                      <option key={category.tempId} value={category.tempId}>
-                        {category.label || t('untitledCategory')}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <p className="text-sm font-medium text-foreground">{t('manualPrimaryCategory')}</p>
+            <p className="text-xs text-muted-foreground mb-2">{t('manualPrimaryCategoryHint')}</p>
+            <select
+              value={manualDefaults.product}
+              onChange={(event) => {
+                const next = event.target.value;
+                setManualDefaults({
+                  product: next,
+                  packaging: next,
+                  delivery: next,
+                  service_charge: next,
+                });
+              }}
+              disabled={!isOwner}
+              className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted sm:max-w-xs"
+            >
+              {manualCategories.map((category) => (
+                <option key={category.tempId} value={category.tempId}>
+                  {category.label || t('untitledCategory')}
+                </option>
               ))}
-            </div>
+            </select>
+            {manualExampleTax !== null && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {t('manualExample', { tax: manualExampleTax })}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setManualAdvancedOpen((value) => !value)}
+              className="mt-4 flex items-center gap-1 text-sm font-medium text-brand"
+            >
+              <ChevronDown
+                size={14}
+                className={manualAdvancedOpen ? 'rotate-180' : ''}
+              />
+              {t('manualAdvancedAssign')}
+            </button>
+            {!manualAdvancedOpen && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {manualDefaultsAllSame
+                  ? t('manualDefaultsSummarySame', {
+                      category: primaryManualCategory?.label || t('untitledCategory'),
+                    })
+                  : t('manualDefaultsSummaryMixed')}
+              </p>
+            )}
+            {manualAdvancedOpen && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-2">{t('defaultCategoryHint')}</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {(
+                    [
+                      ['product', t('defaultNewProducts')],
+                      ['packaging', t('defaultPackaging')],
+                      ['delivery', t('defaultDelivery')],
+                      ['service_charge', t('defaultServiceCharge')],
+                    ] as Array<[keyof ManualDefaults, string]>
+                  ).map(([key, label]) => (
+                    <label key={key} className="block">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <select
+                        value={manualDefaults[key]}
+                        onChange={(event) =>
+                          setManualDefaults((current) => ({
+                            ...current,
+                            [key]: event.target.value,
+                          }))
+                        }
+                        disabled={!isOwner}
+                        className="mt-1 w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted"
+                      >
+                        {manualCategories.map((category) => (
+                          <option key={category.tempId} value={category.tempId}>
+                            {category.label || t('untitledCategory')}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {manualOverrideConfirm && (

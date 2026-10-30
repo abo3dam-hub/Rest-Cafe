@@ -7,8 +7,8 @@
  * answers one classification question and every line — including products
  * with no stored tax category, e.g. CSV-imported ones — is charged at that
  * rate, printed as its own breakdown line. The announced 2027 sales tax
- * must stay dormant. Settings mirror production: country '' (no country
- * profiles), currency SYP.
+ * is a second selectable profile at 5%. Settings mirror production:
+ * country '' (no country profiles), currency SYP.
  *
  * Usage: node tests/run-electron-node-test.cjs tests/syria-tax-profile.test.ts
  */
@@ -90,19 +90,19 @@ async function main() {
     assertEqualOrThrow(baseline.data.order.tax_amount, 0, 'baseline tax is zero');
     assertEqualOrThrow(baseline.data.order.total, 10000, 'baseline total is the subtotal');
 
-    console.log('\n2. Permission gate and dormant sales tax');
+    console.log('\n2. Permission gate and input validation');
     const forbidden = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: manager.authHeader,
       body: { profile: 'consumption', classification: 'rated_2_3' },
     });
     assertEqualOrThrow(forbidden.status, 403, 'manager without tax-packs.manage is rejected');
-    const dormant = await api(baseUrl, '/api/tax-packs/syria-profile', {
+    const badSalesRate = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: owner.authHeader,
-      body: { profile: 'sales' },
+      body: { profile: 'sales', rate: 150 },
     });
-    assertEqualOrThrow(dormant.status, 400, 'sales tax stays dormant until it is in force');
+    assertEqualOrThrow(badSalesRate.status, 400, 'sales profile still validates the rate');
     const badClass = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: owner.authHeader,
@@ -222,7 +222,31 @@ async function main() {
     assertEqualOrThrow(customOrder.data.order.tax_amount, 1050, 'fee uses the edited 7% rate');
     assertEqualOrThrow(getSetting(db, 'syria_tax_rate'), '7', 'edited rate recorded');
 
-    console.log('\n10. Turning taxes off is a safe off-ramp');
+    console.log('\n10. Sales tax is a selectable profile at its announced 5%');
+    const sales = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'sales' },
+    });
+    assertEqualOrThrow(sales.status, 200, 'owner can select the sales tax profile');
+    assertEqualOrThrow(sales.data.pack_id, 'syria-sales', 'sales pack installed');
+    assertEqualOrThrow(sales.data.rate, 5, 'announced default rate is 5%');
+    assertEqualOrThrow(getSetting(db, 'tax_profile'), 'syria_sales', 'sales profile recorded');
+    const salesOrder = await createOrder([
+      { product_id: 'syria-p1', quantity: 1 },
+      { product_id: 'syria-p2', quantity: 1 },
+    ]);
+    assertEqualOrThrow(salesOrder.data.order.tax_amount, 750, 'sales tax is 5% of the whole bill');
+    const salesBreakdown = (typeof salesOrder.data.order.tax_breakdown === 'string'
+      ? JSON.parse(salesOrder.data.order.tax_breakdown || '[]')
+      : salesOrder.data.order.tax_breakdown || []) as any[];
+    assertEqualOrThrow(
+      salesBreakdown.some((line) => line.title === 'ضريبة المبيعات' && line.rate === 5),
+      true,
+      'breakdown carries the sales tax line',
+    );
+
+    console.log('\n11. Turning taxes off is a safe off-ramp');
     const off = await api(baseUrl, '/api/settings/taxes_enabled', {
       method: 'PUT',
       headers: owner.authHeader,
