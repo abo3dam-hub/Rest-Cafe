@@ -225,7 +225,7 @@ export default function AppSidebar() {
                   className="aspect-square size-8 shrink-0 rounded-md object-cover"
                 />
                 <div className="flex flex-col gap-0.5 min-w-0 leading-none">
-                  <span className="font-semibold truncate">
+                  <span className="font-semibold truncate leading-5">
                     {currentTenant?.business_name || tCommon('brandName')}
                   </span>
                 </div>
