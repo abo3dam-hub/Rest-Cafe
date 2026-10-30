@@ -36,7 +36,7 @@ const STATUS_CONFIG: Record<
 > = {
   disconnected: {
     labelKey: 'printerNoPrinter',
-    color: 'text-gray-400',
+    color: 'text-gray-600',
     Icon: Printer,
   },
   connecting: {
