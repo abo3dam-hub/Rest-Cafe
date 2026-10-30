@@ -97,7 +97,7 @@ export function nameToColor(name: string): string {
     hash = codePoint + ((hash << 5) - hash);
   }
   const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 45%, 65%)`;
+  return `hsl(${hue}, 45%, 32%)`;
 }
 
 /** Checks whether Base64 data URI is within character size limit (50K chars). */
