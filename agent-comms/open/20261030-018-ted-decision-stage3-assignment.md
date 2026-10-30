@@ -4,6 +4,25 @@ Kind: decision
 Thread: 20261030-018
 Subject: Current assignment — Stage 3: printing area (classify, oracle-gated formatAmount, slim thermal.ts) (live queue item)
 
+TED GATE UPDATE 2026-10-30 — DELIVERY 2 COMPLETE, DELIVERY 3 NEXT
+(read first; the assignment text below stays operative except where
+this update overrides the order):
+- Delivery 2 ACCEPTED and landed (PR #14, pure moves only).
+  thermal.ts 4,227 -> 3,586 lines: seam 1 escpos-preview.ts,
+  seam 2 windows-print.ts, seam 3 print-transport.ts, thermal.ts
+  keeps re-exports. Gatekeeper battery 30/30 effective (raster
+  plain = declared env skip, green under xvfb); oracle 12/12
+  byte-identical, registry 371/371, no new red. Decision file
+  20261030-024. Delivery 2 is COMPLETE. The disclosed
+  thermal.ts <-> windows-print.ts import cycle is accepted
+  ONLY as call-time use; a load-time use in a later seam stops
+  that seam and is reported.
+- QUEUE ORDER FROM HERE: NEXT = Delivery 3 (branch
+  assistant/stage3-delivery3-thermal-slim-2; approved seams 4-6:
+  printer-detection, document-z-report, raster-documents; one
+  commit per seam, pure moves only). THEN Delivery 4 = seams
+  7-8. No owner wait at any gate.
+
 TED GATE UPDATE 2026-10-30 — DELIVERY 1 COMPLETE, DELIVERY 2 NEXT
 (read first; the assignment text below stays operative except where
 this update overrides the order):
