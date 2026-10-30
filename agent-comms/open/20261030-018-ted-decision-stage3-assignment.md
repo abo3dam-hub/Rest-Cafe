@@ -4,6 +4,19 @@ Kind: decision
 Thread: 20261030-018
 Subject: Current assignment — Stage 3: printing area (classify, oracle-gated formatAmount, slim thermal.ts) (live queue item)
 
+TED GATE UPDATE 2026-10-30 — MENU-PRINTING REPAIR LANDED, PART B NEXT
+(read first; the assignment text below stays operative except where
+this update overrides the order):
+- Repair LANDED (PR #12): test:menu-printing is 10/10 again; oracle
+  12/12 byte-identical, bills-print-api 34/34, migration registry
+  371/371, lint 0 errors, backend build green. Thread 20261030-020
+  closed with decision file 20261030-022. The stop rule is lifted.
+- QUEUE ORDER FROM HERE: NEXT = Delivery 1 Part B (branch
+  assistant/stage3-delivery1-partb-formatamount; oracle-gated
+  formatAmount unification, Part B rules below unchanged). THEN
+  Delivery 2 = seams 1-3, Delivery 3 = seams 4-6, Delivery 4 =
+  seams 7-8. No owner wait at any gate.
+
 TED GATE UPDATE 2026-10-30 — PART A LANDED, QUEUE REFRESHED (read first;
 the assignment text below stays operative except where this update
 overrides the order):
