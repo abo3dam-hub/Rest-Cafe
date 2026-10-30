@@ -921,6 +921,7 @@ router.post(
         printer ? { id: printer.id, name: printer.name } : undefined,
       );
 
+      const hasConfiguredPrinter = !!printer;
       if (!printer && preview === true) {
         printer = { id: 0, name: 'Default 80mm Preview', paper_width: '80mm' };
       }
@@ -1091,6 +1092,11 @@ router.post(
 
       if (preview === true) {
         // Previews and prints share the same document formatting pipeline.
+        // With no printer configured the preview is paperless — the screen
+        // shapes Arabic natively — so shaping defaults on; an explicit
+        // caller choice wins, and a configured printer keeps its profile.
+        const previewShapingOverride =
+          arabicShapingOverride ?? (hasConfiguredPrinter ? undefined : true);
         const prepared = prepareReceipt(
           order,
           bill,
@@ -1098,7 +1104,7 @@ router.post(
           billTemplate || 'classic',
           useUnicode,
           isReprint,
-          arabicShapingOverride,
+          previewShapingOverride,
           receiptLanguages.primary,
           receiptLanguages.additional,
         );
