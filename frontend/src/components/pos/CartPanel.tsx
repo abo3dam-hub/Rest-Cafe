@@ -323,7 +323,7 @@ export default function CartPanel({
                     : t('selectTable')}
                   <span
                     aria-hidden="true"
-                    className="hidden sm:inline-flex ms-1 px-1 py-0.2 rounded border border-current text-[10px] font-mono opacity-80"
+                    className="hidden sm:inline-flex ms-1 px-1 py-0.2 rounded border border-current text-[10px] font-mono"
                   >
                     F2
                   </span>
