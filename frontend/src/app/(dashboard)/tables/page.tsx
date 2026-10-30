@@ -1368,7 +1368,7 @@ export default function TablesPage() {
                                   className={`text-xs font-medium inline-flex items-center gap-1 ${
                                     !table.is_active
                                       ? 'text-green-600 hover:text-green-700'
-                                      : 'text-red-500 hover:text-red-700'
+                                      : 'text-red-600 hover:text-red-700'
                                   }`}
                                 >
                                   {!table.is_active ? (
@@ -1556,7 +1556,7 @@ export default function TablesPage() {
                               <button
                                 type="button"
                                 onClick={() => setReservingTable(table)}
-                                className="text-xs text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 font-medium"
+                                className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-700 font-medium"
                               >
                                 {tTables('reserve')}
                               </button>
