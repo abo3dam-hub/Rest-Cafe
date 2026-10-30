@@ -20,7 +20,13 @@ function readBannerDismissed(): boolean {
   }
 }
 
-export function KdsWorkspace({ conn, serverDefault }: { conn: UseKdsConnectionResult; serverDefault: 'tabs' | 'kanban' | null }) {
+export function KdsWorkspace({
+  conn,
+  serverDefault,
+}: {
+  conn: UseKdsConnectionResult;
+  serverDefault: 'tabs' | 'kanban' | null;
+}) {
   const { viewMode, setViewMode } = useKdsView(serverDefault);
   const t = useTranslations('kds');
   const orderAlert = useNewOrderAlert(conn.orders, { surface: 'kds' });
@@ -64,21 +70,26 @@ export function KdsWorkspace({ conn, serverDefault }: { conn: UseKdsConnectionRe
         </button>
       )}
       {alert && (
-        <button
-          type="button"
-          onClick={orderAlert.dismissAlert}
-          className="fixed top-4 inset-x-0 mx-auto w-fit z-50 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg"
-          role="status"
-        >
-          <Bell size={16} />
-          {alert.latestTableLabel
-            ? t('newOrderAlertTable', { table: alert.latestTableLabel })
-            : t('newOrderAlert', { count: alert.count })}
-        </button>
+        <div role="status" className="fixed top-4 inset-x-0 mx-auto w-fit z-50">
+          <button
+            type="button"
+            onClick={orderAlert.dismissAlert}
+            className="flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg"
+          >
+            <Bell size={16} />
+            {alert.latestTableLabel
+              ? t('newOrderAlertTable', { table: alert.latestTableLabel })
+              : t('newOrderAlert', { count: alert.count })}
+          </button>
+        </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col">
         {viewMode === 'kanban' ? (
-          <KdsKanbanBoard orders={conn.orders} updating={conn.updating} updateItemStatus={conn.updateItemStatus} />
+          <KdsKanbanBoard
+            orders={conn.orders}
+            updating={conn.updating}
+            updateItemStatus={conn.updateItemStatus}
+          />
         ) : (
           <KdsTabsView
             orders={conn.orders}
