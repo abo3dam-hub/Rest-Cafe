@@ -53,7 +53,9 @@ export function KdsHeader({
               <WifiOff size={16} className="text-amber-500" />
             </span>
           ) : null}
-          <span className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
+          />
           <span className="text-xs text-gray-400">
             {connected
               ? connectionMode === 'websocket'
@@ -62,7 +64,7 @@ export function KdsHeader({
               : t('connectionConnecting')}
           </span>
 
-          <div className="flex items-center bg-muted rounded-lg p-0.5 ms-2" role="tablist">
+          <div className="flex items-center bg-muted rounded-lg p-0.5 ms-2">
             <button
               onClick={() => onChangeView('tabs')}
               aria-pressed={viewMode === 'tabs'}
