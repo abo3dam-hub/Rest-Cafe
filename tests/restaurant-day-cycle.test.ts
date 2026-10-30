@@ -276,21 +276,26 @@ async function runRoundA() {
         'A5: the void-adjustment line never reaches the kitchen board');
     }
 
-    // 6) Sold-out probe: a separate takeaway order for the sold-out mansaf.
+    // 6) Sold-out probe: the backend itself refuses a sold-out product —
+    //    on creation and on add-items alike (fixed after the day-cycle
+    //    finding; previously the POS screen was the only enforcement).
     const probe = await api(A, '/orders', {
       method: 'POST', headers: waiter.authHeader,
       body: { type: 'takeaway', items: [{ product_id: 'p-mansaf', quantity: 1 }] },
     });
     console.log(`    [probe] sold-out mansaf order attempt → HTTP ${probe.status}`);
-    assertEqual(probe.status, 201,
-      'A6: FINDING — the backend accepts an order for a sold-out product (sold-out is enforced only by the POS screen)');
-    if (probe.status === 201) {
-      const cancelProbe = await api(A, `/orders/${probe.data.order.id}/status`, {
-        method: 'PATCH', headers: waiter.authHeader,
-        body: { status: 'cancelled', reason: 'probe cleanup' },
-      });
-      assertEqual(cancelProbe.status, 200, 'A6: probe order cancelled while pending (no PIN needed)');
-    }
+    assertEqual(probe.status, 400,
+      'A6: the backend refuses an order for a sold-out product');
+    assert(String(probe.data?.error || '').includes('sold out'),
+      'A6: the refusal names the sold-out cause');
+    const probeAdd = await api(A, `/orders/${oid}/items`, {
+      method: 'POST', headers: waiter.authHeader,
+      body: { items: [{ product_id: 'p-mansaf', quantity: 1 }] },
+    });
+    assertEqual(probeAdd.status, 400,
+      'A6: adding a sold-out item to the open table order is also refused');
+    cur = (await api(A, `/orders/${oid}`, { headers: waiter.authHeader })).data.order;
+    assertEqual(cur.total, 65000, 'A6: the refused add left the order total at 65,000');
 
     // 7) Second course on the same table.
     const add = await api(A, `/orders/${oid}/items`, {
@@ -340,6 +345,12 @@ async function runRoundA() {
     });
     console.log(`    [print] preview → HTTP ${preview.status}, text length: ${(preview.data?.text || '').length}, warnings: ${JSON.stringify(preview.data?.warnings || [])}`);
     assertEqual(preview.status, 200, 'A9: device-path preview responds 200');
+    assert((preview.data?.text || '').length > 0,
+      'A9: no-printer Arabic preview renders text (paperless preview defaults shaping on)');
+    assert((preview.data?.text || '').includes('83,000'),
+      'A9: preview text carries the 83,000 total');
+    assert(/[؀-ۿﭐ-﷿ﹰ-﻿]/.test(preview.data?.text || ''),
+      'A9: preview text contains Arabic script');
 
     // 10) Cash payment settles everything.
     const pay = await api(A, `/bills/${bill.id}/payment`, {
@@ -364,8 +375,8 @@ async function runRoundA() {
     assertEqual(s.bills?.collected, 83000, 'A11: summary collected = 83,000');
     const cashRow = (s.paymentMethods || []).find((p) => p.method === 'cash');
     assertEqual(cashRow?.total, 83000, 'A11: summary payment methods: cash = 83,000');
-    assertEqual((s.ordersByStatus || []).find((r) => r.status === 'cancelled')?.count, 1,
-      'A11: the cancelled probe order is counted as cancelled, not as a sale');
+    assertEqual((s.ordersByStatus || []).find((r) => r.status === 'cancelled')?.count ?? 0, 0,
+      'A11: the refused sold-out probe never became an order (no cancelled row, no sale)');
     const daily = await api(A, '/reports/daily-stats', { headers: ownerAuth });
     assertEqual(daily.data.sales, 83000, 'A11: daily-stats sales = 83,000');
     const taxComp = await api(A, '/reports/tax-components', { headers: ownerAuth });
