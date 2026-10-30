@@ -183,3 +183,16 @@ export function validateProductQuantity(
     );
   }
 }
+
+/** Sold-out is a backend sale boundary, not only a POS display state. */
+export function assertProductNotSoldOut(product: {
+  name?: string;
+  is_sold_out?: boolean | number | null;
+}): void {
+  if (Number(product.is_sold_out) === 1) {
+    throw Object.assign(new Error(`${product.name || 'product'} is sold out`), {
+      statusCode: 400,
+      diagnosticCode: 'product_sold_out',
+    });
+  }
+}

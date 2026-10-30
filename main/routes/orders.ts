@@ -67,6 +67,7 @@ import {
   validateOrderNotes,
   validateItemNotes,
   validateProductQuantity,
+  assertProductNotSoldOut,
   validateDeliveryAddress,
   validateDeliveryNote,
   resolveExpectedPaymentMethod,
@@ -883,6 +884,9 @@ function insertOrderItems(
 
     // Validate quantity and price
     validateProductQuantity(product, quantity);
+    // A pure quantity reduction re-inserts an already-sold line and needs no
+    // new units, so it stays allowed when the product has since sold out.
+    if (!context.preserveSelections) assertProductNotSoldOut(product);
     const variant = resolveOrderItemVariant(db, product, item, isOnlineOrder, {
       // A quantity reduction keeps the stored selection even if the merchant
       // has since disabled the variant or added variants the line never had;
@@ -1780,6 +1784,7 @@ router.post(
 
           // Validate quantity and price
           validateProductQuantity(product, quantity);
+          assertProductNotSoldOut(product);
           const variant = resolveOrderItemVariant(db, product, item, isOnlineOrder);
           let unitPrice = variant
             ? variantUnitPrice(variant, isOnlineOrder)

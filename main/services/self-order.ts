@@ -133,7 +133,7 @@ export function sanitizeSelfOrderItems(
   if (raw.length > MAX_ITEMS) return { error: 'Too many items in one order' };
 
   const productStmt = db.prepare(
-    'SELECT id, category_id, allow_fractional_quantity FROM products WHERE id = ? AND is_active = 1 AND deleted_at IS NULL',
+    'SELECT id, category_id, allow_fractional_quantity, is_sold_out FROM products WHERE id = ? AND is_active = 1 AND deleted_at IS NULL',
   );
   const variantStmt = db.prepare(
     'SELECT id FROM product_variants WHERE id = ? AND product_id = ? AND is_active = 1',
@@ -156,9 +156,16 @@ export function sanitizeSelfOrderItems(
     const line = (entry ?? {}) as Record<string, unknown>;
     const productId = typeof line.product_id === 'string' ? line.product_id : '';
     const product = productStmt.get(productId) as
-      | { id: string; category_id: string | null; allow_fractional_quantity: number }
+      | {
+          id: string;
+          category_id: string | null;
+          allow_fractional_quantity: number;
+          is_sold_out: number;
+        }
       | undefined;
-    if (!product) return { error: 'One of the items is no longer available' };
+    if (!product || Number(product.is_sold_out) === 1) {
+      return { error: 'One of the items is no longer available' };
+    }
 
     const rawQty = typeof line.quantity === 'number' ? line.quantity : NaN;
     if (!Number.isFinite(rawQty) || rawQty <= 0 || rawQty > 500) {
