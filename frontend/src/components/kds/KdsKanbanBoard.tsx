@@ -263,7 +263,7 @@ const KanbanOrderCard = memo(function KanbanOrderCard({
               <Badge variant="secondary">{t('tableLabel', { name: order.table.name })}</Badge>
             )}
           </div>
-          <div className="flex items-center gap-1 text-sm text-gray-400 font-mono shrink-0">
+          <div className="flex items-center gap-1 text-sm text-gray-600 font-mono shrink-0">
             <Clock size={12} />
             <Ltr>
               <ElapsedTime dateStr={order.created_at} />
