@@ -25,9 +25,14 @@ overrides the order):
   same assertions; barrel unchanged; landing needs 10/10 plus oracle,
   bills-print-api and migration-registry green). THEN Part B (branch
   assistant/stage3-delivery1-partb-formatamount). THEN Delivery 2 =
-  seams 1-2, Delivery 3 = seams 3-4, then further two-seam deliveries
-  (5-6, 7-8) until the approved list is exhausted. No owner wait at
+  seams 1-3, Delivery 3 = seams 4-6, Delivery 4 = seams 7-8 (owner
+  decision 2026-10-30, decision file 20261030-021: THREE seams per
+  delivery, superseding the two-seam bundling). No owner wait at
   any gate; no Part B or seam move is authored before the repair lands.
+  Gatekeeping note: if one seam in a delivery fails verification,
+  Ted bisects by commit, lands the verified seams in order, and
+  returns only the faulty seam — the one-commit-per-seam rule is
+  what makes this possible and is mandatory.
 
 OWNER PRE-AUTHORIZATION (recorded by Ted): on 2026-10-30 ~05:39
 Damascus, Ali said, verbatim in substance: "when Stage 3's turn
@@ -61,8 +66,9 @@ shared/print/ and frontend/src/lib/printer/ are in classification
 scope; restructuring scope is main/printers/ (thermal.ts) unless
 Ted's seam approval below says otherwise.
 
-THREE deliveries, in order (owner bundling rule applies inside
-Delivery 2+: two seams per delivery, one commit per seam):
+Deliveries in order (owner bundling rule, updated 2026-10-30:
+Delivery 2+ bundles THREE seams per delivery, one commit per seam;
+the final delivery takes the remainder):
 
 DELIVERY 1 — branch assistant/stage3-delivery1-classify-format
   Part A — CLASSIFY, do not restructure. Zero production-code
@@ -101,16 +107,18 @@ DELIVERY 1 — branch assistant/stage3-delivery1-classify-format
 
 DELIVERY 2 — branch assistant/stage3-delivery2-thermal-slim-1
   (starts only after Delivery 1 lands and the seam approval is on
-  main) Approved seams 1 and 2: extract each into its target
+  main) Approved seams 1, 2 and 3: extract each into its target
   module under main/printers/; thermal.ts keeps re-exports /
   composition so existing call sites do not change. One commit
   per seam; every commit compiles and passes on its own.
 
 DELIVERY 3 — branch assistant/stage3-delivery3-thermal-slim-2
-  Approved seams 3 and 4, same rules. If the approved list has
-  fewer seams, this delivery takes the remainder. If seams
-  remain after Delivery 3, Ted refreshes this assignment for
-  further two-seam deliveries until the list is exhausted.
+  Approved seams 4, 5 and 6, same rules.
+
+DELIVERY 4 — branch assistant/stage3-delivery4-thermal-slim-3
+  Approved seams 7 and 8 (the remainder), same rules. If seams
+  remain after Delivery 4, Ted refreshes this assignment for
+  further three-seam deliveries until the list is exhausted.
 
 Stage 3 is complete when: the approved seam list is exhausted,
 thermal.ts is reduced to the core ESC/POS builder + orchestration
