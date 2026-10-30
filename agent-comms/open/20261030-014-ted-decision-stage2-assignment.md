@@ -9,6 +9,13 @@ stage1-complete.md). This file is the live assignment queue for
 Stage 2 and stays in open/ until the stage completes. Always work
 from the version on upstream main.
 
+UPDATE 2026-10-30 — DELIVERY 1 LANDED (PR #9, accepted in
+closed/20261030-016-ted-decision-stage2-delivery1-accepted.md;
+report follow-up 16): main/db/backup.ts + main/db/settings.ts are
+on main behind the db.ts facade. DELIVERY 2 IS NEXT AND UNLOCKED:
+branch assistant/stage2-delivery2-migrations-core may start now,
+with the same delivery-start announcement as its first action.
+
 Goal: split main/db.ts (9,214 lines, 114 exports, ~305 getDatabase()
 call edges) into main/db/* modules while main/db.ts becomes a
 re-export barrel. ZERO call sites change; ZERO behavior change;
