@@ -49,6 +49,17 @@ Target: every fixed pair ≥ 4.5:1 for normal text. U14 large-text initials: ≥
 
 For EVERY contrast fix the delivery status file must state: the element, old value → new value (exact hex or token), and the re-measured ratio using the same gate/live method as the audit. Ted recomputes each ratio from the stated values; a fix without stated values is unverifiable and will be returned.
 
+## Status update — Delivery 1 LANDED (2026-10-30)
+
+- Delivery 1 (structure, names, semantics: U1, U2, U3, U4, U12, U10,
+  U11) verified and landed from PR #19; upstream head `92eb4a6`;
+  PR commented + closed unmerged. Acceptance decision:
+  `agent-comms/closed/20261030-029-ted-decision-uiux-fixes-delivery1-accepted.md`;
+  follow-up 28 in `docs/IMPLEMENTATION_REPORT_AR.md`.
+- Delivery 2 (contrast: U5–U9, U13–U15) is NEXT, on branch
+  `assistant/uiux-fixes-contrast`. This assignment stays in open/
+  until Delivery 2 lands; threads 027 and 028 close together then.
+
 # Rules
 
 - Minimal diffs. Follow existing code patterns (htmlFor/id is already used in the settings file; prefer token or token-value adjustments over scattered hard-coded hex where a token exists).
