@@ -198,6 +198,13 @@ function apiMessage(error: unknown, fallback: string): string {
   return apiErrorText(error, fallback, apiErrorT);
 }
 
+const SYRIA_CLASS_RATES: Record<string, string> = {
+  unrated: '0',
+  rated_2_3: '5',
+  rated_4_5: '10',
+  nightclub: '20',
+};
+
 function taxModeSegmentClass(active: boolean): string {
   return `px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
     active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -291,6 +298,10 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   const [manualLoaded, setManualLoaded] = useState(false);
   const [manualOverrideConfirm, setManualOverrideConfirm] = useState<string | null>(null);
   const [manualBuilderOpen, setManualBuilderOpen] = useState(false);
+  const [syriaBuilderOpen, setSyriaBuilderOpen] = useState(false);
+  const [syriaClassification, setSyriaClassification] = useState('unrated');
+  const [syriaRate, setSyriaRate] = useState('0');
+  const [syriaSaving, setSyriaSaving] = useState(false);
   const applyManualDefinition = useCallback(async (country: string) => {
     const response = await api.get(`/tax-packs/manual-${country.toLowerCase()}`);
     const definition = response.data?.active_version?.definition as
@@ -341,6 +352,21 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
     [applyManualDefinition],
   );
 
+  const loadSyriaSettings = useCallback(async () => {
+    try {
+      const [classRes, rateRes] = await Promise.all([
+        api.get('/settings/syria_tax_classification').catch(() => null),
+        api.get('/settings/syria_tax_rate').catch(() => null),
+      ]);
+      const storedClass = classRes?.data?.setting?.value;
+      if (typeof storedClass === 'string' && storedClass in SYRIA_CLASS_RATES) {
+        setSyriaClassification(storedClass);
+      }
+      const storedRate = rateRes?.data?.setting?.value;
+      if (typeof storedRate === 'string' && storedRate !== '') setSyriaRate(storedRate);
+    } catch {}
+  }, []);
+
   const loadList = useCallback(async () => {
     const [response, settingResponse] = await Promise.all([
       api.get('/tax-packs'),
@@ -350,11 +376,12 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
     setPacks(nextPacks);
     setStoreCountry(response.data.store_country || 'SY');
     setTaxesEnabled(settingResponse.data.setting?.value === 'true');
+    void loadSyriaSettings();
     setSelectedPackId((current) => {
       if (current && nextPacks.some((pack) => pack.id === current)) return current;
       return nextPacks.find((pack) => pack.active_for_store)?.id || nextPacks[0]?.id || '';
     });
-  }, []);
+  }, [loadSyriaSettings]);
 
   const loadDetail = useCallback(async (packId: string) => {
     if (!packId) {
@@ -395,6 +422,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         const nextPacks = packResponse.data.packs as PackSummary[];
         setPacks(nextPacks);
         setStoreCountry(packResponse.data.store_country || 'SY');
+        void loadSyriaSettings();
         void api
           .get('/settings/taxes_enabled')
           .then((settingResponse) => {
@@ -443,16 +471,24 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   }, [selectedPackId, t]);
 
   const selectedPack = packs.find((pack) => pack.id === selectedPackId);
-  const activePackPublisher = packs.find((pack) => pack.active_for_store)?.publisher;
+  const activePack = packs.find((pack) => pack.active_for_store);
+  const activePackPublisher = activePack?.publisher;
   // Real backend tax state; only changes once configuration is activated.
-  const taxMode: 'off' | 'official' | 'manual' = !taxesEnabled
+  const taxMode: 'off' | 'official' | 'manual' | 'syria' = !taxesEnabled
     ? 'off'
-    : activePackPublisher === 'local'
-      ? 'manual'
-      : 'official';
+    : activePack?.id === 'syria-consumption'
+      ? 'syria'
+      : activePackPublisher === 'local'
+        ? 'manual'
+        : 'official';
   const manualBuilderVisible = manualBuilderOpen || taxMode === 'manual';
-  // Rest&Cafe taxes are manual-only: any active configuration shows as 'manual'.
-  const activeSegment: 'off' | 'manual' = manualBuilderOpen || taxMode !== 'off' ? 'manual' : 'off';
+  const syriaBuilderVisible = syriaBuilderOpen || taxMode === 'syria';
+  const activeSegment: 'off' | 'manual' | 'syria' =
+    syriaBuilderOpen || taxMode === 'syria'
+      ? 'syria'
+      : manualBuilderOpen || taxMode !== 'off'
+        ? 'manual'
+        : 'off';
   const targetOptions =
     entityType === 'product'
       ? detail?.targets.products || []
@@ -570,11 +606,37 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       await api.put('/settings/taxes_enabled', { value: 'false' });
       setTaxesEnabled(false);
       setManualBuilderOpen(false);
+      setSyriaBuilderOpen(false);
       toast.success(t('turnedOff'));
     } catch (error) {
       toast.error(apiMessage(error, t('turnOffFailed')));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveSyriaProfile() {
+    if (!isOwner) return;
+    const rateNum = Number(syriaRate);
+    if (!Number.isFinite(rateNum) || rateNum < 0 || rateNum > 100) {
+      toast.error(t('syriaApplyFailed'));
+      return;
+    }
+    setSyriaSaving(true);
+    try {
+      await api.post('/tax-packs/syria-profile', {
+        profile: 'consumption',
+        classification: syriaClassification,
+        rate: rateNum,
+      });
+      setTaxesEnabled(true);
+      setSyriaBuilderOpen(false);
+      toast.success(t('syriaApplied'));
+      await refreshAll();
+    } catch (error) {
+      toast.error(apiMessage(error, t('syriaApplyFailed')));
+    } finally {
+      setSyriaSaving(false);
     }
   }
 
@@ -780,6 +842,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
             disabled={!isOwner || saving}
             onClick={() => {
               setManualBuilderOpen(false);
+              setSyriaBuilderOpen(false);
               if (taxesEnabled) void turnTaxesOff();
             }}
             className={taxModeSegmentClass(activeSegment === 'off')}
@@ -789,18 +852,94 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
           <button
             type="button"
             disabled={!isOwner}
-            onClick={() => setManualBuilderOpen(true)}
+            onClick={() => {
+              setManualBuilderOpen(true);
+              setSyriaBuilderOpen(false);
+            }}
             className={taxModeSegmentClass(activeSegment === 'manual')}
           >
             {t('modeManual')}
+          </button>
+          <button
+            type="button"
+            disabled={!isOwner}
+            onClick={() => {
+              setSyriaBuilderOpen(true);
+              setManualBuilderOpen(false);
+            }}
+            className={taxModeSegmentClass(activeSegment === 'syria')}
+          >
+            {t('modeSyria')}
           </button>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
           {taxMode === 'off' && t('modeOffHint')}
           {taxMode === 'manual' && t('modeManualHint')}
+          {taxMode === 'syria' && t('modeSyriaHint')}
           {manualBuilderOpen && taxMode !== 'manual' && t('modeManualUnsavedHint')}
         </p>
       </section>
+
+      {syriaBuilderVisible && (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2">
+            <Calculator size={20} className="text-brand" />
+            <h3 className="font-semibold text-foreground">{t('modeSyria')}</h3>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{t('syriaBuilderHint')}</p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-foreground">
+                {t('syriaClassification')}
+              </span>
+              <select
+                value={syriaClassification}
+                disabled={!isOwner}
+                onChange={(event) => {
+                  setSyriaClassification(event.target.value);
+                  setSyriaRate(SYRIA_CLASS_RATES[event.target.value] ?? '0');
+                }}
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+              >
+                <option value="unrated">{t('syriaClassUnrated')}</option>
+                <option value="rated_2_3">{t('syriaClassRated23')}</option>
+                <option value="rated_4_5">{t('syriaClassRated45')}</option>
+                <option value="nightclub">{t('syriaClassNightclub')}</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-foreground">
+                {t('syriaRate')}
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={syriaRate}
+                disabled={!isOwner}
+                onChange={(event) => setSyriaRate(event.target.value)}
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+              />
+            </label>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">{t('syriaRateHint')}</p>
+
+          <div className="mt-4">
+            <Button
+              onClick={() => void saveSyriaProfile()}
+              disabled={!isOwner || syriaSaving}
+            >
+              {syriaSaving ? t('saving') : t('syriaApply')}
+            </Button>
+          </div>
+
+          <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
+            {t('syriaSalesNote')}
+          </p>
+        </section>
+      )}
 
       {manualBuilderVisible && (
         <section className="rounded-xl border border-border bg-card p-5">
