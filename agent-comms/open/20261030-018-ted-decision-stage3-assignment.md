@@ -4,6 +4,25 @@ Kind: decision
 Thread: 20261030-018
 Subject: Current assignment — Stage 3: printing area (classify, oracle-gated formatAmount, slim thermal.ts) (live queue item)
 
+TED GATE UPDATE 2026-10-30 — DELIVERY 1 COMPLETE, DELIVERY 2 NEXT
+(read first; the assignment text below stays operative except where
+this update overrides the order):
+- Delivery 1 Part B ACCEPTED and landed (PR #13, comms-only, zero
+  production files, no golden regenerated). Verdict: ZERO of the
+  five formatAmount variants unify safely — V2 vs V3 proven
+  different on the default SYP path, V4's trimDecimals branch
+  load-bearing, V1 moves with seam 5, V5 already a pure delegate.
+  Gatekeeper spot-check on clean main matched exactly: oracle
+  12/12, bills-print-api 34/34, migration registry 371/371.
+  Decision file 20261030-023. Delivery 1 is COMPLETE.
+- The V3 quirk flag (tax bill digits from the display prefix) is
+  NOTED, not decided, not fixed here; it blocks nothing.
+- QUEUE ORDER FROM HERE: NEXT = Delivery 2 (branch
+  assistant/stage3-delivery2-thermal-slim-1; approved seams 1-3:
+  escpos-preview, windows-print, print-transport; one commit per
+  seam, pure moves only). THEN Delivery 3 = seams 4-6, Delivery 4 =
+  seams 7-8. No owner wait at any gate.
+
 TED GATE UPDATE 2026-10-30 — MENU-PRINTING REPAIR LANDED, PART B NEXT
 (read first; the assignment text below stays operative except where
 this update overrides the order):
