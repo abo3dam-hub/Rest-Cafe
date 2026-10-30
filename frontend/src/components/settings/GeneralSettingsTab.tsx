@@ -177,10 +177,13 @@ export function GeneralSettingsTab({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">{t('businessName')}</label>
+            <label htmlFor="business-name" className="block text-sm text-muted-foreground mb-1">
+              {t('businessName')}
+            </label>
             {isAdmin ? (
               <input
                 type="text"
+                id="business-name"
                 value={form.businessName}
                 onChange={(e) => {
                   markHydrationTouched('businessName');
@@ -293,9 +296,12 @@ export function GeneralSettingsTab({
           </div>
 
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">{t('billingType')}</label>
+            <label htmlFor="billing-type" className="block text-sm text-muted-foreground mb-1">
+              {t('billingType')}
+            </label>
             {isAdmin ? (
               <select
+                id="billing-type"
                 value={form.billingType}
                 onChange={(e) => {
                   markHydrationTouched('billingType');
@@ -311,11 +317,12 @@ export function GeneralSettingsTab({
             )}
           </div>
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">
+            <label htmlFor="tables-required" className="block text-sm text-muted-foreground mb-1">
               {t('tablesRequired')}
             </label>
             {isAdmin ? (
               <select
+                id="tables-required"
                 value={form.tablesRequired ? 'yes' : 'no'}
                 onChange={(e) => {
                   markHydrationTouched('tablesRequired');
@@ -333,9 +340,12 @@ export function GeneralSettingsTab({
             )}
           </div>
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">{t('taxRegistered')}</label>
+            <label htmlFor="tax-registered" className="block text-sm text-muted-foreground mb-1">
+              {t('taxRegistered')}
+            </label>
             {isAdmin ? (
               <select
+                id="tax-registered"
                 value={form.taxRegistered ? 'yes' : 'no'}
                 onChange={(e) => {
                   markHydrationTouched('taxRegistered');
@@ -671,11 +681,15 @@ export function GeneralSettingsTab({
               </p>
             </div>
             <div>
-              <label className="block text-sm text-muted-foreground mb-1">
+              <label
+                htmlFor="invoice-reset-period"
+                className="block text-sm text-muted-foreground mb-1"
+              >
                 {t('invoiceResetPeriod')}
               </label>
               {isAdmin ? (
                 <select
+                  id="invoice-reset-period"
                   value={orderNumberForm.invoiceResetPeriod}
                   onChange={(e) => {
                     markHydrationTouched('invoiceResetPeriod');
@@ -792,8 +806,11 @@ export function GeneralSettingsTab({
             </span>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground mb-1">{t('languages')}</p>
+            <label htmlFor="language" className="block text-sm text-muted-foreground mb-1">
+              {t('languages')}
+            </label>
             <select
+              id="language"
               value={language}
               onChange={(e) => {
                 const lang = e.target.value as Language;
