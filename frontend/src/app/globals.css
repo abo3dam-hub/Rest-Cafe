@@ -559,6 +559,13 @@ html.dark::-webkit-scrollbar-thumb:hover,
   .animate-shake-centered {
     animation: none;
   }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── RTL / direction foundation (Batch C, Refs #241) ──────────────────────────
