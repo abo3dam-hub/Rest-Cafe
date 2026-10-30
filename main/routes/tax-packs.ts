@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import { getDatabase, getSettingValue, now, upsertSettings, withTxn } from '../db';
 import { requirePermission } from '../services/authorization';
 import { applyPayableRounding, TaxEngine } from '../services/tax-engine';
+import { resolvePackLookupCountry } from '../services/tax';
 import type {
   CountryPack,
   PluginPrintTemplate,
@@ -263,6 +264,7 @@ function activePackForCountry(country: string): {
   version: VersionRow;
   definition: CountryPack;
 } {
+  const lookupCountry = resolvePackLookupCountry(country);
   const db = getDatabase();
   const row = db
     .prepare(`
@@ -277,7 +279,7 @@ function activePackForCountry(country: string): {
     ORDER BY CASE WHEN pack.country = ? THEN 0 ELSE 1 END, pack.updated_at DESC
     LIMIT 1
   `)
-    .get(country, country) as any;
+    .get(lookupCountry, lookupCountry) as any;
   if (!row)
     throw Object.assign(new Error(`No active tax pack is installed for ${country}`), {
       statusCode: 409,
@@ -1009,7 +1011,7 @@ export async function reinstallPackVersion(
 router.get('/', requirePermission('tax-packs.view-test'), (_req: Request, res: Response) => {
   try {
     const db = getDatabase();
-    const storeCountry = getSettingValue('country') || '';
+    const storeCountry = resolvePackLookupCountry(getSettingValue('country') || '');
     const rows = db
       .prepare(`
       SELECT pack.*,
@@ -1418,7 +1420,8 @@ router.post(
 // covering the whole bill, one percent rule, exclusive (added on top). The
 // consumption-spending fee follows Decree 11/2015 as amended by Law 15/2024;
 // rates stay editable so a future amendment is a number change, not a
-// rebuild. The announced sales tax ships dormant until it enters into force.
+// rebuild. The announced 2027 sales tax is offered as an owner-selectable
+// profile ahead of its entry into force (owner decision, 2026-10-30).
 const SYRIA_PROFILES = {
   consumption: {
     packId: 'syria-consumption',
@@ -1448,8 +1451,6 @@ const SYRIA_CONSUMPTION_CLASS_RATES: Record<string, number> = {
   nightclub: 20,
 };
 const SYRIA_SALES_DEFAULT_RATE = 5;
-// Flip when the announced sales tax is published as in-force law.
-const SYRIA_SALES_TAX_IN_FORCE = false;
 
 function buildSyriaProfilePack(
   profile: SyriaProfileId,
@@ -1520,11 +1521,6 @@ router.post(
       const profile = req.body?.profile as SyriaProfileId;
       if (profile !== 'consumption' && profile !== 'sales') {
         return res.status(400).json({ error: 'Unknown Syria tax profile' });
-      }
-      if (profile === 'sales' && !SYRIA_SALES_TAX_IN_FORCE) {
-        return res
-          .status(400)
-          .json({ error: 'The sales tax is not in force yet and cannot be activated' });
       }
       const classification =
         typeof req.body?.classification === 'string' ? req.body.classification : 'unrated';

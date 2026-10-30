@@ -112,8 +112,18 @@ function round(value: number, decimals: number = 2): number {
   return Number(Math.round(Number(value + 'e' + decimals)) + 'e-' + decimals);
 }
 
+// Rest&Cafe has no country profiles: an unset or malformed store country
+// resolves against the home-market key the manual pack builder and the
+// settings panel already use, so a locally configured pack is never
+// shadowed by the bundled '*' generic pack at calculation time.
+export function resolvePackLookupCountry(country: string): string {
+  const normalized = (country || '').toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : 'SY';
+}
+
 // Shared helper to retrieve the active country pack for tax calculation and categories API.
 export function getActiveCountryPack(country: string): CountryPack {
+  const lookupCountry = resolvePackLookupCountry(country);
   try {
     const db = getDatabase();
     const row = db
@@ -125,12 +135,12 @@ export function getActiveCountryPack(country: string): CountryPack {
       ORDER BY CASE WHEN pack.country = ? THEN 0 ELSE 1 END, pack.updated_at DESC
       LIMIT 1
     `)
-      .get(country, country) as { pack_json: string } | undefined;
+      .get(lookupCountry, lookupCountry) as { pack_json: string } | undefined;
     if (row) return JSON.parse(row.pack_json) as CountryPack;
   } catch {
     // Fall back to immutable bundled pack JSON if DB migrations haven't run.
   }
-  return getBundledCountryPack(country);
+  return getBundledCountryPack(lookupCountry);
 }
 
 // Resolves a specific installed pack version for historical order items, falling back to the active pack.
