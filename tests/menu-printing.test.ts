@@ -388,7 +388,9 @@ test('Unicode menu printing uses raster-capable WebUSB output and refuses raster
 test('menu route prints with Syria defaults while unconfigured, validates filters, and honors the default WebUSB printer', async () => {
   const express = require('express');
   const request = require('supertest');
-  const database = require('../main/db');
+  // Stub getDatabase on main/db/core, the module that defines it: main/db.ts
+  // is a getter-only re-export barrel, so assigning the stub there throws.
+  const database = require('../main/db/core');
   const authorization = require('../main/services/authorization');
   const thermal = require('../main/printers/thermal');
   const originals = {
@@ -628,7 +630,7 @@ test('menu route prints with Syria defaults while unconfigured, validates filter
       'includeOutOfStock surfaces a sold-out variant row',
     );
   } finally {
-    Object.assign(database, { getDatabase: originals.getDatabase });
+    database.getDatabase = originals.getDatabase;
     Object.assign(authorization, { requirePermission: originals.requirePermission });
     Object.assign(thermal, { printMenuDocument: originals.printMenuDocument });
   }
