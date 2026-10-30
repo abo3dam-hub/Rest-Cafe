@@ -67,7 +67,7 @@ export function KdsTabsView({ orders, updating, updateItemStatus }: KdsTabsViewP
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
                 isActive
                   ? `${config.bg} ${config.text} ring-2 ring-current`
-                  : `${config.bg} ${config.text} opacity-50 hover:opacity-80`
+                  : `${config.bg} ${config.text}`
               }`}
             >
               <div className={`w-2 h-2 rounded-full ${config.color}`} />
@@ -100,7 +100,7 @@ export function KdsTabsView({ orders, updating, updateItemStatus }: KdsTabsViewP
                     <Badge variant="secondary">{t('tableLabel', { name: order.table.name })}</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-sm text-gray-400 font-mono shrink-0">
+                <div className="flex items-center gap-1 text-sm text-gray-600 font-mono shrink-0">
                   <Clock size={12} />
                   <Ltr><ElapsedTime dateStr={order.created_at} /></Ltr>
                 </div>
