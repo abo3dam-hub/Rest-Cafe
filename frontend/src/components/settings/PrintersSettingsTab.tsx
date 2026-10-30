@@ -817,8 +817,11 @@ export function PrintersSettingsTab({
               )}
             </div>
             <div>
-              <p className="font-medium text-foreground mb-2">{t('printMethod')}</p>
+              <label htmlFor="print-method" className="block font-medium text-foreground mb-2">
+                {t('printMethod')}
+              </label>
               <select
+                id="print-method"
                 value={printingForm.printMethod}
                 onChange={(e) => {
                   markHydrationTouched('printMethod');
