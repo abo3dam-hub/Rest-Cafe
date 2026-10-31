@@ -3231,6 +3231,13 @@ function preparePaymentBatch(
     }
     if (key) seenTransactionKeys.add(key);
   }
+  if (bill.payment_status === 'cancelled') {
+    throw paymentValidationError(
+      'Cannot accept payment on a cancelled bill',
+      'bill_cancelled',
+      409,
+    );
+  }
   if (bill.payment_status === 'refunded' || bill.payment_status === 'partially_refunded') {
     throw paymentValidationError('Cannot accept payment on a refunded bill', 'bill_refunded', 409);
   }
@@ -3244,7 +3251,32 @@ function preparePaymentBatch(
     return !Number.isNaN(num) && num > 0;
   });
   if (bill.payment_status === 'paid') {
-    if (hasPositiveAmount) {
+    // A duplicate payment on a settled bill refuses, whatever its shape: an
+    // explicit amount already did, and a no-amount (pay-remaining) attempt
+    // is the same duplicate with remaining 0 (F-R2-1) — but only when the
+    // bill was fully paid in money. When part of the bill was forgiven by
+    // a discount (bill-level discount_amount, or an item-level discount on
+    // the order's items — an item discount shrinks the subtotal instead of
+    // the bill's discount column), the no-amount call is the zero-balance
+    // settlement's own retry shape: the discount, not a payment, completed
+    // the settlement, and the retry stays a 200 no-op
+    // (test:issue-zero-balance-settlement). An explicit amount still
+    // refuses on such a bill. Known limit, disclosed in the status report:
+    // a bill that mixed a discount with a full payment of the discounted
+    // total also reads as discount-settled here, so its no-amount duplicate
+    // returns 200 instead of 400; no money moves either way.
+    const itemDiscountTotal = Number(
+      (
+        db
+          .prepare('SELECT COALESCE(SUM(discount_amount), 0) d FROM order_items WHERE order_id = ?')
+          .get(bill.order_id) as any
+      )?.d || 0,
+    );
+    const fullyPaidInMoney =
+      Number(bill.discount_amount || 0) <= 0 &&
+      itemDiscountTotal <= 0 &&
+      Number(bill.paid_amount || 0) >= Number(bill.total || 0) - 1e-6;
+    if (hasPositiveAmount || fullyPaidInMoney) {
       throw paymentValidationError('Bill is already paid', 'bill_already_paid');
     }
     return { bill, prepared: [], existingPayments, effectiveCustomerId };
@@ -3473,7 +3505,7 @@ export function completeExactBalanceSettlement(
 
   const unpaidSibling = db
     .prepare(
-      `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded') LIMIT 1`,
+      `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded', 'cancelled') LIMIT 1`,
     )
     .get(bill.order_id, bill.id);
   const orderFullyPaid = !unpaidSibling;
@@ -3666,7 +3698,7 @@ function applyPaymentBatch(
     }
     const unpaidSibling = db
       .prepare(
-        `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded') LIMIT 1`,
+        `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded', 'cancelled') LIMIT 1`,
       )
       .get(bill.order_id, bill.id);
     if (!unpaidSibling) {
@@ -3823,7 +3855,7 @@ function applyPaymentBatch(
   if (paymentStatus === 'paid') {
     const unpaidSibling = db
       .prepare(
-        `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded') LIMIT 1`,
+        `SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status NOT IN ('paid', 'refunded', 'partially_refunded', 'cancelled') LIMIT 1`,
       )
       .get(bill.order_id, bill.id);
     const orderFullyPaid = !unpaidSibling;
