@@ -118,8 +118,12 @@ function activateInstalledPack(
   }
   const previousVersionId = pack.active_version_id;
   withTxn(() => {
+    // Deactivate every pack order-time resolution could pick for this pack's
+    // country: same-country packs and the '*' fallback alike. Scoping this
+    // to the pack's own country only left a differently-keyed pack active
+    // (manual 'SY' vs syria '*'), so activation never fully applied.
     db.prepare(
-      `UPDATE country_packs SET status = 'installed', updated_at = ? WHERE country = ? AND id != ?`,
+      `UPDATE country_packs SET status = 'installed', updated_at = ? WHERE (country = ? OR country = '*') AND id != ?`,
     ).run(now(), pack.country, pack.id);
     if (previousVersionId) {
       db.prepare(`UPDATE country_pack_versions SET status = 'installed' WHERE id = ?`).run(
@@ -141,7 +145,7 @@ function activateInstalledPack(
     db.prepare(`
       UPDATE installed_print_templates
       SET status = 'installed'
-      WHERE pack_id IN (SELECT id FROM country_packs WHERE country = ?)
+      WHERE pack_id IN (SELECT id FROM country_packs WHERE country = ? OR country = '*')
     `).run(pack.country);
     db.prepare(
       `UPDATE installed_print_templates SET status = 'active' WHERE pack_version_id = ?`,
@@ -315,6 +319,51 @@ function activePackForCountry(country: string): {
     },
     definition: JSON.parse(row.pack_json) as CountryPack,
   };
+}
+
+// The single pack order-time resolution would pick for the store's country:
+// an exact-country match beats the '*' fallback. Undefined when no pack is
+// active at all. Activation paths must consult this, not just same-country
+// rows: a '*' pack and an exact-country pack can both be 'active' at once,
+// and only the resolved one decides what checkout can calculate (F-R3-1).
+function findResolvedActivePack(): PackRow | undefined {
+  const lookupCountry = resolvePackLookupCountry(getSettingValue('country') || '');
+  const db = getDatabase();
+  return db
+    .prepare(
+      `SELECT * FROM country_packs
+       WHERE country IN (?, '*') AND status = 'active'
+       ORDER BY CASE WHEN country = ? THEN 0 ELSE 1 END, updated_at DESC
+       LIMIT 1`,
+    )
+    .get(lookupCountry, lookupCountry) as PackRow | undefined;
+}
+
+// The resolved-active pack when it is a different pack than the one being
+// activated. Switching away from it without first deactivating it would
+// strand products on categories the resolved pack does not know, while
+// reporting success — the F-R3-1 shape. Callers reject with 409 instead.
+// Bundled packs are not a conflict: local-generic is the install-time
+// default a fresh store resolves against until a real pack is activated,
+// and replacing it loses no owner configuration (it carries only the
+// bundled generic categories).
+function conflictingActivePack(targetPackId: string): PackRow | undefined {
+  const active = findResolvedActivePack();
+  if (!active || active.id === targetPackId) return undefined;
+  if (BUNDLED_PACKS_BY_ID.has(active.id)) return undefined;
+  return active;
+}
+
+// The two Syria profile packs (syria-consumption, syria-sales) share one
+// category vocabulary ('establishment-services') and one builder, so a
+// switch between them remaps products onto a category both packs define:
+// it applies completely. A manual (or any other) pack defines its own
+// categories, so activating a Syria pack over it strands the products.
+// The existing syria-tax-profile suite pins consumption -> sales as a
+// working switch; the rejection therefore applies only when the active
+// pack is outside the Syria family.
+function isSyriaProfilePackId(packId: string | null | undefined): boolean {
+  return packId === 'syria-consumption' || packId === 'syria-sales';
 }
 
 function validateOverrideTarget(
@@ -1524,10 +1573,7 @@ router.post(
       }
       const classification =
         typeof req.body?.classification === 'string' ? req.body.classification : 'unrated';
-      if (
-        profile === 'consumption' &&
-        !(classification in SYRIA_CONSUMPTION_CLASS_RATES)
-      ) {
+      if (profile === 'consumption' && !(classification in SYRIA_CONSUMPTION_CLASS_RATES)) {
         return res.status(400).json({ error: 'Unknown establishment classification' });
       }
       let rate: number;
@@ -1574,13 +1620,26 @@ router.post(
       };
       const validation = validationChecklist(version);
       if (!validation.valid) {
-        return res
-          .status(400)
-          .json({ error: 'Syria tax profile failed validation', validation });
+        return res.status(400).json({ error: 'Syria tax profile failed validation', validation });
       }
 
       const definition = SYRIA_PROFILES[profile];
       let remapped: Array<{ entity: string; count: number }> = [];
+      // A different resolved-active pack (e.g. a manual pack) must be
+      // deactivated first. Activating over it returns a false 200 while the
+      // products are remapped onto categories the resolved pack does not
+      // know, which breaks every subsequent checkout (F-R3-1). Reject
+      // before mutating anything so tax state stays byte-for-byte untouched.
+      // The other Syria profile pack is not a conflict: both profiles share
+      // one category vocabulary, so the switch applies completely.
+      const conflict = conflictingActivePack(pack.id);
+      if (conflict && !isSyriaProfilePackId(conflict.id)) {
+        return res.status(409).json({
+          error: `A different tax pack (${conflict.id}) is currently active. Deactivate it first, then activate the Syria tax profile.`,
+          code: 'active_pack_conflict',
+          active_pack_id: conflict.id,
+        });
+      }
       withTxn(() => {
         const existingPackRow = db
           .prepare('SELECT * FROM country_packs WHERE id = ?')
@@ -1940,6 +1999,18 @@ router.post(
           .status(400)
           .json({ error: 'Pack version failed activation validation', validation });
       }
+      // Activating a version of a pack that is not the resolved-active one
+      // would flip status flags without switching the configuration checkout
+      // resolves against — the same half-applied shape as F-R3-1. Reject
+      // before mutating anything; deactivate the active pack first.
+      const conflict = conflictingActivePack(pack.id);
+      if (conflict) {
+        return res.status(409).json({
+          error: `A different tax pack (${conflict.id}) is currently active. Deactivate it first, then activate this pack version.`,
+          code: 'active_pack_conflict',
+          active_pack_id: conflict.id,
+        });
+      }
       try {
         activateInstalledPack(pack, version, actorUserId(req), {
           acknowledgeCommunityDisclaimer: req.body?.acknowledge_community_disclaimer === true,
@@ -1960,6 +2031,45 @@ router.post(
     } catch (error: any) {
       console.error('[Tax Packs] Activation failed:', error);
       res.status(500).json({ error: 'Could not activate pack version' });
+    }
+  },
+);
+
+// Deactivates the pack: it stops being the resolved-active pack, and its
+// active version returns to 'installed'. Products, overrides, and settings
+// are left untouched — the next activation remaps them — so deactivation
+// alone never strands checkout on categories no pack knows. This is step
+// one of the supported two-step switch: deactivate, then activate the
+// replacement pack (e.g. manual pack first, then the Syria profile).
+router.post(
+  '/:packId/deactivate',
+  requirePermission('tax-packs.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      const pack = db.prepare('SELECT * FROM country_packs WHERE id = ?').get(req.params.packId) as
+        | PackRow
+        | undefined;
+      if (!pack) return res.status(404).json({ error: 'Tax pack not found' });
+      if (pack.status !== 'active') {
+        return res.json({ changed: false, message: 'Tax pack is not active' });
+      }
+      const activeVersionId = pack.active_version_id;
+      withTxn(() => {
+        db.prepare(
+          `UPDATE country_packs SET active_version_id = NULL, status = 'installed', updated_at = ? WHERE id = ?`,
+        ).run(now(), pack.id);
+        if (activeVersionId) {
+          db.prepare(`UPDATE country_pack_versions SET status = 'installed' WHERE id = ?`).run(
+            activeVersionId,
+          );
+        }
+        audit('deactivate_pack', actorUserId(req), pack.id, activeVersionId, null, {});
+      });
+      res.json({ changed: true, pack_id: pack.id });
+    } catch (error: any) {
+      console.error('[Tax Packs] Deactivation failed:', error);
+      res.status(500).json({ error: 'Could not deactivate tax pack' });
     }
   },
 );
@@ -2016,6 +2126,17 @@ router.post(
         return res
           .status(400)
           .json({ error: 'Rollback target failed activation validation', validation });
+      }
+      // Rollback only makes sense on the pack checkout resolves against.
+      // Flipping another pack to 'active' would strand the resolved pack
+      // without switching the configuration — the F-R3-1 shape.
+      const conflict = conflictingActivePack(pack.id);
+      if (conflict) {
+        return res.status(409).json({
+          error: `A different tax pack (${conflict.id}) is currently active. Deactivate it first, then roll back this pack.`,
+          code: 'active_pack_conflict',
+          active_pack_id: conflict.id,
+        });
       }
       const previousVersionId = pack.active_version_id;
       withTxn(() => {
