@@ -3253,6 +3253,12 @@ router.patch(
           approvedByUserId = user.id;
         }
 
+        // Bills this cancellation closes (F-R1-1): the order's unpaid,
+        // never-paid bills are closed in this same transaction so a
+        // generated bill does not survive its order as a live unpaid row.
+        // Bills with any payment recorded are out of reach here.
+        const closedBillIds: number[] = [];
+
         switch (status) {
           case 'preparing':
             db.prepare(
@@ -3336,6 +3342,19 @@ router.patch(
             db.prepare(
               'UPDATE orders SET status = ?, cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?',
             ).run(status, nowStr, reason, nowStr, req.params.id);
+            const unpaidBills = db
+              .prepare(
+                `SELECT id FROM bills WHERE order_id = ? AND payment_status = 'unpaid' AND COALESCE(paid_amount, 0) = 0`,
+              )
+              .all(req.params.id) as Array<{ id: number }>;
+            if (unpaidBills.length > 0) {
+              // Terminal, not deleted: the row, its items, and its total stay
+              // as the audit trail; only its live status ends.
+              db.prepare(
+                `UPDATE bills SET payment_status = 'cancelled', updated_at = ? WHERE order_id = ? AND payment_status = 'unpaid' AND COALESCE(paid_amount, 0) = 0`,
+              ).run(nowStr, req.params.id);
+              closedBillIds.push(...unpaidBills.map((bill) => bill.id));
+            }
             // Only free table if explicitly requested (default: true for backward compatibility)
             if (currentOrder.table_id && free_table !== false) {
               db.prepare("UPDATE tables SET status = 'available', updated_at = ? WHERE id = ?").run(
@@ -3371,6 +3390,9 @@ router.patch(
                 : {}),
             }),
             ...(status === 'cancelled' && reason ? { reason } : {}),
+            ...(status === 'cancelled' && closedBillIds.length > 0
+              ? { closed_bill_ids: closedBillIds }
+              : {}),
           },
         });
 
