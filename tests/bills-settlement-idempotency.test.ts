@@ -1,4 +1,14 @@
 // Verification of settlement idempotency, zero-balance replays, and payment concurrency.
+//
+// NOTE (assignment 033, finding F-R2-1): a duplicate payment on a settled
+// bill refuses with 400 'Bill is already paid' whatever its shape — an
+// explicit amount always did, and a no-amount (pay-remaining) attempt is
+// the same duplicate with remaining 0. Sections 1.1-1.4 below used to pin
+// the old 200 no-op for no/zero-amount duplicates on positive-total bills;
+// they now pin the refusal, keeping every underlying invariant (0 loyalty
+// points, 0 ledger rows, bill/order untouched, no kitchen override). The
+// zero-balance settlement flow itself (Section 2: an UNSETTLED bill whose
+// total is genuinely 0) still settles with 200 and is untouched.
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -189,8 +199,13 @@ async function run(): Promise<void> {
       });
       checkEqual(
         nullPayRes.status,
-        200,
-        'Null-amount payment call on already-paid bill returns 200',
+        400,
+        'Null-amount payment call on already-paid bill is refused (F-R2-1: same as the explicit-amount duplicate)',
+      );
+      checkEqual(
+        String(nullPayRes.data?.error || '').includes('already paid'),
+        true,
+        'Null-amount refusal carries the already-paid message',
       );
       checkEqual(
         nullPayRes.data?.loyaltyPointsEarned ?? 0,
@@ -217,8 +232,13 @@ async function run(): Promise<void> {
       });
       checkEqual(
         zeroPayRes.status,
-        200,
-        'Zero-amount payment call on already-paid bill returns 200',
+        400,
+        'Zero-amount payment call on already-paid bill is refused (F-R2-1)',
+      );
+      checkEqual(
+        String(zeroPayRes.data?.error || '').includes('already paid'),
+        true,
+        'Zero-amount refusal carries the already-paid message',
       );
       checkEqual(
         zeroPayRes.data?.loyaltyPointsEarned ?? 0,
@@ -243,7 +263,11 @@ async function run(): Promise<void> {
         body: { method: 'cash', amount: 0, customer_id: 'cust-f1' },
         headers: { ...ownerAuth, 'Idempotency-Key': 'idem-f1-zero-single-001' },
       });
-      checkEqual(zeroIdemRes.status, 200, 'Idempotent zero-amount payment call returns 200');
+      checkEqual(
+        zeroIdemRes.status,
+        400,
+        'Idempotent zero-amount payment call on the settled bill is refused too (F-R2-1)',
+      );
       checkEqual(
         zeroIdemRes.data?.loyaltyPointsEarned ?? 0,
         0,
@@ -314,8 +338,13 @@ async function run(): Promise<void> {
       });
       checkEqual(
         batchNullRes.status,
-        200,
-        'Batch null-amount payment call on already-paid bill returns 200',
+        400,
+        'Batch null-amount payment call on already-paid bill is refused (F-R2-1)',
+      );
+      checkEqual(
+        String(batchNullRes.data?.error || '').includes('already paid'),
+        true,
+        'Batch null-amount refusal carries the already-paid message',
       );
       checkEqual(
         batchNullRes.data?.loyaltyPointsEarned ?? 0,
@@ -334,8 +363,13 @@ async function run(): Promise<void> {
       });
       checkEqual(
         batchZeroRes.status,
-        200,
-        'Batch zero-amount payment call on already-paid bill returns 200',
+        400,
+        'Batch zero-amount payment call on already-paid bill is refused (F-R2-1)',
+      );
+      checkEqual(
+        String(batchZeroRes.data?.error || '').includes('already paid'),
+        true,
+        'Batch zero-amount refusal carries the already-paid message',
       );
       checkEqual(
         batchZeroRes.data?.loyaltyPointsEarned ?? 0,
@@ -394,7 +428,11 @@ async function run(): Promise<void> {
         body: { method: 'cash', amount: null },
         headers: ownerAuth,
       });
-      checkEqual(nullCall.status, 200, 'Null-amount call returns 200');
+      checkEqual(
+        nullCall.status,
+        400,
+        'Null-amount call on the paid bill is refused (F-R2-1) and touches nothing',
+      );
 
       const billAfter = db.prepare('SELECT * FROM bills WHERE id = ?').get(billId) as any;
       const orderAfter = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as any;
@@ -410,7 +448,7 @@ async function run(): Promise<void> {
     // Already-paid bill with undelivered kitchen items skips kitchen verification
     {
       console.log(
-        '\n[1.4] Paid bill with undelivered kitchen items does not require override PIN on 0-amount call',
+        '\n[1.4] Paid bill with undelivered kitchen items: a 0-amount duplicate is refused, not a kitchen check (F-R2-1)',
       );
       const createOrder = await api(baseUrl, '/api/orders', {
         method: 'POST',
@@ -462,8 +500,8 @@ async function run(): Promise<void> {
       });
       checkEqual(
         nullRetryWithoutPin.status,
-        200,
-        'Null-amount call on already-paid bill succeeds without override_pin even with undelivered items',
+        400,
+        'Null-amount call on already-paid bill is refused without override_pin even with undelivered items (F-R2-1)',
       );
 
       // Call payment with amount: 0 on this already-paid bill WITHOUT override_pin
@@ -474,8 +512,8 @@ async function run(): Promise<void> {
       });
       checkEqual(
         zeroRetryWithoutPin.status,
-        200,
-        'Zero-amount call on already-paid bill succeeds without override_pin even with undelivered items',
+        400,
+        'Zero-amount call on already-paid bill is refused without override_pin even with undelivered items (F-R2-1)',
       );
 
       // And batch payments without override_pin
@@ -486,8 +524,8 @@ async function run(): Promise<void> {
       });
       checkEqual(
         batchZeroRetryWithoutPin.status,
-        200,
-        'Batch zero-amount call on already-paid bill succeeds without override_pin even with undelivered items',
+        400,
+        'Batch zero-amount call on already-paid bill is refused without override_pin even with undelivered items (F-R2-1)',
       );
 
       const auditCountAfter = (
@@ -501,6 +539,78 @@ async function run(): Promise<void> {
         auditCountAfter,
         auditCountBefore,
         'No duplicate kitchen_delivery_override audit log recorded on zero-amount retry',
+      );
+    }
+
+    // Explicit and no-amount duplicates on a settled bill refuse identically (F-R2-1).
+    {
+      console.log(
+        '\n[1.5] Explicit-amount and no-amount duplicates on a settled bill refuse identically',
+      );
+      const createOrder = await api(baseUrl, '/api/orders', {
+        method: 'POST',
+        body: {
+          type: 'takeaway',
+          customer_id: 'cust-f1',
+          items: [{ product_id: 'prod-500', quantity: 1 }],
+        },
+        headers: ownerAuth,
+      });
+      const orderId = createOrder.data?.order?.id;
+      db.prepare("UPDATE order_items SET status = 'served' WHERE order_id = ?").run(orderId);
+
+      const genBill = await api(baseUrl, '/api/bills/generate', {
+        method: 'POST',
+        body: { order_id: orderId },
+        headers: ownerAuth,
+      });
+      const billId = genBill.data?.bill?.id;
+
+      const settleRes = await api(baseUrl, `/api/bills/${billId}/payment`, {
+        method: 'POST',
+        body: { method: 'cash', amount: 500 },
+        headers: ownerAuth,
+      });
+      checkEqual(settleRes.status, 200, 'Bill settles with the explicit payment');
+      checkEqual(settleRes.data?.bill?.payment_status, 'paid', 'Bill is paid');
+
+      const explicitDup = await api(baseUrl, `/api/bills/${billId}/payment`, {
+        method: 'POST',
+        body: { method: 'cash', amount: 500 },
+        headers: ownerAuth,
+      });
+      checkEqual(explicitDup.status, 400, 'Explicit-amount duplicate is refused');
+      const noAmountDup = await api(baseUrl, `/api/bills/${billId}/payment`, {
+        method: 'POST',
+        body: { method: 'cash', amount: null },
+        headers: ownerAuth,
+      });
+      checkEqual(noAmountDup.status, 400, 'No-amount duplicate is refused');
+      const batchNoAmountDup = await api(baseUrl, `/api/bills/${billId}/payments`, {
+        method: 'POST',
+        body: { payments: [{ method: 'cash', amount: 0 }] },
+        headers: ownerAuth,
+      });
+      checkEqual(batchNoAmountDup.status, 400, 'Batch no-amount duplicate is refused');
+      checkEqual(
+        noAmountDup.data?.error,
+        explicitDup.data?.error,
+        'No-amount and explicit duplicates refuse with the same message',
+      );
+      checkEqual(
+        batchNoAmountDup.data?.error,
+        explicitDup.data?.error,
+        'Batch no-amount duplicate refuses with the same message',
+      );
+
+      const billAfter = db.prepare('SELECT * FROM bills WHERE id = ?').get(billId) as any;
+      checkEqual(billAfter.payment_status, 'paid', 'Bill stays paid after the refused duplicates');
+      checkEqual(billAfter.paid_amount, 500, 'Paid amount is unchanged by the refused duplicates');
+      const recordedPayments = JSON.parse(billAfter.payment_details || '[]') as any[];
+      checkEqual(
+        recordedPayments.length,
+        1,
+        'The day totals count the payment once (one recorded payment)',
       );
     }
 
@@ -781,8 +891,26 @@ async function run(): Promise<void> {
         cancelExecutedDuringPinCheck,
         'Order cancellation hook executed during waiter PIN check',
       );
-      checkEqual(waiterPayRes.status, 200, 'Waiter payment transaction completes with 200');
-      checkEqual(waiterPayRes.data?.bill?.payment_status, 'paid', 'Bill status is paid');
+      // Assignment 033 (Fix 2): the mid-flight cancel closes the order's
+      // unpaid bill in the same transaction, so the waiter payment that was
+      // still in PIN verification now meets a closed bill and is refused —
+      // no money moves for a cancelled order. The old expectation (payment
+      // lands, bill 'paid', order stays 'cancelled') is superseded: a bill
+      // that reads as cancelled must not accept payment, even one that
+      // started before the cancel.
+      checkEqual(waiterPayRes.status, 409, 'Waiter payment is refused once the bill is closed');
+      checkEqual(
+        String(waiterPayRes.data?.error || '')
+          .toLowerCase()
+          .includes('cancelled'),
+        true,
+        'The refusal names the cancelled bill',
+      );
+      checkEqual(
+        waiterPayRes.data?.display_code,
+        'bill_cancelled',
+        'The refusal carries the bill_cancelled code',
+      );
 
       // The critical consistency invariant:
       // Order must REMAIN 'cancelled' and must NOT be resurrected to 'completed'!
@@ -794,10 +922,15 @@ async function run(): Promise<void> {
       );
 
       const finalBill = db
-        .prepare('SELECT payment_status, balance FROM bills WHERE id = ?')
+        .prepare('SELECT payment_status, balance, paid_amount FROM bills WHERE id = ?')
         .get(billId) as any;
-      checkEqual(finalBill?.payment_status, 'paid', 'Bill is paid');
-      checkEqual(Number(finalBill?.balance), 0, 'Bill balance is 0');
+      checkEqual(finalBill?.payment_status, 'cancelled', 'Bill stays cancelled');
+      checkEqual(
+        Number(finalBill?.balance),
+        500,
+        'Bill balance is untouched by the refused payment',
+      );
+      checkEqual(Number(finalBill?.paid_amount), 0, 'No payment lands on the cancelled bill');
     }
 
     // In-flight owner reject (invalid PIN) vs waiter payment (valid PIN)
