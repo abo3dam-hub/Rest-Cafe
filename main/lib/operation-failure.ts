@@ -68,6 +68,7 @@ const PAYMENT_DISPLAY_CODES = [
   'transaction_reference_reused',
   'bill_refunded',
   'bill_already_paid',
+  'bill_cancelled',
   'payment_exceeds_balance',
   'customer_mismatch',
   'customer_unavailable',
