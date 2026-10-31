@@ -17,9 +17,10 @@
  *   Round 3 — small combined-tax probe (fresh DB, 4 tables): manual sales
  *     tax 5% AND consumption fee 10% together, as two components of one
  *     manual pack. (Two separate tax packs cannot stack: only one pack is
- *     active per country, and re-activating the Syria profile while a
- *     manual pack is active leaves checkout broken with 400 — see the
- *     stacking probe at the end of Round 3 and finding F-R3-1.)
+ *     active per country, and activating the Syria profile while a manual
+ *     pack is active is rejected with 409 before anything mutates — see the
+ *     stacking probe at the end of Round 3 and finding F-R3-1, fixed by
+ *     assignment 033.)
  *
  * Money rule (absolute, from the day-cycle file): the expected numbers below
  * are the contract. A mismatch is a FINDING — recorded exactly (scenario,
@@ -2531,9 +2532,11 @@ async function finale(A, ownerAuth, db, ledger, expected, round) {
   const tablesEnd = db.prepare(`SELECT COUNT(*) c FROM tables WHERE status != 'available'`).get().c;
   // Demo-seeded tables T1–T4 are untouched (available); the 40 rush tables must all be available.
   expectMoney(`${round} sweep`, 'tables not available at day end', 0, tablesEnd, 'integrity sweep');
-  // Cancel-after-bill leaves the unpaid bill row behind (verified behaviour,
-  // see the status report finding F-R1-1): the row exists, is unpaid, and
-  // contributes nothing to any money total.
+  // Cancel-after-bill closes the order's unpaid, never-paid bill in the
+  // same transaction (assignment 033, F-R1-1 fixed): no orphaned live
+  // unpaid bill may survive its cancelled order. The closed row itself
+  // still exists with payment_status 'cancelled', total intact, paid 0 —
+  // the sweep below asserts exactly that shape.
   const orphanBills = db
     .prepare(`
     SELECT COUNT(*) c, COALESCE(SUM(b.paid_amount),0) p FROM bills b
@@ -2542,11 +2545,23 @@ async function finale(A, ownerAuth, db, ledger, expected, round) {
   expectMoney(
     `${round} sweep`,
     'orphaned unpaid bills of cancelled orders',
-    isR3 ? 0 : 2,
+    0,
     orphanBills.c,
-    'integrity sweep (documented behaviour)',
+    'integrity sweep (assignment 033: zero after the Fix 2 closure)',
   );
   expectMoney(`${round} sweep`, 'orphaned bills paid amount', 0, orphanBills.p, 'integrity sweep');
+  const closedBills = db
+    .prepare(`
+    SELECT COUNT(*) c FROM bills b
+    JOIN orders o ON o.id = b.order_id WHERE o.status = 'cancelled' AND b.payment_status = 'cancelled'`)
+    .get();
+  expectMoney(
+    `${round} sweep`,
+    'cancelled orders whose unpaid bill reads cancelled',
+    isR3 ? 0 : 2,
+    closedBills.c,
+    'integrity sweep (Fix 2: the two cancel-after-bill rows close)',
+  );
   // The sold-out product stays sold out at day end (never auto-resets).
   if (!isR3) {
     const probe = await api(A, '/orders', {
@@ -2772,12 +2787,12 @@ async function runRound3() {
     }
     await finale(A, ownerAuth, db, ledger, EXPECTED_R3, 'R3');
 
-    // ── Stacking probe (finding F-R3-1): two separate tax packs cannot
-    // stack. With the manual pack active, re-activating the Syria
-    // consumption profile returns 200 yet leaves checkout broken: every
-    // order fails 400 (products point at the establishment-services
-    // category the manual pack does not define). Verified behaviour is
-    // pinned here; the finding itself lives in the status report.
+    // ── Stacking probe (finding F-R3-1, FIXED by assignment 033): two
+    // separate tax packs cannot stack. With the manual pack active,
+    // activating the Syria consumption profile is REJECTED (409,
+    // active_pack_conflict) before anything mutates, and checkout keeps
+    // working with the manual pack's numbers. The rejection, the single
+    // active pack, and the surviving checkout are all pinned here.
     console.log(
       '    [R3 stacking probe] activating the Syria profile while the manual pack is active…',
     );
@@ -2786,30 +2801,42 @@ async function runRound3() {
       headers: ownerAuth,
       body: { profile: 'consumption', classification: 'rated_4_5' },
     });
-    assertEqualOrThrow(react.status, 200, 'R3 probe: Syria profile activation returns 200');
+    assertEqualOrThrow(
+      react.status,
+      409,
+      'R3 probe: Syria profile activation over the active manual pack is rejected',
+    );
+    assertEqualOrThrow(
+      react.data?.code,
+      'active_pack_conflict',
+      'R3 probe: the rejection carries the stable error code',
+    );
+    assertEqualOrThrow(
+      react.data?.active_pack_id,
+      'manual-sy',
+      'R3 probe: the rejection names the active manual pack',
+    );
     const packsAfter = await api(A, '/tax-packs', { headers: ownerAuth });
     const activeAfter = (packsAfter.data.packs || [])
       .filter((p) => p.active_for_store)
       .map((p) => p.id);
-    console.log(
-      `    [R3 stacking probe] active packs after the switch: ${JSON.stringify(activeAfter)} (manual-sy stays active)`,
+    assertEqualOrThrow(
+      JSON.stringify(activeAfter),
+      JSON.stringify(['manual-sy']),
+      'R3 probe: only the manual pack stays active after the rejected switch',
     );
-    const broken = await api(A, '/orders', {
+    const stillWorks = await api(A, '/orders', {
       method: 'POST',
       headers: waiter.authHeader,
       body: { type: 'takeaway', items: [{ product_id: SH, quantity: 1 }] },
     });
     assertEqualOrThrow(
-      broken.status,
-      400,
-      'R3 probe: order creation fails after the profile switch',
-    );
-    assertOrThrow(
-      String(broken.data?.error || '').includes('unknown tax category'),
-      'R3 probe: the failure names the unknown tax category',
+      stillWorks.status,
+      201,
+      'R3 probe: checkout still works after the rejected switch',
     );
     console.log(
-      '    [R3 stacking probe] FINDING F-R3-1 recorded: profile switch breaks checkout (400, unknown tax category establishment-services)',
+      '    [R3 stacking probe] F-R3-1 FIXED: profile switch rejected (409 active_pack_conflict), checkout unbroken with manual numbers',
     );
     console.log('    [R3] done');
   } finally {
