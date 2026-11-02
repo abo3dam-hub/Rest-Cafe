@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Loader2,
   Printer,
+  AlertTriangle,
 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 import toast from 'react-hot-toast';
@@ -68,6 +69,9 @@ export default function StatusBar() {
   const [isTestingPrint, setIsTestingPrint] = useState(false);
   const [isKickingDrawer, setIsKickingDrawer] = useState(false);
   const [isConfiguredWebUsbReady, setIsConfiguredWebUsbReady] = useState(false);
+  // Port-bump notice (F-006): the status bar is the one surface visible on
+  // every page including the POS, so a moved server port shows here too.
+  const [portBumpDetails, setPortBumpDetails] = useState<string | null>(null);
 
   const inFlightRef = useRef(false);
   const drawerToggleRef = useRef<HTMLButtonElement>(null);
@@ -93,6 +97,34 @@ export default function StatusBar() {
     fetchStatus();
     const interval = setInterval(fetchStatus, 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Poll live server ports so a bump shows on every page, including the POS.
+  useEffect(() => {
+    let cancelled = false;
+    let latestRequest = 0;
+    const queryPorts = () => {
+      const request = ++latestRequest;
+      api
+        .get('/server-ports')
+        .then((res) => {
+          if (cancelled || request !== latestRequest) return;
+          const bumped = [res.data?.api, res.data?.kds, res.data?.server_app]
+            .filter((s) => s?.port_bumped)
+            .map((s) => `${s.service} ${s.requested_port} → ${s.port}`);
+          setPortBumpDetails(bumped.length > 0 ? bumped.join('; ') : null);
+        })
+        .catch(() => {
+          if (!cancelled && request === latestRequest) setPortBumpDetails(null);
+        });
+    };
+
+    queryPorts();
+    const interval = setInterval(queryPorts, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Fetch active shift session (async continuation to satisfy cascading-renders rule)
@@ -496,6 +528,20 @@ export default function StatusBar() {
 
         {/* Right: Thermal Printer, Shift State, and Telemetry Trigger */}
         <div className="ms-auto flex h-full items-center gap-2 sm:gap-3">
+          {/* Moved server port (F-006): persistent, visible on every page. */}
+          {portBumpDetails && (
+            <div
+              data-testid="status-bar-port-bump"
+              className="flex items-center gap-1 px-1.5 py-0.5"
+              title={`${tCommon('portBumpNotice', { details: portBumpDetails })}`}
+            >
+              <AlertTriangle size={13} className="text-amber-500" />
+              <span className="hidden sm:inline font-medium text-amber-600 dark:text-amber-400">
+                {tCommon('portMovedShort')}
+              </span>
+            </div>
+          )}
+
           {/* Thermal Printer Status Indicator */}
           <div
             data-testid="status-bar-printer"
