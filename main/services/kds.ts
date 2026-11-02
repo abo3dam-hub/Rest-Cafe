@@ -569,7 +569,7 @@ function handleStatusUpdate(client: KdsClient, message: any): void {
         status,
       }),
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('[KDS] Status update error:', error);
     client.ws.send(JSON.stringify({ type: 'error', message: 'Could not update item status' }));
   }
