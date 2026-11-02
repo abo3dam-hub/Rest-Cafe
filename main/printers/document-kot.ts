@@ -11,7 +11,6 @@ import {
   formatVariantItemHeading,
   parseVariantSelection,
   pushWrapped,
-  truncate,
   truncateShapedLine,
   type PrintWarning,
 } from './formatting-helpers';
@@ -395,48 +394,70 @@ function kotHeaderLines(
 function kotItemLines(
   row: KotItemsBlock['rows'][number],
   cols: number,
-  arabicShaping: boolean,
   language: string,
   capabilities?: ThermalPrinterCapabilities,
-): string[] {
+): {
+  lines: string[];
+  nameLines: number;
+  addonLines: number[];
+  instructionLines: number;
+} {
   const lines: string[] = [];
   const itemPrefix = row.quantity + 'x  ';
-  lines.push(
-    '{DOUBLE_HEIGHT}{BOLD}' +
-      itemPrefix +
-      truncateShapedLine(
-        row.name.text,
-        Math.max(1, cols - displayCellWidth(itemPrefix)),
-        arabicShaping,
-        language,
-        capabilities,
-      ) +
-      '{/BOLD}{/DOUBLE_HEIGHT}',
+  const nameWrapped: string[] = [];
+  pushWrapped(
+    nameWrapped,
+    row.name.text,
+    Math.max(1, cols - displayCellWidth(itemPrefix)),
+    language,
+    capabilities,
   );
+  const prefixPad = ' '.repeat(displayCellWidth(itemPrefix));
+  nameWrapped.forEach((text, index) => {
+    lines.push(
+      '{DOUBLE_HEIGHT}{BOLD}' +
+        (index === 0 ? itemPrefix : prefixPad) +
+        text +
+        '{/BOLD}{/DOUBLE_HEIGHT}',
+    );
+  });
+  const addonLines: number[] = [];
   for (const addon of row.addons) {
     const quantity = addon.quantity ?? 1;
     const quantitySuffix = quantity > 1 ? ` x${quantity}` : '';
-    const name = truncate(
+    const wrapped: string[] = [];
+    pushWrapped(
+      wrapped,
       addonName(addon),
       Math.max(1, cols - 4 - displayCellWidth(quantitySuffix)),
       language,
       capabilities,
     );
-    lines.push('  + ' + name + quantitySuffix);
+    wrapped.forEach((text, index) => {
+      lines.push(
+        (index === 0 ? '  + ' : '    ') +
+          text +
+          (index === wrapped.length - 1 ? quantitySuffix : ''),
+      );
+    });
+    addonLines.push(wrapped.length);
   }
+  let instructionLines = 0;
   if (row.specialInstructions) {
-    lines.push(
-      '  >> ' +
-        truncateShapedLine(
-          row.specialInstructions.text,
-          Math.max(1, cols - 8),
-          arabicShaping,
-          language,
-          capabilities,
-        ),
+    const wrapped: string[] = [];
+    pushWrapped(
+      wrapped,
+      row.specialInstructions.text,
+      Math.max(1, cols - 5),
+      language,
+      capabilities,
     );
+    wrapped.forEach((text, index) => {
+      lines.push((index === 0 ? '  >> ' : '     ') + text);
+    });
+    instructionLines = wrapped.length;
   }
-  return lines;
+  return { lines, nameLines: nameWrapped.length, addonLines, instructionLines };
 }
 
 function addonName(addon: DirectionalText): string {
@@ -475,22 +496,17 @@ export function renderKotDocumentToLines(
   if (items) {
     for (const [rowIndex, row] of items.rows.entries()) {
       const rowStart = lines.length;
-      const rowLines = kotItemLines(
-        row,
-        cols,
-        options.arabicShaping,
-        options.language,
-        options.capabilities,
-      );
+      const rendered = kotItemLines(row, cols, options.language, options.capabilities);
+      const rowLines = rendered.lines;
       lines.push(...rowLines);
       const sourceLines = [`${row.quantity}x  ${row.name.text}`];
       const sourceControlLines = [rowLines[0] ?? ''];
-      let rowLineOffset = 1;
-      for (const addon of row.addons) {
+      let rowLineOffset = rendered.nameLines;
+      for (const [addonIndex, addon] of row.addons.entries()) {
         const quantitySuffix = (addon.quantity ?? 1) > 1 ? ` x${addon.quantity}` : '';
         sourceLines.push(`  + ${addon.text}${quantitySuffix}`);
         sourceControlLines.push(rowLines[rowLineOffset] ?? '');
-        rowLineOffset += 1;
+        rowLineOffset += rendered.addonLines[addonIndex] ?? 1;
       }
       if (row.specialInstructions) {
         sourceLines.push('  >> ' + row.specialInstructions.text);
