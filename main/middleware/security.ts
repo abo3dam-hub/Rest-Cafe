@@ -8,13 +8,28 @@ interface RateLimitRecord {
   resetAt: number;
 }
 
+/** LAN clients get a generous per-IP ceiling instead of the strict limit:
+ * a 5-device restaurant polls at most a few requests a second per device,
+ * while a retry-loop flood runs at tens per second. */
+export const LAN_RATE_LIMIT_MULTIPLIER = 6;
+
+/** General API ceiling for non-LAN clients (requests per minute per IP). */
+export const API_RATE_LIMIT_PER_MINUTE = 100;
+/** General API ceiling for LAN clients (requests per minute per IP). */
+export const API_LAN_RATE_LIMIT_PER_MINUTE = API_RATE_LIMIT_PER_MINUTE * LAN_RATE_LIMIT_MULTIPLIER;
+
 interface RateLimitOptions {
   windowMs?: number;
   max?: number;
   message?: string;
   skipSuccessfulRequests?: boolean;
-  /** When false, private/LAN IPs are NOT exempt — use for auth endpoints. Default: true. */
-  bypassPrivateIp?: boolean;
+  /** When true (default), private/LAN IPs get the generous LAN ceiling
+   * (lanMax) instead of the strict limit. When false, every IP shares the
+   * strict limit — use for auth endpoints. */
+  lanCeiling?: boolean;
+  /** Per-IP ceiling for private/LAN IPs when lanCeiling is true.
+   * Defaults to max * LAN_RATE_LIMIT_MULTIPLIER. */
+  lanMax?: number;
 }
 
 const DEFAULT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -46,11 +61,12 @@ export function rateLimit(options: RateLimitOptions = {}) {
       }
     }
 
-    // Bypass rate limit for local/private/Tailscale IPs unless bypassPrivateIp is false.
-    const bypassPrivateIp = options.bypassPrivateIp !== false;
-    if (bypassPrivateIp && isAllowedPrivateIp(ip)) {
-      return next();
-    }
+    // Private/LAN IPs get the generous LAN ceiling instead of skipping the
+    // limit (F-031): a retry-loop flood is cut off, a real restaurant never is.
+    const effectiveMax =
+      options.lanCeiling !== false && isAllowedPrivateIp(ip)
+        ? (options.lanMax ?? max * LAN_RATE_LIMIT_MULTIPLIER)
+        : max;
 
     let record = requests.get(ip);
     if (!record || record.resetAt <= now) {
@@ -60,11 +76,11 @@ export function rateLimit(options: RateLimitOptions = {}) {
 
     record.count += 1;
 
-    res.setHeader('RateLimit-Limit', String(max));
-    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - record.count)));
+    res.setHeader('RateLimit-Limit', String(effectiveMax));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, effectiveMax - record.count)));
     res.setHeader('RateLimit-Reset', new Date(record.resetAt).toISOString());
 
-    if (record.count > max) {
+    if (record.count > effectiveMax) {
       return res.status(429).json({ error: message });
     }
 
@@ -241,14 +257,34 @@ export async function withPinVerificationLock<T>(key: string, fn: () => Promise<
   }
 }
 
-/** Shared rate limiter for static/SPA file serving with private IP bypass. */
-export function staticRouteRateLimit(options: { windowMs?: number; limit?: number } = {}) {
+/** General API limiter for the main server: the strict ceiling off-LAN, the
+ * generous LAN ceiling on-LAN (F-031). Auth, PIN, and order-write buckets
+ * are separate limiters and unchanged. */
+export function generalApiRateLimit() {
   return expressRateLimit({
-    windowMs: options.windowMs ?? 60 * 1000,
-    limit: options.limit ?? 600,
+    windowMs: 60 * 1000,
+    limit: (req: Request) =>
+      isAllowedPrivateIp(req.ip || req.socket.remoteAddress || '')
+        ? API_LAN_RATE_LIMIT_PER_MINUTE
+        : API_RATE_LIMIT_PER_MINUTE,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req: Request) => isAllowedPrivateIp(req.ip || req.socket.remoteAddress || ''),
+  });
+}
+
+/** Shared rate limiter for static/SPA file serving. LAN clients get the
+ * generous ceiling (6x the public limit) instead of skipping the limit. */
+export function staticRouteRateLimit(
+  options: { windowMs?: number; limit?: number; lanLimit?: number } = {},
+) {
+  const limit = options.limit ?? 600;
+  const lanLimit = options.lanLimit ?? limit * LAN_RATE_LIMIT_MULTIPLIER;
+  return expressRateLimit({
+    windowMs: options.windowMs ?? 60 * 1000,
+    limit: (req: Request) =>
+      isAllowedPrivateIp(req.ip || req.socket.remoteAddress || '') ? lanLimit : limit,
+    standardHeaders: true,
+    legacyHeaders: false,
   });
 }
 
