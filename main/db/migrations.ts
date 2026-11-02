@@ -3569,6 +3569,41 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    // F-004: per-item KOT printed marker, so a retry or manual reprint sends
+    // only items not yet printed. F-009: durable pending-print queue, so a
+    // failed KOT or receipt print is retried by the system instead of
+    // depending on a human noticing a toast.
+    version: 123,
+    name: 'kot_printed_marker_and_print_jobs',
+    up: () => {
+      const itemColumns = getColumns(getRawDatabase(), 'order_items');
+      if (!itemColumns.includes('kot_printed_at')) {
+        getRawDatabase().exec(
+          'ALTER TABLE order_items ADD COLUMN kot_printed_at TEXT DEFAULT NULL',
+        );
+      }
+      getRawDatabase().exec(`
+        CREATE TABLE IF NOT EXISTS print_jobs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          kind TEXT NOT NULL,
+          order_id INTEGER NOT NULL,
+          bill_id INTEGER,
+          payload TEXT NOT NULL DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'pending',
+          attempts INTEGER NOT NULL DEFAULT 0,
+          next_retry_at TEXT,
+          last_error TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+      `);
+      getRawDatabase().exec(
+        'CREATE INDEX IF NOT EXISTS idx_print_jobs_due ON print_jobs(status, next_retry_at)',
+      );
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
