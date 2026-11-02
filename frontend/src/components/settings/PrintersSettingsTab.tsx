@@ -28,7 +28,7 @@ import {
 } from '@/lib/bill-template-picker';
 import { type PaperSize, type BillTemplate } from '@/store/pos-settings';
 import { usePrinterStore } from '@/hooks/usePrinter';
-import api from '@/lib/api';
+import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 const SELECTABLE_LANGUAGES: Language[] = (Object.keys(LANGUAGES) as Language[]).filter(
@@ -214,7 +214,10 @@ export function PrintersSettingsTab({
   const fetchDetectedPrinters = useCallback(async (signal?: AbortSignal) => {
     setDetectingPrinters(true);
     try {
-      const res = await api.get('/printers/detect', signal ? { signal } : undefined);
+      const res = await api.get('/printers/detect', {
+        ...(signal ? { signal } : {}),
+        timeout: LONG_API_REQUEST_TIMEOUT_MS,
+      });
       if (!signal?.aborted) setDetectedPrinters(res.data.printers || []);
     } catch {
       if (!signal?.aborted) setDetectedPrinters([]);
