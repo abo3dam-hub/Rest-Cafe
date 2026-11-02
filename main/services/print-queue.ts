@@ -19,7 +19,9 @@
  */
 import { getDatabase, now, withTxn } from '../db';
 import { printReceiptDetailed, type PrintResult } from '../printers/thermal';
+import { markBillPrintedOnDispatch } from './receipt';
 import { dispatchKotForOrder } from './kot-print';
+import type { PrintWarning } from '../../shared/print/warnings';
 import { getOrderWithItems } from '../routes/bills';
 import { resolveBrandLogo } from '../branding';
 import { getCountryByCode, getCurrencySymbol, resolveTenantCurrency } from '../countries';
@@ -377,9 +379,8 @@ export interface BillPrintDispatchOptions {
 
 /**
  * Dispatches one receipt exactly as the print-bill route does, from the
- * bill and order rows the caller loaded. Deliberately does not touch
- * `bills.printed_at` or `print_logs`: the route never did, and F-026
- * (printed_at semantics) belongs to Delivery 5.
+ * bill and order rows the caller loaded. Does not touch `bills.printed_at`
+ * itself: the caller records it only after this dispatch succeeds (F-026).
  */
 export async function dispatchBillPrint(
   db: ReturnType<typeof getDatabase>,
@@ -412,7 +413,7 @@ export async function executePrintJob(
   db: ReturnType<typeof getDatabase>,
   job: PrintJob,
   dispatchers: PrintJobDispatchers = {},
-): Promise<{ ok: boolean; detail?: string }> {
+): Promise<{ ok: boolean; detail?: string; warnings?: PrintWarning[] }> {
   if (job.kind === 'kot') {
     const dispatchKot = dispatchers.dispatchKot ?? dispatchKotForOrder;
     const result = await dispatchKot(db, {
@@ -445,7 +446,7 @@ export async function executePrintJob(
       ? { arabicShaping: job.payload.arabicShaping }
       : {}),
   });
-  if (result.ok) return { ok: true };
+  if (result.ok) return { ok: true, warnings: result.warnings };
   return { ok: false, detail: result.detail || 'Receipt print failed' };
 }
 
@@ -462,6 +463,11 @@ export async function processDuePrintJobs(
       const result = await executePrintJob(db, job, dispatchers);
       if (result.ok) {
         completePrintJob(db, job.id);
+        // The bytes moved: only now does the bill count as printed (F-026),
+        // with any warnings the dispatch produced recorded with it (F-017).
+        if (job.kind === 'receipt' && job.bill_id) {
+          markBillPrintedOnDispatch(db, job.bill_id, result.warnings);
+        }
         succeeded += 1;
       } else {
         failPrintJob(db, job.id, result.detail || 'Print failed');
