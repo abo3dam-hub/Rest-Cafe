@@ -27,25 +27,30 @@ booting Electron.
 `initialize()` runs once, from `app.whenReady()`. Every step checks the shutdown flag before
 continuing, so a quit during startup unwinds instead of half-starting:
 
-1. `initDatabase()`.
-2. `await startServer()` - the main API on `:3001`.
-3. `cloudSync.start()`, `telemetry.start()`, `googleDrive.start()`. These are launched without
-   `await`: no optional network service may delay or fail startup.
-4. `await startKdsServer()` - the KDS server on `:3002`.
-5. `await startServerApp()` - the server app on `:3003`.
-6. `startMdns()`, unless `FLO_E2E_SKIP_OPTIONAL_NETWORK` is `1`.
-7. `await initPrinter()`.
-8. IPC handler registration.
-9. `runtimeState = 'ready'`, and the relaunch guard is marked recovered.
-10. `createWindow()`, then power-monitor recovery, child-process crash telemetry, the tray, and the
-    application menu.
-11. On a non-store build, the auto-updater is configured and a delayed update check runs. Store
-    builds report a `store-managed` one-shot status instead.
+1. `initDatabase()`, then the idempotency retention prune (expired keyed
+   order/payment/refund records are deleted; a failure is logged and never blocks startup).
+2. `applyAutostartSetting()` — the stored autostart preference is honoured in the Windows
+   login items; a safe no-op off Windows.
+3. `await startServer()` - the main API on `:3001`.
+4. `localBackup.start()` and `printQueue.start()` — the daily local backup scheduler and
+   the durable print queue (failed KOT and receipt prints are retried from the queue).
+   These are launched without `await`: neither may delay or fail startup.
+5. `await startKdsServer()` - the KDS server on `:3002`.
+6. `await startServerApp()` - the server app on `:3003`.
+7. `startMdns()`, unless `FLO_E2E_SKIP_OPTIONAL_NETWORK` is `1`.
+8. `await initPrinter()`.
+9. IPC handler registration.
+10. `runtimeState = 'ready'`, and the relaunch guard is marked recovered.
+11. `createWindow()`, then power-monitor recovery, child-process crash telemetry, the tray, and the
+    application menu. A delayed tax-pack catalog check runs five seconds later (best-effort,
+    skipped offline and on the E2E network skip). Software updates are manual — the owner
+    installs new builds by hand; there is no auto-updater and no update check runs.
 
-If any step throws, the state becomes `failed`, the error is reported to telemetry on a best-effort
-basis, cleanup runs, and the process exits with code 1. A `SchemaVersionMismatchError` adds the
-database and application schema versions to that report. A shutdown that interrupts startup is not
-treated as a failure.
+If any step throws, the state becomes `failed`, the error is logged and shown in an error box, a
+local operation-diagnostics record is captured on a best-effort basis, cleanup runs, and the
+process exits with code 1. A `SchemaVersionMismatchError` carries the database and application
+schema versions in its message, so they appear in that log. A shutdown that interrupts startup is
+not treated as a failure.
 
 ## No window without a healthy runtime
 
@@ -160,7 +165,7 @@ Everything else that `initialize()` starts is absent:
 | Main API, KDS, Server App, database | yes |
 | mDNS advertisement | no |
 | Printer initialization | no |
-| Electron windows, tray, menu, auto-updater, power-monitor recovery | no, there is no Electron runtime |
+| Electron windows, tray, menu, power-monitor recovery | no, there is no Electron runtime |
 
 Its shutdown path is a hand-written sequence that mirrors the drain order but skips the tray, raster
 surface and mDNS steps, because those services were never started.
@@ -171,5 +176,6 @@ build, not against `dev-server.js`. If a behaviour only appears under `npm run d
 
 ## Uncaught failures outside the lifecycle
 
-`uncaughtException` and `unhandledRejection` are logged and reported to telemetry. They do not by
-themselves trigger cleanup; the shutdown entrypoints decide whether the process is exiting.
+`uncaughtException` and `unhandledRejection` are logged, and a local operation-diagnostics
+record is captured for each unless the app is already quitting. They do not by themselves trigger
+cleanup; the shutdown entrypoints decide whether the process is exiting.
