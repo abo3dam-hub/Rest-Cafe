@@ -6,6 +6,7 @@ import { useTranslations } from 'use-intl';
 import { Copy, ExternalLink, MonitorSmartphone, Trash2 } from 'lucide-react';
 import { useFormatDate } from '@/hooks/useFormatDate';
 import api from '@/lib/api';
+import { cacheHostCandidates } from '@/lib/host-rediscovery';
 import {
   CUSTOMER_DISPLAY_DEFAULTS,
   CUSTOMER_DISPLAY_PATH,
@@ -408,6 +409,13 @@ export function CustomerDisplayCard() {
         const addresses = getPairingAddresses(data);
         setNetworkAddresses(addresses);
         setNetworkInfoStatus('ready');
+        // Re-discovery candidates (F-030): remember this host's addresses
+        // so a tablet can find it again if the LAN address moves.
+        cacheHostCandidates(
+          [addresses.primary, ...addresses.other].filter(
+            (origin): origin is string => origin !== null,
+          ),
+        );
         const availableOrigins = [addresses.primary, ...addresses.other, localPreviewOrigin];
         setSelectedOrigin((current) =>
           current && availableOrigins.includes(current) ? current : addresses.primary || '',
