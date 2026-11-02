@@ -427,7 +427,7 @@ router.get(
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="categories-export.csv"');
       res.send(withUtf8Bom(lines.join('\n')));
-    } catch (err: any) {
+    } catch (err) {
       console.error('[API] Menu CSV export failed:', err);
       res.status(500).json({ error: 'Menu CSV export failed' });
     }
@@ -476,7 +476,7 @@ router.get(
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="products-export.csv"');
       res.send(withUtf8Bom(lines.join('\n')));
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof RegionalNotConfiguredError)
         return res.status(409).json({ error: 'regional_not_configured' });
       console.error('[API] Menu CSV export failed:', err);
@@ -523,7 +523,7 @@ router.get(
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="addons-export.csv"');
       res.send(withUtf8Bom(lines.join('\n')));
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof RegionalNotConfiguredError)
         return res.status(409).json({ error: 'regional_not_configured' });
       console.error('[API] Menu CSV export failed:', err);
@@ -629,7 +629,7 @@ router.post(
 
       captureMenuCsvRowRejections(failed, changedRows);
       res.json({ created, updated, reactivated, skipped, failed, errors });
-    } catch (err: any) {
+    } catch (err) {
       return csvImportErrorResponse(res, err);
     }
   },
@@ -948,7 +948,7 @@ router.post(
         errors,
         categories_created: categoriesCreated,
       });
-    } catch (err: any) {
+    } catch (err) {
       return csvImportErrorResponse(res, err);
     }
   },
@@ -1447,7 +1447,7 @@ router.post(
         addons_reactivated: addonsReactivated,
         errors,
       });
-    } catch (err: any) {
+    } catch (err) {
       return csvImportErrorResponse(res, err);
     }
   },
