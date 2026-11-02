@@ -30,6 +30,7 @@ import {
   projectKdsOrder,
 } from './db';
 import { setupKdsWebSocket, notifyKdsUpdate } from './services/kds';
+import { recordPortBump } from './server-state';
 import { syncOrderStatusFromItems } from './services/order-status-rollup';
 import { getJWTSecret } from './security/jwt-secret';
 import { normalizeEmail, parseCategoryIds } from './routes/auth';
@@ -888,6 +889,7 @@ export function startKdsServer(): Promise<void> {
           console.log(
             `[KDS Server] Port ${attemptedPort} in use (${err.code}), trying ${currentKdsPort}`,
           );
+          recordPortBump('kds', attemptedPort, currentKdsPort, err.code);
           tryListen();
           return;
         }
@@ -925,4 +927,9 @@ export function stopKdsServer(): Promise<void> {
 
 export function getKdsPort(): number {
   return activeKdsPort;
+}
+
+/** The port the KDS server first tried to bind (before any bump). */
+export function getDefaultKdsPort(): number {
+  return KDS_PORT;
 }
