@@ -44,7 +44,7 @@ router.get(
     try {
       const apps = await Promise.all(MORE_APPS.map(toAppResponse));
       res.json({ apps });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
