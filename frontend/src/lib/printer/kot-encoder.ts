@@ -2,7 +2,7 @@
 import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder';
 import type { Order } from '@/lib/types';
 import { LANGUAGES, type Language } from '@/lib/i18n/languages';
-import { columnsForReceiptPaperSize, displayCellWidth, truncateToDisplayCells } from '@print/width';
+import { columnsForReceiptPaperSize, displayCellWidth } from '@print/width';
 import { formatTime } from './format-date';
 import { normalizeThermalText } from './unicode';
 import {
@@ -90,8 +90,8 @@ export function buildKotBytes(
   const label = (key: string): string => printLabelResolver(key, language);
   const locale = opts.locale ?? LANGUAGES[language as Language]?.locale ?? 'en-US';
   const safePrinterText = safePrinterTextForLanguage(language, cols, opts.capabilities);
-  const truncateText = (text: string, max: number): string =>
-    truncate(text, max, opts.capabilities);
+  const wrapKotText = (text: string, max: number): string[] =>
+    wrapPrinterText(normalizeThermalText(text, opts.capabilities), Math.max(1, max));
   const thermalCapabilities = mergeThermalCapabilities(opts.capabilities, arabicShaping);
 
   const enc = new ReceiptPrinterEncoder({ columns: cols });
@@ -297,19 +297,25 @@ export function buildKotBytes(
 
     hasItems = true;
 
-    // Item name with quantity
-    const qtyName = `${item.quantity}x ${formatItemHeading(item.product_name, item.variant_selection)}`;
+    // Item name with quantity — wraps like the receipt path instead of
+    // truncating, so two products sharing a long prefix stay distinct.
+    const qtyPrefix = `${item.quantity}x `;
+    const qtyName = formatItemHeading(item.product_name, item.variant_selection);
+    const nameWrapped = wrapKotText(qtyName, Math.max(1, cols - displayCellWidth(qtyPrefix)));
+    const namePad = ' '.repeat(displayCellWidth(qtyPrefix));
     enc.bold(true);
-    safePrinterText(
-      enc,
-      truncateText(qtyName, cols),
-      warnings,
-      false,
-      arabicShaping,
-      undefined,
-      undefined,
-      language,
-    ).newline();
+    for (const [index, line] of nameWrapped.entries()) {
+      safePrinterText(
+        enc,
+        `${index === 0 ? qtyPrefix : namePad}${line}`,
+        warnings,
+        false,
+        arabicShaping,
+        undefined,
+        undefined,
+        language,
+      ).newline();
+    }
     enc.bold(false);
 
     // Addons can come from older/API paths as a JSON string. Normalize before
@@ -321,36 +327,43 @@ export function buildKotBytes(
           const qty =
             'quantity' in addon && typeof addon.quantity === 'number' ? addon.quantity : 1;
           const quantitySuffix = qty > 1 ? ` x${qty}` : '';
-          const addonName = truncateText(
+          const addonWrapped = wrapKotText(
             addon.name,
             Math.max(1, cols - 5 - displayCellWidth(quantitySuffix)),
           );
-          safePrinterText(
-            enc,
-            `   + ${addonName}${quantitySuffix}`,
-            warnings,
-            false,
-            arabicShaping,
-            undefined,
-            undefined,
-            language,
-          ).newline();
+          for (const [index, line] of addonWrapped.entries()) {
+            safePrinterText(
+              enc,
+              `${index === 0 ? '   + ' : '     '}${line}${
+                index === addonWrapped.length - 1 ? quantitySuffix : ''
+              }`,
+              warnings,
+              false,
+              arabicShaping,
+              undefined,
+              undefined,
+              language,
+            ).newline();
+          }
         }
       }
     }
 
     // Special instructions
     if (item.special_instructions) {
-      safePrinterText(
-        enc,
-        `   >> ${truncateText(item.special_instructions, cols - 6)}`,
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        language,
-      ).newline();
+      const noteWrapped = wrapKotText(item.special_instructions, Math.max(1, cols - 6));
+      for (const [index, line] of noteWrapped.entries()) {
+        safePrinterText(
+          enc,
+          `${index === 0 ? '   >> ' : '      '}${line}`,
+          warnings,
+          false,
+          arabicShaping,
+          undefined,
+          undefined,
+          language,
+        ).newline();
+      }
     }
 
     enc.newline();
@@ -405,14 +418,6 @@ function thermalRule(
     return;
   }
   enc.rule({ style });
-}
-
-// Helpers
-function truncate(str: string, max: number, capabilities?: ThermalPrinterCapabilities): string {
-  const normalized = normalizeThermalText(str, capabilities);
-  return displayCellWidth(normalized) > max
-    ? truncateToDisplayCells(normalized, Math.max(1, max - 1)) + '…'
-    : normalized;
 }
 
 // Fallback label when thermal capabilities cannot represent metadata.
