@@ -26,6 +26,7 @@ import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/ca
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
 import { operationDiagnostics } from './services/operation-diagnostics';
 import { isOfflineMode } from './services/offline-mode';
+import { applyAutostartSetting } from './services/autostart';
 import { localBackup } from './services/local-backup';
 import { printQueue } from './services/print-queue';
 import { startKdsServer, stopKdsServer, getKdsPort, isKdsServerRunning } from './kds-server';
@@ -1156,6 +1157,10 @@ async function initialize(): Promise<void> {
     console.log('[Flo] Initializing database...');
     initDatabase();
     if (isShutdownRequested()) return;
+
+    // Autostart (F-005): honour the stored preference in the Windows login
+    // items. Safe no-op off Windows; never throws.
+    applyAutostartSetting();
 
     console.log('[Flo] Starting local server...');
     await startServer();
