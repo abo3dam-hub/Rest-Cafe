@@ -61,9 +61,13 @@ export function formatReceipt(
     currency: 'USD',
   };
   // Merchant templates resolve through document pipeline; pack templates use compliance renderer.
+  // Raster stays off for pack templates only: they have no document lines
+  // or financial-line groups, so rasterizing them would weaken the
+  // fail-closed rule (F-017). Merchant templates render through the
+  // classic pipeline and rasterize like it.
   const selection = parseBillTemplateSelection(template);
   const templateCapabilities =
-    selection?.source === 'pack' || selection?.source === 'merchant'
+    selection?.source === 'pack'
       ? capabilities && { ...capabilities, raster: { ...capabilities.raster, enabled: false } }
       : capabilities;
   if (selection?.source === 'pack') {
