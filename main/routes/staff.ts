@@ -181,7 +181,7 @@ router.get('/', requirePermission('staff.view'), (req: Request, res: Response) =
 
     const staff = db.prepare(query).all(...params);
     res.json({ staff });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -217,7 +217,7 @@ router.get(
         `)
         .all();
       res.json({ approvers, staff: approvers });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -246,7 +246,7 @@ router.get('/:id', requirePermission('staff.view'), (req: Request, res: Response
       .get(req.params.id);
 
     res.json({ staff: { ...member, performance } });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -386,7 +386,7 @@ router.post('/', requireStaffWrite, authRateLimit(), (req: Request, res: Respons
         ...(role === 'chef' ? { station_ids: normalizedStationIds } : {}),
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -665,7 +665,7 @@ router.post('/:id/reactivate', requireStaffWrite, (req: Request, res: Response) 
       .prepare(`SELECT ${STAFF_SELECT_FIELDS} FROM users WHERE id = ?`)
       .get(req.params.id);
     res.json({ staff: updated });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
