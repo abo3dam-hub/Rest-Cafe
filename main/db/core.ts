@@ -1164,6 +1164,45 @@ export function now(): string {
   return new Date().toISOString().replace('T', ' ').replace(/\..*$/, '');
 }
 
+/** Idempotency records older than this are pruned at startup (F-033). 90 days
+ * is far beyond any retry window a client can still be in — retries happen
+ * within minutes of the original request — while keeping the tables bounded. */
+export const IDEMPOTENCY_RETENTION_DAYS = 90;
+
+const IDEMPOTENCY_TABLES = [
+  'payment_idempotency',
+  'order_idempotency',
+  'refund_idempotency',
+] as const;
+
+/** Deletes idempotency records older than the retention window, one atomic
+ * batch per table. Replay inside the window is untouched: rows newer than
+ * the cutoff are never matched. Returns the per-table delete counts. */
+export function pruneIdempotencyRecords(
+  targetDb: ReturnType<typeof getDatabase> = getDatabase(),
+  olderThanDays: number = IDEMPOTENCY_RETENTION_DAYS,
+): { payment: number; order: number; refund: number } {
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\..*$/, '');
+  const counts = { payment: 0, order: 0, refund: 0 };
+  const keys = ['payment', 'order', 'refund'] as const;
+  const prune = targetDb.transaction(() => {
+    for (let i = 0; i < IDEMPOTENCY_TABLES.length; i++) {
+      const table = IDEMPOTENCY_TABLES[i];
+      const exists = targetDb
+        .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`)
+        .get(table);
+      if (!exists) continue;
+      const result = targetDb.prepare(`DELETE FROM ${table} WHERE created_at < ?`).run(cutoff);
+      counts[keys[i]] = result.changes;
+    }
+  });
+  prune();
+  return counts;
+}
+
 /** Records who performed an order/item mutation (docs/reference/product-invariants.md). */
 export function recordOrderAudit(
   db: ReturnType<typeof getDatabase>,
