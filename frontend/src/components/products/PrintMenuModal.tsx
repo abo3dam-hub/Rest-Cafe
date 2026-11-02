@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Check, FileDown, FileText, LoaderCircle, Printer, Receipt } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 import toast from 'react-hot-toast';
-import api from '@/lib/api';
+import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -211,11 +211,15 @@ export default function PrintMenuModal({ open, onOpenChange }: Props) {
   /** Sends ESC/POS to the chosen receipt printer; WebUSB printers receive the
    *  encoded bytes over the browser transport instead. */
   const printToReceipt = async (selectedFilters: PrintFilters, targetWindow?: Window | null): Promise<boolean> => {
-    const response = await api.post('/printers/print-menu', {
-      ...selectedFilters,
-      ...(selectedPrinterId ? { printerId: selectedPrinterId } : {}),
-      paperWidth,
-    });
+    const response = await api.post(
+      '/printers/print-menu',
+      {
+        ...selectedFilters,
+        ...(selectedPrinterId ? { printerId: selectedPrinterId } : {}),
+        paperWidth,
+      },
+      { timeout: LONG_API_REQUEST_TIMEOUT_MS },
+    );
     if (response.data.webusb === true) {
       const bytes = response.data.bytes;
       if (!Array.isArray(bytes) || !bytes.every((byte: unknown) => Number.isInteger(byte) && Number(byte) >= 0 && Number(byte) <= 255)) {
