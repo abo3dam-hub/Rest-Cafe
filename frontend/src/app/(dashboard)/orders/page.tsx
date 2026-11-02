@@ -160,6 +160,7 @@ export default function OrdersPage() {
   const { setTablesRequired, autoPrintBill, printerUseUnicode, printerArabicShaping } =
     usePosSettingsStore();
   const tOrders = useTranslations('orders');
+  const tPrintWarnings = useTranslations('printWarnings');
   const tPos = useTranslations('pos');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
@@ -242,7 +243,23 @@ export default function OrdersPage() {
   // Other states
   const [addItemsOrder, setAddItemsOrder] = useState<Order | null>(null);
   const [printHistory, setPrintHistory] = useState<
-    Record<number, { id: number; print_type: string; user_name: string; printed_at: string }[]>
+    Record<
+      number,
+      {
+        id: number;
+        print_type: string;
+        user_name: string;
+        printed_at: string;
+        warnings?: {
+          id: number;
+          field: string;
+          text: string;
+          message: string;
+          kind: string;
+          source: string;
+        }[];
+      }[]
+    >
   >({});
   const fetchedBillIdsRef = useRef<Set<number>>(new Set());
 
@@ -998,7 +1015,7 @@ export default function OrdersPage() {
         try {
           await api.post(
             `/bills/${bill.id}/print`,
-            { print_type: 'receipt' },
+            { print_type: 'receipt', warnings: printWarnings },
             { timeout: LONG_API_REQUEST_TIMEOUT_MS },
           );
         } catch {
@@ -1049,7 +1066,7 @@ export default function OrdersPage() {
       try {
         await api.post(
           `/bills/${billId}/print`,
-          { print_type: isReprint ? 'reprint' : 'receipt' },
+          { print_type: isReprint ? 'reprint' : 'receipt', warnings: printWarnings },
           { timeout: LONG_API_REQUEST_TIMEOUT_MS },
         );
         fetchPrintHistory(billId);
@@ -2016,6 +2033,29 @@ export default function OrdersPage() {
                 ? tOrders('reprintReceiptWarning')
                 : tOrders('printReceiptConfirm')}
             </p>
+            {(() => {
+              // Lines an earlier print of this bill could not render are
+              // recorded with the bill (F-017); show them before reprinting.
+              const recorded = printHistory[confirmPrintBillId]?.[0]?.warnings ?? [];
+              if (recorded.length === 0) return null;
+              return (
+                <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+                  <p className="font-medium text-amber-800">
+                    {tPrintWarnings('title', { count: recorded.length })}
+                  </p>
+                  <ul className="mt-1 list-disc ps-4 text-amber-700">
+                    {recorded.slice(0, 8).map((warning) => (
+                      <li key={warning.id}>{warning.message || warning.text}</li>
+                    ))}
+                  </ul>
+                  {recorded.length > 8 && (
+                    <p className="mt-1 text-amber-700">
+                      {tPrintWarnings('moreLines', { count: recorded.length - 8 })}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setConfirmPrintBillId(null)}>
                 {tCommon('cancel')}
