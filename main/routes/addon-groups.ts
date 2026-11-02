@@ -321,7 +321,7 @@ router.get(
       });
 
       res.json({ addon_groups: groupsWithAddons });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -344,7 +344,7 @@ router.get(
         .prepare('SELECT * FROM addons WHERE addon_group_id = ? ORDER BY sort_order, name')
         .all(req.params.id);
       res.json({ addon_group: serializeAddonGroup({ ...(group as any), addons }) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -486,7 +486,7 @@ router.post(
       res.status(201).json({
         addon_group: serializeAddonGroup(Object.assign({}, group, { addons: groupAddons })),
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -713,7 +713,7 @@ router.put(
       res.json({
         addon_group: serializeAddonGroup(Object.assign({}, updated, { addons: updatedAddons })),
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -738,7 +738,7 @@ router.delete(
         req.params.id,
       );
       res.json({ message: 'Addon group deleted' });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -851,7 +851,7 @@ router.post(
 
       const addon = db.prepare('SELECT * FROM addons WHERE id = ?').get(addonId);
       res.status(201).json({ addon: serializeAddon(addon) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -978,7 +978,7 @@ router.put(
 
       const updated = db.prepare('SELECT * FROM addons WHERE id = ?').get(req.params.addonId);
       res.json({ addon: serializeAddon(updated) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1029,7 +1029,7 @@ router.delete(
         return res.status(400).json({ errors: deletedAtomically });
       }
       res.json({ message: 'Addon deleted' });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
