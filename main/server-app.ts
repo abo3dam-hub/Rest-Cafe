@@ -50,6 +50,7 @@ import {
   getServerAppPort as getActiveServerAppPort,
   setServerAppPort,
 } from './server-app-state';
+import { recordPortBump } from './server-state';
 import { API_JSON_BODY_LIMIT } from './http-limits';
 import { buildCspHeader } from './csp';
 import { readPosSortSettings } from './lib/pos-sort';
@@ -725,6 +726,7 @@ export function startServerApp(): Promise<void> {
           console.log(
             `[Server App] Port ${attemptedPort} in use (${err.code}), trying ${currentPort}`,
           );
+          recordPortBump('server-app', attemptedPort, currentPort, err.code);
           tryListen();
           return;
         }
