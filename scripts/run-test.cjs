@@ -20,6 +20,8 @@ const { spawnSync } = require('node:child_process');
 const DECLARED_ENVIRONMENT_SKIPS = {
   // Runs order-item-addons / addon-price-integrity (ABI guard).
   'test:order-item-addons': 'better-sqlite3 ABI guard',
+  'test:bill-print-warnings': 'better-sqlite3 ABI guard',
+  'test:bill-printed-at': 'better-sqlite3 ABI guard',
   'test:bills-print-api': 'better-sqlite3 ABI guard',
   'test:cancel-override': 'better-sqlite3 ABI guard',
   'test:cash-closures': 'better-sqlite3 ABI guard',
@@ -29,9 +31,11 @@ const DECLARED_ENVIRONMENT_SKIPS = {
   'test:discount-system': 'better-sqlite3 ABI guard',
   // Runs first-run-setup (ABI guard).
   'test:first-run': 'better-sqlite3 ABI guard',
+  'test:idempotency-retention': 'better-sqlite3 ABI guard',
   'test:integration-discount-settings': 'better-sqlite3 ABI guard',
   'test:issue-127-password-recovery': 'better-sqlite3 ABI guard',
   'test:kitchen-addons': 'better-sqlite3 ABI guard',
+  'test:kot-print-queue': 'better-sqlite3 ABI guard',
   'test:merchant-print-templates': 'better-sqlite3 ABI guard',
   'test:merchant-template-transfer': 'better-sqlite3 ABI guard',
   'test:migration-v56-v57': 'better-sqlite3 ABI guard',
@@ -43,6 +47,7 @@ const DECLARED_ENVIRONMENT_SKIPS = {
   'test:receipt-printing': 'better-sqlite3 ABI guard',
   'test:reports-daily-stats-table-turn': 'better-sqlite3 ABI guard',
   'test:reports-insights': 'better-sqlite3 ABI guard',
+  'test:restore-fresh-install': 'better-sqlite3 ABI guard',
   'test:schema-health': 'better-sqlite3 ABI guard',
   'test:theme-mode-settings': 'better-sqlite3 ABI guard',
   'test:upgrade-path': 'better-sqlite3 ABI guard',
