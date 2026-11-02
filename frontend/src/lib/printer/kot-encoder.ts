@@ -22,7 +22,7 @@ import { isKotItemPending } from '@print/document';
 import { formatItemHeading } from './item-heading';
 
 export interface KotOptions {
-  /** 58 mm (32 cols) or 80 mm (42 cols). Default: 58 */
+  /** 58 mm (32 cols) or 80 mm (48 cols). Default: 58 */
   paperWidth?: 58 | 80;
   /** Exact column count the configured printer declares; overrides `paperWidth`. */
   columns?: number;
