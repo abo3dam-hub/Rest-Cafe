@@ -19,12 +19,11 @@ import {
   isKdsEnabled,
 } from './db';
 import { setupKdsWebSocket } from './services/kds';
-import expressRateLimit from 'express-rate-limit';
 import {
   staticRouteRateLimit,
+  generalApiRateLimit,
   corsOptions,
   getUserAuthStatus,
-  isAllowedPrivateIp,
   isTokenRevoked,
   isTokenStale,
 } from './middleware/security';
@@ -218,17 +217,9 @@ export function startServer(): Promise<void> {
     app.use('/api', databaseMaintenanceMiddleware);
 
     // ── Global API rate limiting ───────────────────────────────────────
-    // Protect all API routes with express-rate-limit and LAN bypass.
-    app.use(
-      '/api',
-      expressRateLimit({
-        windowMs: 60 * 1000,
-        limit: 100,
-        standardHeaders: true,
-        legacyHeaders: false,
-        skip: (req: Request) => isAllowedPrivateIp(req.ip || req.socket.remoteAddress || ''),
-      }),
-    );
+    // Protect all API routes: the strict ceiling off-LAN, the generous
+    // LAN ceiling on-LAN (F-031) — no client skips the limit entirely.
+    app.use('/api', generalApiRateLimit());
 
     // ── Content Security Policy ────────────────────────────────────────
     // Blocks eval() and remote code; unsafe-inline allowed for Next.js and Tailwind.
