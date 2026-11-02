@@ -178,7 +178,7 @@ export function registerRoutes(app: Express): void {
           configuration_ready: configurationReady,
           unclassified_category_id: pack.unclassifiedCategoryId,
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[API] Internal error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -230,7 +230,7 @@ export function registerRoutes(app: Express): void {
         }));
 
         res.json(results);
-      } catch (error: any) {
+      } catch (error) {
         console.error('[API] Internal error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -264,7 +264,7 @@ export function registerRoutes(app: Express): void {
         } else {
           res.json({ found: false, customer: null });
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[API] Internal error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
