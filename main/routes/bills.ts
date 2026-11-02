@@ -994,7 +994,7 @@ router.get('/', requirePermission('bills.read'), (req: Request, res: Response) =
         has_more: offset + bills.length < total,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1017,7 +1017,7 @@ router.get('/:id', requirePermission('bills.read'), (req: Request, res: Response
       : null;
 
     res.json({ bill: { ...bill, order, customer } });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1045,7 +1045,7 @@ router.get('/order/:orderId', requirePermission('bills.read'), (req: Request, re
       : null;
 
     res.json({ bill: { ...bill, order, customer } });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -3094,7 +3094,8 @@ function preparePaymentBatch(
   const resolvedPayments = payments.map((payment, index): PaymentInput => {
     if (PAYMENT_METHODS.has(payment.method)) {
       if (payment.payment_method_id === undefined) return payment;
-      const { payment_method_id: _ignored, ...builtInPayment } = payment;
+      const builtInPayment = { ...payment };
+      delete builtInPayment.payment_method_id;
       return builtInPayment;
     }
     const configured =
@@ -5351,7 +5352,7 @@ router.post('/:id/markPrinted', requirePermission('bills.print'), (req: Request,
       db.prepare('SELECT * FROM bills WHERE id = ?').get(req.params.id),
     );
     res.json({ bill: updatedBill });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -5414,7 +5415,7 @@ router.get('/:id/print-history', requirePermission('bills.read'), (req: Request,
     }
 
     res.json({ prints });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
