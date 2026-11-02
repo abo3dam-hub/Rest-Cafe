@@ -1,5 +1,7 @@
 /** WebUSB ESC/POS thermal printer driver with browser print fallback. */
 
+import { selectUsbDevice } from './webusb-selection';
+
 export type PrinterStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export type PrintMode = 'escpos' | 'browser';
@@ -137,6 +139,13 @@ class PrinterService {
     );
   }
 
+  /**
+   * Finds the granted device for a configured product name. Two
+   * identical-model printers still refuse (exactly-one rule): the
+   * configured record carries no serial, so picking one could send bytes
+   * to the wrong physical printer. That refusal is a loud error, not the
+   * silent empty selection F-027 fixes, so it stays.
+   */
   private async findUniqueConfiguredDevice(productName: string): Promise<USBDevice | null> {
     const matches = (await navigator.usb!.getDevices()).filter(
       (device) => device.productName === productName,
@@ -185,7 +194,7 @@ class PrinterService {
   private reconnectPromise: Promise<boolean> | null = null;
 
   /** Silently re-attaches to a printer granted permission in a previous session. */
-  async tryReconnect(): Promise<boolean> {
+  async tryReconnect(preferredProductName?: string | null): Promise<boolean> {
     if (this.reconnectPromise) return this.reconnectPromise;
     if (this._printMode === 'browser' || this.device || !navigator.usb) {
       return false;
@@ -196,7 +205,9 @@ class PrinterService {
       if (this.device) return true;
       try {
         const devices = await navigator.usb!.getDevices();
-        const previouslyGranted = devices[0];
+        // Prefer the selected configured printer by name, otherwise the
+        // first in stable order — never an arbitrary devices[0] (F-027).
+        const previouslyGranted = selectUsbDevice(devices, preferredProductName);
         if (!previouslyGranted) return false;
         this.setStatus('connecting');
         await this.openDevice(previouslyGranted);
