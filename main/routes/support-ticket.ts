@@ -14,7 +14,7 @@ function preLoginRateLimit(max: number) {
     windowMs: 15 * 60 * 1000,
     max,
     message: 'Too many requests. Please try again later.',
-    bypassPrivateIp: false,
+    lanCeiling: false,
   });
 }
 type SupportUser = { name?: string; email?: string; role?: string };
