@@ -3,12 +3,67 @@ import os from 'os';
 const DEFAULT_PORT = parseInt(process.env.PORT || '3001', 10);
 let activePort = DEFAULT_PORT;
 
+/** The port the main API server first tried to bind (before any bump). */
+export function getDefaultServerPort(): number {
+  return DEFAULT_PORT;
+}
+
 export function getServerPort(): number {
   return activePort;
 }
 
 export function setServerPort(port: number): void {
   activePort = port;
+}
+
+/** One of the three LAN servers whose port the operator pairs devices against. */
+export type ServerServiceId = 'api' | 'kds' | 'server-app';
+
+/** A port bump the operator was never told about (F-006): the service could
+ * not bind its default port and moved. Kept in memory for this run only;
+ * a restart re-derives it from the live ports. */
+export interface PortBumpRecord {
+  service: ServerServiceId;
+  requestedPort: number;
+  actualPort: number;
+  reason: string;
+  at: string;
+}
+
+const portBumps: PortBumpRecord[] = [];
+
+/** Record that a service moved from `fromPort` to `toPort` (EADDRINUSE/EACCES).
+ * Called from the listen-error path of each server; never throws. */
+export function recordPortBump(
+  service: ServerServiceId,
+  fromPort: number,
+  toPort: number,
+  reason: string,
+): void {
+  try {
+    portBumps.push({
+      service,
+      requestedPort: fromPort,
+      actualPort: toPort,
+      reason,
+      at: new Date().toISOString(),
+    });
+  } catch {
+    // Port-bump history is advisory; losing a record must never break startup.
+  }
+}
+
+/** Bumps recorded so far this run, oldest first. */
+export function getPortBumps(): PortBumpRecord[] {
+  return [...portBumps];
+}
+
+/** Latest bump for one service, if it moved. */
+export function getLatestPortBump(service: ServerServiceId): PortBumpRecord | null {
+  for (let i = portBumps.length - 1; i >= 0; i--) {
+    if (portBumps[i].service === service) return portBumps[i];
+  }
+  return null;
 }
 
 /** Helper to check if an IPv4 address is active and valid (excludes loopback & 169.254.x.x link-local APIPA). */
