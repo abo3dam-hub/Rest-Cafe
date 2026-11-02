@@ -284,7 +284,7 @@ router.get('/business', requireBusinessSettingsRead, (req: Request, res: Respons
   try {
     const s = getAllSettings(getDatabase());
     res.json(businessShape(s));
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -476,7 +476,7 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
     });
 
     res.json(businessShape(getAllSettings(db)));
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -486,7 +486,7 @@ router.get('/tax', requirePermission('settings.view'), (req: Request, res: Respo
   try {
     const s = getAllSettings(getDatabase());
     res.json(taxShape(s));
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -530,7 +530,7 @@ router.put('/tax', requirePermission('tax-configuration.manage'), (req: Request,
           : undefined,
     });
     res.json(taxShape(getAllSettings(db)));
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -543,7 +543,7 @@ router.get('/loyalty', requirePermission('settings.view'), (req: Request, res: R
       loyalty_enabled: s.loyalty_enabled === 'true' || s.loyalty_enabled === '1',
       global_cashback_percent: parseFloat(s.global_cashback_percent || '0'),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -578,7 +578,7 @@ router.put('/loyalty', requirePermission('settings.manage'), (req: Request, res:
       loyalty_enabled: s.loyalty_enabled === 'true' || s.loyalty_enabled === '1',
       global_cashback_percent: parseFloat(s.global_cashback_percent || '0'),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -596,7 +596,7 @@ router.get('/discount', requirePermission('settings.view'), (req: Request, res: 
       discount_requires_approval:
         s.discount_requires_approval === 'true' || s.discount_requires_approval === '1',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -655,7 +655,7 @@ router.put('/discount', requirePermission('settings.manage'), (req: Request, res
       discount_requires_approval:
         s.discount_requires_approval === 'true' || s.discount_requires_approval === '1',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -670,7 +670,7 @@ router.get('/kds', requirePermission('settings.view'), (_req: Request, res: Resp
     res.json({
       kds_default_view: s.kds_default_view === 'kanban' ? 'kanban' : 'tabs',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -689,7 +689,7 @@ router.put('/kds', requirePermission('settings.manage'), (req: Request, res: Res
     res.json({
       kds_default_view: s.kds_default_view === 'kanban' ? 'kanban' : 'tabs',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -844,7 +844,7 @@ router.get(
     try {
       const s = getAllSettings(getDatabase());
       res.json(orderNumberingShape(s));
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -922,7 +922,7 @@ router.put(
         invoice_financial_year_start_day,
       });
       res.json(orderNumberingShape(getAllSettings(db)));
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1146,7 +1146,7 @@ router.get('/', requirePermission('settings.view'), (req: Request, res: Response
   try {
     const s = getAllSettings(getDatabase());
     res.json({ settings: publicSettingsShape(s) });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1194,7 +1194,7 @@ router.get(
         updatedAt: template.updated_at,
       }));
       res.json({ core: [...CORE_BILL_TEMPLATES], plugins, merchant });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1331,7 +1331,7 @@ router.put(
 
       upsertSettings(getDatabase(), entries);
       res.json({ settings: entries });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1363,7 +1363,7 @@ router.get(
         return res.status(404).json({ error: 'Setting not found' });
       }
       res.json({ setting });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1499,7 +1499,7 @@ router.put(
 
       const setting = db.prepare('SELECT * FROM settings WHERE key = ?').get(req.params.key);
       res.json({ setting });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
