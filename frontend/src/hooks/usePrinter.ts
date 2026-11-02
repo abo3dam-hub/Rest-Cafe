@@ -25,6 +25,7 @@ import {
 import { buildTaxBillBytes, type TaxBillOptions } from '@/lib/printer/tax-bill-encoder';
 import { buildKotBytes, type KotOptions } from '@/lib/printer/kot-encoder';
 import { enqueuePendingPrintJob } from '@/lib/printer/print-queue';
+import { selectWebUsbPrinter } from '@/lib/printer/webusb-selection';
 import { isKotItemPending } from '@print/document';
 import {
   buildDeliverySlipBytes,
@@ -167,7 +168,7 @@ interface PrinterState {
   hardwarePrinter: HardwarePrinter | null;
   webusbPrinter: HardwarePrinter | null;
   defaultPrinter: HardwarePrinter | null;
-  refreshHardwarePrinter: () => Promise<void>;
+  refreshHardwarePrinter: () => Promise<HardwarePrinter | null>;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   printBill: (
@@ -219,16 +220,20 @@ export const usePrinterStore = create<PrinterState>()(
             list.find((p) => p.is_default === 1 && p.connection_type !== 'webusb') ||
             list.find((p) => p.connection_type !== 'webusb') ||
             null;
-          const webusbPrinters = list.filter((p) => p.connection_type === 'webusb');
-          const webusbPrinter = webusbPrinters.length === 1 ? webusbPrinters[0] : null;
+          // Deterministic selection (F-027): the default WebUSB printer when
+          // set, otherwise the first in stable order — never null while at
+          // least one WebUSB printer is configured.
+          const webusbPrinter = selectWebUsbPrinter(list);
           const configuredDefault = list.find((p) => p.is_default === 1) || null;
           set({
             hardwarePrinter: defaultPrinter,
             webusbPrinter,
             defaultPrinter: configuredDefault,
           });
+          return webusbPrinter;
         } catch {
           set({ hardwarePrinter: null, webusbPrinter: null, defaultPrinter: null });
+          return null;
         }
       },
 
@@ -1154,9 +1159,11 @@ export function usePrinterStatusSync(): void {
       deviceInfo: printerService.deviceInfo,
     });
 
-    store.refreshHardwarePrinter();
-    // Re-attach to previously authorized WebUSB printer across reloads.
-    printerService.tryReconnect();
+    store.refreshHardwarePrinter().then((webusbPrinter) => {
+      // Re-attach to previously authorized WebUSB printer across reloads,
+      // preferring the selected configured printer by name.
+      printerService.tryReconnect(webusbPrinter?.name ?? null);
+    });
 
     const unsub = printerService.onStatusChange((status, info) => {
       usePrinterStore.setState({
