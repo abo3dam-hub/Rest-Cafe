@@ -41,8 +41,10 @@ import {
 
 /** Normalize raw order/items/station rows into an authoritative KOT snapshot. */
 export function buildKotPrintData(order: any, items: any[], stationName: string): KotPrintData {
+  // Only items the kitchen has not seen yet: still pending, and never
+  // printed (F-004 marker — a retry or reprint sends only these).
   const ticketItems = Array.isArray(items)
-    ? items.filter((item: any) => isKotItemPending(item?.status))
+    ? items.filter((item: any) => isKotItemPending(item?.status) && !item?.kot_printed_at)
     : [];
   return {
     stationName: String(stationName ?? ''),
