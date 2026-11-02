@@ -43,6 +43,8 @@ import {
   OPERATION_REFERENCE_V4,
   POSTPAID_ATTEMPT_STORAGE_KEY,
   STRUCTURED_HELP_CAPTURE_POINTS,
+  describePostpaidAttempt,
+  isStalePostpaidAttempt,
   isUsablePostpaidAttempt,
   isUsablePrepaidAttempt,
   parsePrepaidPaymentRequest,
@@ -69,6 +71,15 @@ export interface PosOrderSubmissionSupportError {
   ticketCorrelationId: string;
   clientTicketId: string;
   payload: Record<string, unknown>;
+}
+
+export interface StalePostpaidAttemptInfo {
+  attempt: PostpaidAttempt;
+  /** Storage key the attempt was read from (user-scoped, or the legacy key). */
+  storageKey: string | null;
+  itemCount: number | null;
+  tableId: string | number | null;
+  orderNumber: string | null;
 }
 
 export interface UsePosOrderSubmissionOptions {
@@ -105,6 +116,12 @@ export interface UsePosOrderSubmissionResult {
     force?: boolean,
     reservedWindow?: Window | null,
   ) => Promise<void>;
+  /** A stored postpaid attempt for a different cart than the one in front of
+   * the cashier, surfaced on mount instead of silently forgotten. */
+  stalePostpaidAttempt: StalePostpaidAttemptInfo | null;
+  staleAttemptBusy: boolean;
+  recoverStalePostpaidAttempt: () => Promise<void>;
+  dismissStalePostpaidAttempt: () => void;
 }
 
 /** POS order submission, moved from the POS page without behavior change. */
@@ -134,6 +151,9 @@ export function usePosOrderSubmission({
   const currencyFmt = useFormatCurrency();
 
   const [supportError, setSupportError] = useState<PosOrderSubmissionSupportError | null>(null);
+  const [stalePostpaidAttempt, setStalePostpaidAttempt] =
+    useState<StalePostpaidAttemptInfo | null>(null);
+  const [staleAttemptBusy, setStaleAttemptBusy] = useState(false);
   const activeUserId = user?.id == null ? null : String(user.id);
   const prepaidAttemptRef = useRef<PrepaidAttempt | null>(null);
   const prepaidAttemptKeyRef = useRef<string | null>(null);
@@ -145,6 +165,8 @@ export function usePosOrderSubmission({
   // to the map never unmounts one (see the end of handlePlaceOrder).
   const supportErrorCountRef = useRef(0);
   const appendRecoveryStartedUsersRef = useRef<Set<string>>(new Set());
+  const staleAttemptCheckedUsersRef = useRef<Set<string>>(new Set());
+  const staleAttemptDismissedUsersRef = useRef<Set<string>>(new Set());
   const appendAttemptStorageRef = useRef<AppendAttemptStorage | null>(null);
 
   const getAppendAttemptStorage = (): AppendAttemptStorage => {
@@ -743,6 +765,119 @@ export function usePosOrderSubmission({
       waived_charge_ids: Array.from(cart.waivedChargeIds),
       opted_in_charge_ids: Array.from(cart.optedInChargeIds),
     });
+
+  // Surface a stale postpaid attempt the way appends replay on mount: an
+  // unrecovered attempt is shown to the cashier, never silently forgotten.
+  // It runs once per user session, after the cart draft has restored, so an
+  // attempt for the cart in front of the cashier is the live retry, not a
+  // stale one.
+  useEffect(() => {
+    if (!activeUserId || staleAttemptCheckedUsersRef.current.has(activeUserId)) return;
+    let attempt: PostpaidAttempt | null = null;
+    try {
+      attempt = readPostpaidAttempt();
+    } catch {
+      // Unreadable retry state is reported by the submit path; surfacing
+      // must not block the POS from mounting.
+      return;
+    }
+    staleAttemptCheckedUsersRef.current.add(activeUserId);
+    if (!attempt) return;
+    if (staleAttemptDismissedUsersRef.current.has(activeUserId)) return;
+    if (!isStalePostpaidAttempt(attempt, buildCurrentCartFingerprint())) return;
+    const described = describePostpaidAttempt(attempt);
+    setStalePostpaidAttempt({
+      attempt,
+      storageKey: postpaidAttemptKeyRef.current,
+      itemCount: described.itemCount,
+      tableId: described.tableId,
+      orderNumber: described.orderNumber,
+    });
+    // Runs once per user session to surface a stored postpaid attempt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId]);
+
+  /** Clear the stored record for one stale attempt, and only that attempt: a
+   * newer sale may have taken the key since the banner appeared, and its
+   * record must never be destroyed by cleaning up the old one. */
+  const clearStalePostpaidAttemptRecord = (info: StalePostpaidAttemptInfo): void => {
+    if (typeof window === 'undefined' || !info.storageKey) return;
+    const storage = getAppendAttemptStorage();
+    let stored: PostpaidAttempt | null = null;
+    try {
+      stored = readOrderAttempt<PostpaidAttempt>(
+        storage,
+        info.storageKey,
+        info.attempt.userId,
+        { isValid: isUsablePostpaidAttempt },
+      );
+    } catch {
+      return;
+    }
+    if (
+      stored &&
+      stored.idempotencyKey === info.attempt.idempotencyKey &&
+      stored.fingerprint === info.attempt.fingerprint
+    ) {
+      clearOrderAttempt(storage, info.storageKey, info.attempt);
+    }
+  };
+
+  /** Replay a stale postpaid attempt under its original idempotency key: the
+   * server returns the already-created order when the first response was
+   * lost, and creates it when it never arrived. The current cart may hold a
+   * different sale by now, so it is left alone. */
+  const recoverStalePostpaidAttempt = async () => {
+    const info = stalePostpaidAttempt;
+    if (!info || staleAttemptBusy) return;
+    const attempt = info.attempt;
+    setStaleAttemptBusy(true);
+    try {
+      if (attempt.order) {
+        // The sale already completed: the order exists server-side, so the
+        // attempt record can go and nothing is re-sent.
+        clearStalePostpaidAttemptRecord(info);
+        toast.success(t('orderPlaced', { number: attempt.order.order_number }));
+        setStalePostpaidAttempt(null);
+        return;
+      }
+      const operationId = attempt.operationId || createOperationReference();
+      const payload = JSON.parse(attempt.fingerprint) as Record<string, unknown>;
+      const { data } = await api.post('/orders', payload, {
+        headers: {
+          'Idempotency-Key': attempt.idempotencyKey,
+          ...operationHeaders(operationId),
+        },
+      });
+      const order = data.order as Order;
+      toast.success(t('orderPlaced', { number: order.order_number }));
+      clearStalePostpaidAttemptRecord(info);
+      setStalePostpaidAttempt(null);
+      await refreshTables();
+      await printKotIfEnabled(order);
+    } catch (error) {
+      reportOrderRequestFailure(
+        error,
+        t('placeOrderFailed'),
+        'order.create',
+        'recovery',
+        attempt.operationId || null,
+      );
+    } finally {
+      setStaleAttemptBusy(false);
+    }
+  };
+
+  const dismissStalePostpaidAttempt = () => {
+    const info = stalePostpaidAttempt;
+    if (!info) return;
+    // Hiding is session-only while the outcome is unknown: the record stays
+    // stored and the banner returns on the next mount. An attempt whose order
+    // is already confirmed can be cleared outright — the sale is on the server.
+    if (info.attempt.order) clearStalePostpaidAttemptRecord(info);
+    else if (activeUserId) staleAttemptDismissedUsersRef.current.add(activeUserId);
+    setStalePostpaidAttempt(null);
+  };
 
   const handlePlaceOrder = async () => {
     if (!validateOrderPreflight()) return;
@@ -1703,5 +1838,9 @@ export function usePosOrderSubmission({
     handleAddCartToOrder,
     handlePaymentComplete,
     printBillForTenant,
+    stalePostpaidAttempt,
+    staleAttemptBusy,
+    recoverStalePostpaidAttempt,
+    dismissStalePostpaidAttempt,
   };
 }
