@@ -87,12 +87,7 @@ function registerUnlockOnce(): void {
 // Arm the one-time unlock as soon as the module is first used in a browser.
 registerUnlockOnce();
 
-function playTone(
-  ctx: AudioContext,
-  frequency: number,
-  startAt: number,
-  duration: number,
-): void {
+function playTone(ctx: AudioContext, frequency: number, startAt: number, duration: number): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = 'sine';
@@ -180,4 +175,99 @@ export function playNewOrderChime(): void {
     return;
   }
   if (getAudioMode() === 'element') playViaElement();
+}
+
+/* --- Seen-order persistence (F-029) --- */
+
+/** The surfaces whose new-order alerts keep a persisted seen set. */
+export type OrderAlertSurface = 'kds' | 'pos';
+
+/** The seen set is capped so a long-lived board never grows the stored array without bound. */
+export const SEEN_ORDER_IDS_CAP = 500;
+
+/** localStorage key for the order ids a surface has already seen. */
+export function seenOrderIdsStorageKey(surface: OrderAlertSurface): string {
+  return `flocafe:order-alert:${surface}:seen-ids`;
+}
+
+export interface SeenOrderIdsStorage {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+}
+
+function resolveSeenOrderIdsStorage(): SeenOrderIdsStorage | null {
+  try {
+    const candidate = (globalThis as { localStorage?: unknown }).localStorage as
+      | SeenOrderIdsStorage
+      | undefined;
+    if (
+      candidate &&
+      typeof candidate.getItem === 'function' &&
+      typeof candidate.setItem === 'function'
+    ) {
+      return candidate;
+    }
+  } catch {
+    // No usable storage: the caller treats this as "never persisted".
+  }
+  return null;
+}
+
+/**
+ * The order ids a surface had already seen when it last rendered, or null
+ * when the surface never persisted a set (a brand-new board). A damaged
+ * stored value reads as never-persisted, so the first snapshot seeds
+ * silently instead of chiming for the whole board.
+ */
+export function loadSeenOrderIds(
+  surface: OrderAlertSurface,
+  storage: SeenOrderIdsStorage | null = resolveSeenOrderIdsStorage(),
+): Set<number> | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(seenOrderIdsStorageKey(surface));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const ids = parsed.filter(
+      (entry): entry is number => typeof entry === 'number' && Number.isSafeInteger(entry),
+    );
+    if (ids.length === 0) return null;
+    return new Set(ids.slice(0, SEEN_ORDER_IDS_CAP));
+  } catch {
+    return null;
+  }
+}
+
+/** Persists the seen set, keeping only the most recent ids (snapshot order). */
+export function saveSeenOrderIds(
+  surface: OrderAlertSurface,
+  ids: Iterable<number>,
+  storage: SeenOrderIdsStorage | null = resolveSeenOrderIdsStorage(),
+): void {
+  if (!storage) return;
+  try {
+    const list = Array.from(new Set(ids)).slice(-SEEN_ORDER_IDS_CAP);
+    storage.setItem(seenOrderIdsStorageKey(surface), JSON.stringify(list));
+  } catch {
+    // A denied write only loses the catch-up signal; live alerts still work.
+  }
+}
+
+/**
+ * Splits a snapshot into the orders that are new since the seen set and
+ * the updated set (previous ids pruned to the snapshot, plus the fresh
+ * ones). Pruning keeps the stored set from growing with orders that left
+ * the board.
+ */
+export function diffNewOrders<T extends { id: number }>(
+  orders: readonly T[],
+  seen: ReadonlySet<number>,
+): { fresh: T[]; nextSeen: Set<number> } {
+  const snapshotIds = new Set(orders.map((order) => order.id));
+  const fresh = orders.filter((order) => !seen.has(order.id));
+  const nextSeen = new Set<number>();
+  for (const id of seen) if (snapshotIds.has(id)) nextSeen.add(id);
+  for (const order of fresh) nextSeen.add(order.id);
+  return { fresh, nextSeen };
 }
