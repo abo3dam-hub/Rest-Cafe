@@ -316,6 +316,24 @@ test('receipt column oracle: no font-A line overflows the width it laid out for'
   }
 });
 
+test('receipt column oracle: every line fits the paper width in dots (F-018)', () => {
+  // The no-overflow test above covers font-A single-size lines only. A Font B
+  // line and a double-width line can share a cell count while differing
+  // physically — the compact 80mm qty line is 64 Font B cells, exactly the
+  // 576-dot paper width, while 64 double-width cells would be 1536 dots —
+  // so the physical budget is dots: Font A 12, Font B 9, times the width
+  // magnification in effect. Raster bands are sized by the renderer and are
+  // not text lines, so the walk does not count them here.
+  for (const { title, measurement } of measured) {
+    const [renderedWidth] = measurement.measuredRuleWidths;
+    const paperDots = renderedWidth * 12;
+    const over = measurement.lines
+      .filter((line) => line.dots > paperDots)
+      .map((line) => `line ${line.dots} dots (${line.cells} cells): ${line.text}`);
+    assert.deepEqual(over, [], `${title}: lines exceed the ${paperDots}-dot paper width`);
+  }
+});
+
 test('receipt column oracle: the backend renders at the column count it is driven with', () => {
   for (const template of TEMPLATES) {
     for (const columns of BACKEND_COLUMNS) {
