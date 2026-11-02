@@ -1,7 +1,14 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Customer, Product, Addon, CartItem, ProductVariant } from '@/lib/types';
 import { generateCartItemId, normalizeCartItems } from '@/lib/cart-identity';
 import { cartLineUnitPrice, normalizeOverridePrice } from '@/lib/cart-price';
+import {
+  CART_DRAFT_STORAGE_KEY,
+  createCartDraftStorage,
+  parseCartDraft,
+  serializeCartDraft,
+} from '@/lib/cart-draft';
 
 export { generateCartItemId, normalizeCartItems } from '@/lib/cart-identity';
 
@@ -82,7 +89,9 @@ interface CartState {
   itemCount: () => number;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
   items: [],
   orderType: 'dine_in',
   tableId: null,
@@ -346,4 +355,25 @@ export const useCartStore = create<CartState>((set, get) => ({
   itemCount: () => {
     return get().items.reduce((sum, item) => sum + item.quantity, 0);
   },
-}));
+    }),
+    {
+      name: CART_DRAFT_STORAGE_KEY,
+      storage: createJSONStorage(() => createCartDraftStorage()),
+      // Only the draft fields persist; actions and derived values stay live.
+      // A damaged draft restores nothing: the cashier re-rings it instead of
+      // selling from corrupted lines.
+      partialize: (state) => serializeCartDraft(state),
+      merge: (persisted, current) => {
+        const draft = parseCartDraft(persisted);
+        if (!draft) return current;
+        return {
+          ...current,
+          ...draft,
+          waivedChargeIds: new Set(draft.waivedChargeIds),
+          optedInChargeIds: new Set(draft.optedInChargeIds),
+        };
+      },
+      version: 1,
+    },
+  ),
+);
