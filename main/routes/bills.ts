@@ -17,7 +17,11 @@ import {
 } from '../db';
 import { asyncHandler } from '../middleware/async-handler';
 import { notifyKdsUpdate, notifyOrderUpdated } from '../services/kds';
-import { printReceipt } from '../services/receipt';
+import {
+  recordPrintConfirmation,
+  recordBillPrintWarnings,
+  getBillPrintWarnings,
+} from '../services/receipt';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { hasPermission, requirePermission } from '../services/authorization';
 import { ROLE_ACCESS, hasRole } from '../../shared/role-permissions';
@@ -5321,6 +5325,10 @@ router.patch(
   },
 );
 
+// POST /api/bills/:id/markPrinted - operator attestation that the paper
+// actually printed. A bare request no longer marks: the operator must
+// confirm with { confirmed: true } (e.g. after a browser-print dialog,
+// which reports no paper-output confirmation of its own).
 router.post('/:id/markPrinted', requirePermission('bills.print'), (req: Request, res: Response) => {
   try {
     const db = getDatabase();
@@ -5328,12 +5336,16 @@ router.post('/:id/markPrinted', requirePermission('bills.print'), (req: Request,
     if (!bill) {
       return res.status(404).json({ error: 'Bill not found' });
     }
+    if (req.body?.confirmed !== true) {
+      return res.status(400).json({ error: 'confirmed must be true to mark a bill printed' });
+    }
 
     db.prepare('UPDATE bills SET printed_at = ?, updated_at = ? WHERE id = ?').run(
       now(),
       now(),
       req.params.id,
     );
+    recordBillPrintWarnings(db, Number(req.params.id), req.body?.warnings, 'operator', null);
 
     const updatedBill = parseRowJson(
       db.prepare('SELECT * FROM bills WHERE id = ?').get(req.params.id),
@@ -5345,7 +5357,12 @@ router.post('/:id/markPrinted', requirePermission('bills.print'), (req: Request,
   }
 });
 
-// POST /api/bills/:id/print - Print or reprint bill
+// POST /api/bills/:id/print - record a CONFIRMED print, not a print request.
+// The frontend calls this only after the bytes were dispatched (WebUSB
+// transfer accepted, server print accepted, or the browser print dialog
+// invoked) and passes any warnings the dispatch produced; they are stored
+// with the bill. Direct API callers must confirm through this endpoint
+// after dispatching the bytes themselves.
 router.post(
   '/:id/print',
   requirePermission('printing.execute'),
@@ -5360,7 +5377,12 @@ router.post(
       // User ID is set by the requireAuth middleware after JWT verification
       const userId = (req as any).user?.userId || (req as any).user?.id || 'unknown';
 
-      const result = await printReceipt(parseInt(req.params.id as string), userId, print_type);
+      const result = recordPrintConfirmation(
+        parseInt(req.params.id as string),
+        userId,
+        print_type,
+        req.body?.warnings,
+      );
       res.json(result);
     } catch (error: any) {
       // Return 404 for "Bill not found", 500 for other errors
@@ -5386,6 +5408,10 @@ router.get('/:id/print-history', requirePermission('bills.read'), (req: Request,
       ORDER BY pl.printed_at DESC
     `)
       .all(req.params.id);
+    const warnings = getBillPrintWarnings(db, Number(req.params.id));
+    for (const print of prints as Array<Record<string, unknown>>) {
+      print.warnings = warnings.filter((w) => w.print_log_id === print.id);
+    }
 
     res.json({ prints });
   } catch (error: any) {
