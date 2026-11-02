@@ -907,6 +907,15 @@ export function waitForDatabaseRequests(timeoutMs?: number): Promise<void> {
 
 export function closeDatabase(): void {
   if (db) {
+    // Checkpoint the WAL before closing (R-02) so an unexpected Windows
+    // shutdown leaves the least possible unmerged journal behind. Best
+    // effort only: a checkpoint that cannot run (read-only handle, a
+    // transaction still open) must never prevent the close itself.
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (err) {
+      console.warn('[DB] WAL checkpoint on close failed (continuing with close):', err);
+    }
     db.close();
     db = null as unknown as Database.Database;
     bumpSettingsRevision();
