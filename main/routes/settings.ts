@@ -24,6 +24,7 @@ import {
   isOfflineMode,
   notifyOfflineModeEnabled,
 } from '../services/offline-mode';
+import { AUTOSTART_SETTING_KEY, applyAutostartSetting } from '../services/autostart';
 import {
   getCountryByCode,
   getCurrencyFractionDigits,
@@ -1124,6 +1125,7 @@ const ALLOWED_WILDCARD_KEYS = new Set([
   'pos_category_sort',
   'pos_item_sort',
   'require_open_shift',
+  'autostart_enabled',
 ]);
 
 /**
@@ -1402,7 +1404,8 @@ router.put(
       let valueToPersist: unknown = value;
       if (
         req.params.key === 'require_open_shift' ||
-        req.params.key === 'card_transaction_id_required'
+        req.params.key === 'card_transaction_id_required' ||
+        req.params.key === AUTOSTART_SETTING_KEY
       ) {
         if (value !== true && value !== false && value !== 'true' && value !== 'false') {
           return res.status(400).json({ error: `${req.params.key} must be a boolean` });
@@ -1485,6 +1488,13 @@ router.put(
         })();
       } else {
         saveSetting.run(req.params.key, valueToPersist as string, now());
+      }
+
+      // Autostart (F-005): apply the freshly saved value immediately so
+      // turning the toggle off is respected in this run, not only after
+      // a restart. Never blocks the response.
+      if (req.params.key === AUTOSTART_SETTING_KEY) {
+        applyAutostartSetting(valueToPersist === 'true');
       }
 
       const setting = db.prepare('SELECT * FROM settings WHERE key = ?').get(req.params.key);
