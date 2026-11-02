@@ -1216,7 +1216,15 @@
     "soldOutReminderTitle": "Items still sold out",
     "soldOutReactivateAll": "Reactivate all",
     "soldOutSaved": "Sold-out state updated",
-    "soldOutSaveFailed": "Could not update sold-out state"
+    "soldOutSaveFailed": "Could not update sold-out state",
+    "catalogRetrying": "Reloading the menu…",
+    "offlineIndicator": "Offline — check the network before continuing the sale",
+    "staleAttemptTitle": "An earlier sale was not confirmed",
+    "staleAttemptBody": "An earlier sale with {count} items never confirmed its result. Check it before continuing.",
+    "staleAttemptBodyUnknown": "An earlier sale never confirmed its result. Check it before continuing.",
+    "staleAttemptPlaced": "This sale was already placed as order {number}.",
+    "staleAttemptRecover": "Check status",
+    "staleAttemptDismiss": "Dismiss for now"
   },
   "printTest": {
     "amt": "Amt",
