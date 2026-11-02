@@ -167,7 +167,7 @@ export function generateKotHtml(order: Order, opts: KotWebPrintOptions = {}): st
       ?.trim() ?? '';
 
   const items = (order.items ?? [])
-    .filter((item) => isKotItemPending(item.status))
+    .filter((item) => isKotItemPending(item.status) && !item.kot_printed_at)
     .map((item) => ({
       name: directionalText(
         formatItemHeading(String(item.product_name ?? ''), item.variant_selection),
