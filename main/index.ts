@@ -21,6 +21,7 @@ import {
   closeDatabase,
   waitForDatabaseRequests,
   beginDatabaseShutdown,
+  pruneIdempotencyRecords,
 } from './db';
 import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/catalog';
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
@@ -1157,6 +1158,20 @@ async function initialize(): Promise<void> {
     console.log('[Flo] Initializing database...');
     initDatabase();
     if (isShutdownRequested()) return;
+
+    // Idempotency retention (F-033): drop keyed order/payment/refund records
+    // older than the retention window so the tables stay bounded. Replay
+    // inside the window is untouched. A failure here must not block startup.
+    try {
+      const pruned = pruneIdempotencyRecords();
+      const prunedTotal = pruned.payment + pruned.order + pruned.refund;
+      if (prunedTotal > 0)
+        console.log(
+          `[DB] Idempotency retention pruned ${pruned.payment} payment, ${pruned.order} order, ${pruned.refund} refund records`,
+        );
+    } catch (error) {
+      console.warn('[DB] Idempotency retention cleanup failed (non-fatal):', error);
+    }
 
     // Autostart (F-005): honour the stored preference in the Windows login
     // items. Safe no-op off Windows; never throws.
