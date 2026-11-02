@@ -38,7 +38,7 @@ import {
 import { isExcludedFromBillReceipt } from '../../../../shared/order-item-status';
 
 export interface TaxBillOptions {
-  /** 58 mm (2.5", 32 cols) or 80 mm (3.5", 42 cols). Default: 58 */
+  /** 58 mm (2.5", 32 cols) or 80 mm (3.5", 48 cols). Default: 58 */
   paperWidth?: 58 | 80;
   /** Exact column count the configured printer declares; overrides `paperWidth`. */
   columns?: number;
