@@ -289,7 +289,7 @@ router.post(
         // Single tenant — frontend auto-selects when tenants.length === 1
         tenants: [tenant],
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[Auth] Login error:', error);
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -514,7 +514,7 @@ router.post('/password/change', authRateLimit(), (req: Request, res: Response) =
     invalidateUserAuthCache(decoded.userId);
 
     res.json({ message: 'Password changed successfully' });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -641,7 +641,7 @@ router.post('/recover-password', authRateLimit(), (req: Request, res: Response) 
         ? 'Owner access restored. You can now log in with your new password.'
         : 'Password reset successfully. You can now log in with your new password.',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Auth] Password recovery error:', error);
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -662,7 +662,7 @@ router.get('/setup/status', (_req: Request, res: Response) => {
       masterPinAvailable: isMasterPinAvailable(),
       currencyReset,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -685,7 +685,7 @@ router.get('/branding', (_req: Request, res: Response) => {
       business_name: s.business_name || '',
       logo: resolveBrandLogo(s.receipt_logo),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
