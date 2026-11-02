@@ -4,8 +4,11 @@ FloCafe stores everything in one SQLite file managed with `better-sqlite3`. Sche
 append-only and versioned. This page covers where the file lives, how a version becomes a
 migration, what protects customer data on the way, and how to verify all of it.
 
-The code is [`main/db.ts`](../../main/db.ts). It is large and owns more than the schema; the
-sections below are the parts a contributor needs in order to change it safely.
+The code is split across [`main/db/`](../../main/db/): `core.ts` (connection, settings cache,
+and shared helpers), `migrations.ts` (the registry and the initial schema), `backup.ts`
+(backup, restore, and journals), and `settings.ts` (settings access). [`main/db.ts`](../../main/db.ts)
+is a 150-line re-export barrel over those modules; call sites import from it exactly as before.
+The sections below are the parts a contributor needs in order to change the schema safely.
 
 ## Database location
 
@@ -36,7 +39,8 @@ self-contained.
 
 ## The migration registry
 
-`MIGRATIONS` in [`main/db.ts`](../../main/db.ts) is the exported, append-only array of
+`MIGRATIONS` in [`main/db/migrations.ts`](../../main/db/migrations.ts) (re-exported by the
+[`main/db.ts`](../../main/db.ts) barrel) is the exported, append-only array of
 `{ version, name, up }` entries. Its order and version numbers are the persisted schema contract
 for installed databases. The registry is the source for the current entry count, latest version,
 and migration names.
@@ -62,7 +66,7 @@ flowchart TB
   F --> G{"user_version ><br/>highest MIGRATIONS?"}
   G -->|"newer than build"| H["THROW SchemaVersionMismatchError<br/>startup fails"]
   G -->|"equal"| J["integrity checks and repairs"]
-  G -->|"older"| I["checkpoint WAL, copy to backups/<br/>flo-backup-...-pre-vA-to-vB.db"]
+  G -->|"older"| I["checkpoint WAL, copy to backups/<br/>rest-cafe-backup-...-pre-vA-to-vB.db"]
   I --> K["for each pending migration:<br/>transaction { up(); user_version = n }"]
   K --> J
   J --> L["foreign_keys ON"]
@@ -81,12 +85,12 @@ Startup refuses to continue in two situations, and both exist to protect custome
 2. **A database newer than the build.** If `user_version` is greater than the highest migration in
    this build, `runMigrations` throws `SchemaVersionMismatchError`. An older build must not open a
    newer schema, because the migrations it does know how to run would be the wrong ones. Startup
-   fails with both version numbers reported to telemetry.
+   fails, and the error message carries both version numbers.
 
 ## The automatic pre-migration backup
 
 Before any pending batch runs, `syncBackupBeforeMigration` writes a snapshot into
-`backups/flo-backup-<timestamp>-pre-v<from>-to-v<to>.db`. On a brand-new install, where no source
+`backups/rest-cafe-backup-<timestamp>-pre-v<from>-to-v<to>.db`. On a brand-new install, where no source
 file exists yet, it still creates the file so the backup contract holds, and stamps it with the
 pre-migration version.
 
@@ -148,22 +152,23 @@ compromised renderer cannot aim the restore at a file of its choosing.
 
 A successful restore keeps the snapshot of what it replaced. `retainRestoreSafetyCopy` stamps
 `_flo_meta` onto the replacement-journal snapshot, copies it to
-`flo-backup-<timestamp>-pre-restore-v<version>.db`, and prunes to `MAX_RETAINED_RESTORE_SAFETY_COPIES`
+`rest-cafe-backup-<timestamp>-pre-restore-v<version>.db`, and prunes to `MAX_RETAINED_RESTORE_SAFETY_COPIES`
 (3). It copies rather than renames so the journal keeps pointing at a real file, which is what lets a
 crash between the committed journal and cleanup still roll the live database back. Because the copy
-carries the `flo-backup-` prefix, it appears in `listBackups()` and is restorable through the same
+carries a managed-backup prefix, it appears in `listBackups()` and is restorable through the same
 preset path as any other managed backup, so a restore of the wrong file is an undo rather than data
 loss. Retention failure is logged and never fails the committed restore.
 
 ### Daily local backup
 
-`main/services/local-backup.ts` writes one backup a day to `Documents/FloCafe/Backups`, outside
+`main/services/local-backup.ts` writes one backup a day to `Documents/RestCafe/Backups`, outside
 `userData`, so it survives a data wipe, a reinstall, and an uninstall. It is on unless
 `local_backup_enabled` is `'false'`. A check runs two minutes after startup and then hourly; it calls
 `createBackup()` when the newest file is at least 24 hours old, and skips a database with
 no orders, products, or customers so an empty install cannot push real backups out of retention.
-Files are named `flo-backup-<UTC timestamp with milliseconds>Z.db`; names from older releases
-without milliseconds are still recognized. Each file is staged and then hard-linked in under the
+Files are named `rest-cafe-backup-<UTC timestamp with milliseconds>Z.db` (with `-` in place of
+`:` and `.` in the timestamp); names from older releases under the legacy `flo-backup-` prefix
+and without milliseconds are still recognized. Each file is staged and then hard-linked in under the
 first free millisecond name, so a snapshot never replaces an existing backup. Only names matching that pattern are listed or pruned. Files dated
 ahead of the clock rank below every other file because their time cannot be trusted; the file just
 written is always kept, and the newest `LOCAL_BACKUP_RETENTION` (5) are kept in total. Failures are
