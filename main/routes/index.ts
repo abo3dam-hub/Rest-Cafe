@@ -27,6 +27,7 @@ import { kdsRoutes } from './kds';
 import { customerDisplayFeedRoutes } from './customer-display-feed';
 import { kdsInfoRoutes } from './kds-info';
 import { posInfoRoutes } from './pos-info';
+import { serverPortsRoutes } from './server-ports';
 import { serverAppInfoRoutes } from './server-app-info';
 import { selfOrderAdminRoutes } from './self-order-admin';
 import { moreAppsRoutes } from './more-apps';
@@ -117,6 +118,7 @@ export function registerRoutes(app: Express): void {
   app.use('/api/customer-display', customerDisplayFeedRoutes);
   app.use('/api/kds-info', kdsInfoRoutes);
   app.use('/api/pos-info', posInfoRoutes);
+  app.use('/api/server-ports', serverPortsRoutes);
   app.use('/api/server-app-info', serverAppInfoRoutes);
   app.use('/api/self-order-admin', selfOrderAdminRoutes);
   app.use('/api/more-apps', moreAppsRoutes);
