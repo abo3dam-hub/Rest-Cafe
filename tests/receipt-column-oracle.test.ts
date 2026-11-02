@@ -19,9 +19,9 @@
  * width change shows up as a reflowed receipt diff instead of a bare number.
  *
  * This suite measures and reports. It does not decide what a receipt should be
- * allowed to be: no production width is changed here, and the 80mm divergence
- * between the two paths is recorded as a measured fact with the decision left
- * open.
+ * allowed to be: no production width is changed here. The 80mm width is
+ * unified on the backend profile width (48 columns, Font A) since audit-fix
+ * Delivery 5, and the cross-path test below pins that agreement.
  */
 
 import * as fs from 'node:fs';
@@ -71,7 +71,7 @@ const BACKEND_COLUMNS = [32, 42, 48] as const;
 const PROFILE_COLUMNS: ReadonlyMap<string, number> = new Map([
   ['xprinter-xp-v320m-v330m', 48],
   ['epson-tm-series', 48],
-  ['generic-escpos-80', 42],
+  ['generic-escpos-80', 48],
   ['generic-escpos-58', 32],
 ]);
 /** Templates both render paths implement. */
@@ -401,10 +401,9 @@ const crossPath = PAPER_SIZES.map((paperWidth) => {
 const FRONTEND_REACHABLE_COLUMNS = new Set(crossPath.map((row) => row.frontend));
 
 test('receipt column oracle: the cross-path column table is measured end to end', () => {
-  // Reported, not asserted equal: the two paths are compared at the same paper
-  // for the first time here, and the result decides nothing. The width decision
-  // is deferred, so this prints the table and only checks the measurement is
-  // coherent (both sides rendered exactly one width, and each is its own input).
+  // The two paths are compared at the same paper, and both widths are pinned
+  // to agree since audit-fix Delivery 5 unified 80mm on 48 columns: a
+  // divergence here is a regression, not a report.
   for (const row of crossPath) {
     assert.ok(
       row.backend > 0 && row.frontend > 0,
@@ -416,24 +415,24 @@ test('receipt column oracle: the cross-path column table is measured end to end'
         `${row.backend === row.frontend ? 'agree' : `DIVERGE by ${row.frontend - row.backend}`}`,
     );
   }
-  const measured58 = crossPath.find((row) => row.paperWidth === 58);
-  assert.ok(measured58, '58mm row missing from the cross-path table');
-  assert.equal(
-    measured58.backend,
-    measured58.profileColumns,
-    '58mm: backend must render the column count its profile declares',
-  );
-  assert.equal(
-    measured58.backend,
-    measured58.frontend,
-    '58mm: both render paths must render the same number of columns',
-  );
+  for (const row of crossPath) {
+    assert.equal(
+      row.backend,
+      row.profileColumns,
+      `${row.paperWidth}mm: backend must render the column count its profile declares`,
+    );
+    assert.equal(
+      row.backend,
+      row.frontend,
+      `${row.paperWidth}mm: both render paths must render the same number of columns`,
+    );
+  }
 });
 
 test('receipt column oracle: every paper size the frontend reaches is on the shared width ladder', () => {
   // A width only one of the two paths can reach is a width nothing compares.
-  // The generic 80mm profile is such a width today; this keeps that gap visible
-  // in the suite output instead of silent.
+  // Both paper sizes sit on the shared ladder since the 80mm unification,
+  // so a rung off the ladder fails here instead of going uncompared.
   for (const row of crossPath) {
     assert.ok(
       BACKEND_COLUMNS.includes(row.frontend as (typeof BACKEND_COLUMNS)[number]),
