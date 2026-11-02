@@ -792,7 +792,7 @@ router.get(
         orders: ordersWithRelations,
         ...(nextCursor !== null && { nextCursor }),
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1304,7 +1304,7 @@ router.get(
       // Hydrate relations using batchHydrateOrders.
       const [hydrated] = batchHydrateOrders(db, [order]);
       res.json({ order: hydrated });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
