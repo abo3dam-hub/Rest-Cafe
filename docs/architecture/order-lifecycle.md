@@ -271,7 +271,9 @@ enabled, excluding the share funded by wallet points.
 statuses inside a single transaction. Its allowed transitions, terminal completion and cancellation
 safeguards, `override_pin` approval rules, pending-only restock rule, and audit fields are in the
 [API reference](../reference/api.md#orders). Kitchen item status is a separate surface
-(`/api/order-items`); see [order-item status](../reference/api.md#order-item-status).
+(`/api/order-items`); see [order-item status](../reference/api.md#order-item-status). Item-status
+progression is deliberately unenforced: any authorised role may move an item to any live status,
+forward or backward, and accountability comes from audit attribution, not transition rules.
 
 ## Refunds
 
