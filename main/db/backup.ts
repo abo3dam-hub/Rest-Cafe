@@ -802,7 +802,7 @@ function removeDatabaseFiles(dbPath: string): string[] {
   for (const filePath of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
     try {
       if (pathEntryExists(filePath)) fs.unlinkSync(filePath);
-    } catch (error: any) {
+    } catch (error) {
       console.warn(`[DB] Could not remove ${filePath}:`, error);
       failures.push(filePath);
     }
@@ -2211,15 +2211,21 @@ export function mergeUserStationSecurityState(
     );
   }
 
-  const currentUsers = dbInstance.prepare('SELECT id FROM users').all() as { id: string }[];
-  for (const user of currentUsers) {
-    dbInstance.prepare('DELETE FROM station_users WHERE user_id = ?').run(user.id);
-  }
-  const insert = dbInstance.prepare(
-    'INSERT INTO station_users (user_id, station_id, created_at) VALUES (?, ?, ?)',
-  );
-  for (const row of rows) {
-    if (preservedIds.has(row.user_id)) insert.run(row.user_id, row.station_id, now());
+  // With no live users there is no live assignment state to protect, so the
+  // restored assignments stay as the backup had them; a fresh install must
+  // not silently unassign every chef. When the live store has users, its
+  // assignments win and the restored ones are replaced, as before.
+  if (userIds.length > 0) {
+    const currentUsers = dbInstance.prepare('SELECT id FROM users').all() as { id: string }[];
+    for (const user of currentUsers) {
+      dbInstance.prepare('DELETE FROM station_users WHERE user_id = ?').run(user.id);
+    }
+    const insert = dbInstance.prepare(
+      'INSERT INTO station_users (user_id, station_id, created_at) VALUES (?, ?, ?)',
+    );
+    for (const row of rows) {
+      if (preservedIds.has(row.user_id)) insert.run(row.user_id, row.station_id, now());
+    }
   }
 }
 
@@ -2454,15 +2460,21 @@ export function mergeUserSecurityState(
   }
 
   // Accounts introduced only by an older snapshot must not become a new
-  // login path without an explicit owner reactivation.
+  // login path without an explicit owner reactivation — but only when the
+  // live database actually has users to protect. On a fresh install the
+  // preserved list is empty, and disabling every restored account would
+  // strand the store: the backup owner could not log in, and first-run
+  // setup refuses because a user row already exists.
   const preservedIds = new Set(rows.map((row) => row.id));
   const restoredUsers = dbInstance.prepare('SELECT id FROM users').all() as { id: string }[];
   const restoredIds = new Set(restoredUsers.map((user) => user.id));
-  const disableRestoredOnly = dbInstance.prepare(
-    'UPDATE users SET is_active = 0, tokens_valid_after = ? WHERE id = ?',
-  );
-  for (const user of restoredUsers) {
-    if (!preservedIds.has(user.id)) disableRestoredOnly.run(now(), user.id);
+  if (rows.length > 0) {
+    const disableRestoredOnly = dbInstance.prepare(
+      'UPDATE users SET is_active = 0, tokens_valid_after = ? WHERE id = ?',
+    );
+    for (const user of restoredUsers) {
+      if (!preservedIds.has(user.id)) disableRestoredOnly.run(now(), user.id);
+    }
   }
 
   const insertPreservedUser = dbInstance.prepare(`
