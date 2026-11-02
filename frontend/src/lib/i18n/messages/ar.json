@@ -1216,7 +1216,15 @@
     "soldOutReminderTitle": "أصناف ما زالت منتهية الكمية",
     "soldOutReactivateAll": "إعادة تفعيل الكل",
     "soldOutSaved": "تم تحديث حالة انتهاء الكمية",
-    "soldOutSaveFailed": "تعذّر تحديث حالة انتهاء الكمية"
+    "soldOutSaveFailed": "تعذّر تحديث حالة انتهاء الكمية",
+    "catalogRetrying": "جارٍ إعادة تحميل القائمة…",
+    "offlineIndicator": "غير متصل — تحقّق من الشبكة قبل متابعة البيع",
+    "staleAttemptTitle": "طلب سابق لم يُؤكَّد",
+    "staleAttemptBody": "بيع سابق فيه {count} أصناف لم يصل تأكيد نتيجته. تحقّق منه قبل المتابعة.",
+    "staleAttemptBodyUnknown": "بيع سابق لم يصل تأكيد نتيجته. تحقّق منه قبل المتابعة.",
+    "staleAttemptPlaced": "هذا البيع تمّ تسجيله سابقاً كطلب رقم {number}.",
+    "staleAttemptRecover": "تحقّق من الحالة",
+    "staleAttemptDismiss": "تجاهل مؤقتاً"
   },
   "printTest": {
     "amt": "المبلغ",
