@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react';
 import api, {
   captureClientOperationFailure,
   createOperationReference,
+  LONG_API_REQUEST_TIMEOUT_MS,
   operationHeaders,
 } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -995,7 +996,11 @@ export default function OrdersPage() {
         );
         showPrintWarningsToast(printWarnings);
         try {
-          await api.post(`/bills/${bill.id}/print`, { print_type: 'receipt' });
+          await api.post(
+            `/bills/${bill.id}/print`,
+            { print_type: 'receipt' },
+            { timeout: LONG_API_REQUEST_TIMEOUT_MS },
+          );
         } catch {
           /* best-effort history tracking */
         }
@@ -1042,7 +1047,11 @@ export default function OrdersPage() {
       toast.success(isReprint ? tOrders('printReceiptReprint') : tOrders('printReceipt'));
       showPrintWarningsToast(printWarnings);
       try {
-        await api.post(`/bills/${billId}/print`, { print_type: isReprint ? 'reprint' : 'receipt' });
+        await api.post(
+          `/bills/${billId}/print`,
+          { print_type: isReprint ? 'reprint' : 'receipt' },
+          { timeout: LONG_API_REQUEST_TIMEOUT_MS },
+        );
         fetchPrintHistory(billId);
       } catch {
         /* best-effort history tracking */
