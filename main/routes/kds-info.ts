@@ -2,7 +2,7 @@
 import { Router, Request, Response } from 'express';
 import QRCode from 'qrcode';
 import { getLocalIP, getAllLocalIPs } from '../server-state';
-import { getKdsPort } from '../kds-server';
+import { getDefaultKdsPort, getKdsPort } from '../kds-server';
 import { requireKdsEnabled } from '../middleware/security';
 import { asyncHandler } from '../middleware/async-handler';
 
@@ -10,40 +10,49 @@ const router = Router();
 
 router.use(requireKdsEnabled);
 
-router.get('/', asyncHandler(async (_req: Request, res: Response) => {
-  try {
-    const kdsPort = getKdsPort();
-    const ip = getLocalIP();
-    const allIps = getAllLocalIPs();
+router.get(
+  '/',
+  asyncHandler(async (_req: Request, res: Response) => {
+    try {
+      const kdsPort = getKdsPort();
+      const ip = getLocalIP();
+      const allIps = getAllLocalIPs();
 
-    const mdnsUrl = `http://flo.local:${kdsPort}`;
-    const ipUrl   = `http://${ip}:${kdsPort}`;
-    const qrUrl   = ipUrl;
+      const mdnsUrl = `http://flo.local:${kdsPort}`;
+      const ipUrl = `http://${ip}:${kdsPort}`;
+      const qrUrl = ipUrl;
 
-    const ipsData = await Promise.all(allIps.map(async (localIp) => {
-      const url = `http://${localIp}:${kdsPort}`;
-      try {
-        const qr_data = await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', width: 256 });
-        return { ip: localIp, url, qr_data };
-      } catch {
-        return { ip: localIp, url, qr_data: null };
-      }
-    }));
+      const ipsData = await Promise.all(
+        allIps.map(async (localIp) => {
+          const url = `http://${localIp}:${kdsPort}`;
+          try {
+            const qr_data = await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', width: 256 });
+            return { ip: localIp, url, qr_data };
+          } catch {
+            return { ip: localIp, url, qr_data: null };
+          }
+        }),
+      );
 
-    const primaryIpData = ipsData.find((entry) => entry.ip === ip);
-    const qrDataUrl = primaryIpData?.qr_data ?? null;
+      const primaryIpData = ipsData.find((entry) => entry.ip === ip);
+      const qrDataUrl = primaryIpData?.qr_data ?? null;
 
-    res.json({
-      mdns_url:    mdnsUrl,
-      ip_url:      ipUrl,
-      qr_url:      qrUrl,
-      qr_data_url: qrDataUrl,
-      ips_data:    ipsData,
-    });
-  } catch (error: any) {
-    console.error('[API] Internal error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}));
+      res.json({
+        mdns_url: mdnsUrl,
+        ip_url: ipUrl,
+        qr_url: qrUrl,
+        qr_data_url: qrDataUrl,
+        ips_data: ipsData,
+        // Live port the KDS server actually bound, for the pairing tab (F-006).
+        port: kdsPort,
+        requested_port: getDefaultKdsPort(),
+        port_bumped: kdsPort !== getDefaultKdsPort(),
+      });
+    } catch (error: any) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }),
+);
 
 export const kdsInfoRoutes = router;
