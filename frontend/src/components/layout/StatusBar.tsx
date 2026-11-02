@@ -23,7 +23,7 @@ import { tenantCan } from '@/lib/permissions';
 import { usePrinterStore } from '@/hooks/usePrinter';
 import type { CashSession } from '@/hooks/useCashSession';
 import { printerService } from '@/lib/printer/PrinterService';
-import api from '@/lib/api';
+import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import { Ltr } from './Ltr';
 
 interface StatusInfo {
@@ -250,7 +250,9 @@ export default function StatusBar() {
   const handleTestPrint = async () => {
     setIsTestingPrint(true);
     try {
-      const res = await api.post<PrinterActionResponse>('/printers/test-active');
+      const res = await api.post<PrinterActionResponse>('/printers/test-active', undefined, {
+        timeout: LONG_API_REQUEST_TIMEOUT_MS,
+      });
       await printWebUsbAction(res.data);
       toast.success(tSettings('testPrintSent') || 'Test print sent!');
     } catch (err: unknown) {
@@ -267,7 +269,9 @@ export default function StatusBar() {
   const handleKickDrawer = async () => {
     setIsKickingDrawer(true);
     try {
-      const res = await api.post<PrinterActionResponse>('/printers/kick-drawer');
+      const res = await api.post<PrinterActionResponse>('/printers/kick-drawer', undefined, {
+        timeout: LONG_API_REQUEST_TIMEOUT_MS,
+      });
       await printWebUsbAction(res.data);
       toast.success(tSettings('cashDrawerPulseSent'));
     } catch (err: unknown) {
