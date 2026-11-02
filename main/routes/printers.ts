@@ -297,7 +297,7 @@ router.post('/', requirePermission('printers.manage'), (req: Request, res: Respo
         connection_type,
         ip_address ?? null,
         port ?? 9100,
-        paper_width ?? 'cols-42',
+        paper_width ?? 'cols-48',
         shouldBeDefault ? 1 : 0,
         cash_drawer_pulse_enabled === true ? 1 : 0,
         now(),
@@ -815,7 +815,7 @@ router.post(
       const targetPrinter =
         body.paperWidth === undefined
           ? printer
-          : { ...printer, paper_width: body.paperWidth === 58 ? 'cols-32' : 'cols-42' };
+          : { ...printer, paper_width: body.paperWidth === 58 ? 'cols-32' : 'cols-48' };
       const result = await printMenuDocument(
         menu,
         getHttpRequestSignal(req),
