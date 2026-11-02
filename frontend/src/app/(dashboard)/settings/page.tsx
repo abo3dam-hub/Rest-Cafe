@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
+import { cacheHostCandidates } from '@/lib/host-rediscovery';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { normalizeOptionalPhone } from '@/lib/phone';
@@ -211,6 +212,30 @@ function SettingsNavItem({
         </span>
       )}
     </button>
+  );
+}
+
+/** Live port for one pairing card (F-006): the port the service actually
+ * bound, plus a warning when it moved off its default. */
+function PairingPortNotice({
+  port,
+  requestedPort,
+  bumped,
+}: {
+  port: number;
+  requestedPort: number;
+  bumped: boolean;
+}) {
+  const t = useTranslations('settings');
+  return (
+    <div className="mb-5">
+      <p className="text-xs text-muted-foreground">{t('livePort', { port })}</p>
+      {bumped && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
+          {t('portMovedFrom', { from: requestedPort, to: port })}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -838,6 +863,9 @@ export default function SettingsPage() {
     qr_url: string;
     qr_data_url: string | null;
     ips_data?: { ip: string; url: string; qr_data: string | null }[];
+    port: number;
+    requested_port: number;
+    port_bumped: boolean;
   } | null>(null);
   // Starts true until the KDS tab performs its first load; fetchKdsInfo
   // sets it explicitly for manual refresh.
@@ -848,6 +876,7 @@ export default function SettingsPage() {
     try {
       const res = await api.get('/kds-info', signal ? { signal } : undefined);
       if (signal?.aborted) return false;
+      cacheHostCandidates((res.data.ips_data ?? []).map((d: { url: string }) => d.url));
       setKdsInfo(res.data);
       return true;
     } catch (error) {
@@ -866,6 +895,9 @@ export default function SettingsPage() {
     qr_url: string;
     qr_data_url: string | null;
     ips_data?: { ip: string; url: string; qr_data: string | null }[];
+    port: number;
+    requested_port: number;
+    port_bumped: boolean;
   } | null>(null);
   const [serverAppInfoLoading, setServerAppInfoLoading] = useState(false);
 
@@ -874,6 +906,7 @@ export default function SettingsPage() {
     api
       .get('/server-app-info')
       .then((res) => {
+        cacheHostCandidates((res.data.ips_data ?? []).map((d: { url: string }) => d.url));
         setServerAppInfo(res.data);
       })
       .catch(() => {
@@ -889,6 +922,9 @@ export default function SettingsPage() {
     qr_url: string;
     qr_data_url: string | null;
     ips_data?: { ip: string; url: string; qr_data: string | null }[];
+    port: number;
+    requested_port: number;
+    port_bumped: boolean;
   } | null>(null);
   const [posInfoLoading, setPosInfoLoading] = useState(false);
 
@@ -897,6 +933,7 @@ export default function SettingsPage() {
     api
       .get('/pos-info')
       .then((res) => {
+        cacheHostCandidates((res.data.ips_data ?? []).map((d: { url: string }) => d.url));
         setPosInfo(res.data);
       })
       .catch(() => {
@@ -1402,6 +1439,9 @@ export default function SettingsPage() {
   const [requireKitchenDeliveredSetting, setRequireKitchenDeliveredSetting] = useState(false);
   const [serverAppEnabledSetting, setServerAppEnabledSetting] = useState(true);
   const [savingServerAppEnabled, setSavingServerAppEnabled] = useState(false);
+  // Autostart (F-005): ships on; the owner toggles it in the store tab.
+  const [autostartEnabledSetting, setAutostartEnabledSetting] = useState(true);
+  const [savingAutostartEnabled, setSavingAutostartEnabled] = useState(false);
   const [serverAppBillPrintingEnabledSetting, setServerAppBillPrintingEnabledSetting] =
     useState(false);
   const [savingServerAppBillPrintingEnabled, setSavingServerAppBillPrintingEnabled] =
@@ -1971,6 +2011,13 @@ export default function SettingsPage() {
       if (tab === 'store') {
         const orderNumberAtHydrationStart = { ...orderNumberFormRef.current };
         await loadBusiness();
+        // Autostart (F-005): best effort — a failed read leaves the
+        // default-on state and must never break store-tab hydration.
+        await readOptional('/settings/autostart_enabled')
+          .then((res) => {
+            if (active()) setAutostartEnabledSetting(res?.data.setting?.value !== 'false');
+          })
+          .catch(() => {});
         const { data } = await get('/settings/order-numbering');
         if (!active()) return;
         const loaded: OrderNumberForm = {
@@ -2470,6 +2517,23 @@ export default function SettingsPage() {
     }
   };
 
+  // Autostart (F-005): saved immediately; the main process applies the new
+  // value to the Windows login items in the same request.
+  const saveAutostartEnabled = async (enabled: boolean) => {
+    const previous = autostartEnabledSetting;
+    setAutostartEnabledSetting(enabled);
+    setSavingAutostartEnabled(true);
+    try {
+      await api.put('/settings/autostart_enabled', { value: enabled ? 'true' : 'false' });
+      toast.success(enabled ? t('autostartOn') : t('autostartOff'));
+    } catch {
+      setAutostartEnabledSetting(previous);
+      toast.error(t('saveFailed'));
+    } finally {
+      setSavingAutostartEnabled(false);
+    }
+  };
+
   const saveServerAppBillPrintingEnabled = async (enabled: boolean) => {
     const previous = serverAppBillPrintingEnabledSetting;
     setServerAppBillPrintingEnabledSetting(enabled);
@@ -2936,6 +3000,23 @@ export default function SettingsPage() {
               markHydrationTouched={markHydrationTouched}
               onRequestCurrencyChange={setCurrencyResetTarget}
             />
+            {/* Autostart (F-005): owner-visible toggle, Windows login items. */}
+            {isAdmin && (
+              <div className="bg-card rounded-xl border border-border p-6 mt-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-foreground">{t('autostartEnabled')}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">{t('autostartHint')}</p>
+                  </div>
+                  <Toggle
+                    value={autostartEnabledSetting}
+                    label={t('autostartEnabled')}
+                    disabled={savingAutostartEnabled}
+                    onChange={(v) => void saveAutostartEnabled(v)}
+                  />
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="payments">
@@ -3166,6 +3247,11 @@ export default function SettingsPage() {
 
                 {posInfo && !posInfoLoading && (
                   <div className="flex flex-col gap-6 w-full">
+                    <PairingPortNotice
+                      port={posInfo.port}
+                      requestedPort={posInfo.requested_port}
+                      bumped={posInfo.port_bumped}
+                    />
                     {posInfo.ips_data && posInfo.ips_data.length > 0 ? (
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
@@ -3698,6 +3784,11 @@ export default function SettingsPage() {
 
                   {kdsInfo && !kdsInfoLoading && (
                     <div className="flex flex-col gap-6 w-full">
+                      <PairingPortNotice
+                        port={kdsInfo.port}
+                        requestedPort={kdsInfo.requested_port}
+                        bumped={kdsInfo.port_bumped}
+                      />
                       {kdsInfo.ips_data && kdsInfo.ips_data.length > 0 ? (
                         <>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
@@ -3942,6 +4033,11 @@ export default function SettingsPage() {
 
                   {serverAppInfo && !serverAppInfoLoading && (
                     <div className="flex flex-col gap-6 w-full">
+                      <PairingPortNotice
+                        port={serverAppInfo.port}
+                        requestedPort={serverAppInfo.requested_port}
+                        bumped={serverAppInfo.port_bumped}
+                      />
                       {serverAppInfo.ips_data && serverAppInfo.ips_data.length > 0 ? (
                         <>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
