@@ -60,6 +60,14 @@ const MIN_RULE_CELLS = 20;
 export interface MeasuredLine {
   /** Display cells the printer writes for this line, accounting for character-size width. */
   cells: number;
+  /**
+   * Physical width of the line in printer dots: each printable byte
+   * contributes its character-size width times the font pitch (Font A
+   * 12 dots, Font B 9 dots). A Font B line and a double-width line can
+   * share a cell count while differing physically, so the paper budget
+   * is dots, not cells.
+   */
+  dots: number;
   /** Rendered text for readable golden diffs; trailing padding trimmed. */
   text: string;
   /**
@@ -104,6 +112,7 @@ export function measureEscPos(data: Buffer | Uint8Array): EscPosMeasurement {
   const lines: MeasuredLine[] = [];
   let lineBytes: number[] = [];
   let lineCells = 0;
+  let lineDots = 0;
   let lineFontASingleSize = true;
   let unconsumedControlBytes = 0;
   let sizeWidth = 1;
@@ -118,9 +127,10 @@ export function measureEscPos(data: Buffer | Uint8Array): EscPosMeasurement {
       .replace(/\u00c4/g, '\u2500')
       .replace(/\u00cd/g, '\u2550')
       .replace(/\s+$/, '');
-    lines.push({ cells: lineCells, text, fontASingleSize: lineFontASingleSize });
+    lines.push({ cells: lineCells, dots: lineDots, text, fontASingleSize: lineFontASingleSize });
     lineBytes = [];
     lineCells = 0;
+    lineDots = 0;
     lineFontASingleSize = true;
   };
 
@@ -168,6 +178,7 @@ export function measureEscPos(data: Buffer | Uint8Array): EscPosMeasurement {
     }
     lineBytes.push(byte);
     lineCells += sizeWidth;
+    lineDots += sizeWidth * (fontB ? 9 : 12);
     if (sizeWidth !== 1 || fontB) lineFontASingleSize = false;
     // A control byte that reaches the printable path means the command table
     // mis-sized something, so the cell count is no longer trustworthy.
