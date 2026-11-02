@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { attemptHostRediscoveryOnce } from './host-rediscovery';
 
 let authRedirectInProgress = false;
 
@@ -150,7 +151,12 @@ api.interceptors.response.use(
   },
   (error) => {
     // No response arrived at all: the backend is unreachable from here.
-    if (!error.response) reportApiReachability(false);
+    // Before declaring failure, try re-discovery (F-030): the host IP may
+    // have moved and flo.local / a cached pairing host may answer.
+    if (!error.response) {
+      reportApiReachability(false);
+      if (typeof window !== 'undefined') attemptHostRediscoveryOnce();
+    }
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       // KDS routes render inline login; avoid redirecting away to /auth/login.
       const isKdsPath = window.location.pathname.startsWith('/kds');
