@@ -35,7 +35,7 @@ router.get(
   (_req: Request, res: Response) => {
     try {
       res.json(runHealthCheck());
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Tools] health-check error:', error);
       res.status(500).json({ error: 'Health check failed' });
     }
@@ -58,7 +58,7 @@ router.post(
         return res.status(400).json({ error: 'findingIds must be an array of finding id strings' });
       }
       res.json(applySafeFixes(findingIds as string[] | undefined));
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Tools] apply-safe-fixes error:', error);
       res.status(500).json({ error: 'Applying fixes failed' });
     }
@@ -172,7 +172,7 @@ router.post(
     try {
       resetMasterPin(cleanPin);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Tools] set Master PIN error:', error);
       res.status(500).json({ error: 'Failed to set Master PIN' });
     }
@@ -289,7 +289,7 @@ router.post(
         cleanupPending: false,
         localBackupFailed,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Tools] initialize error:', error);
       res.status(500).json({ error: 'Initialize failed' });
     }
