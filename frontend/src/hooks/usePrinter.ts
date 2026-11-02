@@ -24,6 +24,8 @@ import {
 } from '@/lib/printer/print-document';
 import { buildTaxBillBytes, type TaxBillOptions } from '@/lib/printer/tax-bill-encoder';
 import { buildKotBytes, type KotOptions } from '@/lib/printer/kot-encoder';
+import { enqueuePendingPrintJob } from '@/lib/printer/print-queue';
+import { isKotItemPending } from '@print/document';
 import {
   buildDeliverySlipBytes,
   type DeliverySlipContact,
@@ -51,6 +53,33 @@ import {
 import { getCountryByCode, getCurrencySymbol, resolveTenantCurrency } from '@/lib/countries';
 
 export { PrintCancelledOnTenantChangeError, isPrintCancelledOnTenantChangeError };
+
+/**
+ * Reports a successful frontend (WebUSB) KOT dispatch so the backend
+ * stamps the F-004 marker. Best-effort: a failure here must never fail a
+ * print that already happened — the next retry re-sends only unmarked items.
+ */
+async function reportKotPrinted(orderId: number, itemIds: number[]): Promise<void> {
+  if (itemIds.length === 0) return;
+  try {
+    await api.post(
+      '/printers/kot-printed',
+      { orderId, itemIds },
+      { timeout: LONG_API_REQUEST_TIMEOUT_MS },
+    );
+  } catch {
+    // The ticket already printed; the marker is caught up by the next retry.
+  }
+}
+
+/** The pending, still-unmarked item ids a KOT call covers (what its ticket prints). */
+function kotPendingUnmarkedItemIds(order: Order, opts?: { items?: OrderItem[] }): number[] {
+  const source = opts?.items ?? order.items ?? [];
+  return source
+    .filter((item) => isKotItemPending(item.status) && !item.kot_printed_at)
+    .map((item) => Number(item.id))
+    .filter((id) => Number.isSafeInteger(id));
+}
 
 type CoreBillTemplate = 'classic' | 'compact';
 
@@ -346,6 +375,23 @@ export const usePrinterStore = create<PrinterState>()(
                 response?: { data?: { error?: string; detail?: string } };
                 message?: string;
               };
+              if (!e.response) {
+                // The request never reached the backend (timeout, dropped
+                // Wi-Fi), so nothing server-side queued it: queue the retry
+                // here. A failure the backend answered is already queued
+                // server-side in print_jobs.
+                try {
+                  enqueuePendingPrintJob({
+                    kind: 'receipt',
+                    orderId: bill.order_id,
+                    billId: bill.id,
+                    isReprint,
+                    lastError: e.message || 'Print failed',
+                  });
+                } catch {
+                  // Queueing must never mask the print error itself.
+                }
+              }
               const errorMsg =
                 e.response?.data?.detail || e.response?.data?.error || e.message || 'Print failed';
               if (errorMsg.includes('No default printer configured')) {
@@ -499,7 +545,24 @@ export const usePrinterStore = create<PrinterState>()(
           throwIfTenantChanged();
 
           set({ lastPrintedBytes: bytes });
-          await printerService.print(bytes);
+          try {
+            await printerService.print(bytes);
+          } catch (err) {
+            // The WebUSB dispatch itself failed; the backend never saw
+            // it, so queue the retry here.
+            try {
+              enqueuePendingPrintJob({
+                kind: 'receipt',
+                orderId: bill.order_id,
+                billId: bill.id,
+                isReprint,
+                lastError: (err as Error)?.message || 'Print failed',
+              });
+            } catch {
+              // Queueing must never mask the print error itself.
+            }
+            throw err;
+          }
           return warnings;
         } catch (err) {
           if (!windowTransferred && reservedWindow && !reservedWindow.closed)
@@ -684,6 +747,23 @@ export const usePrinterStore = create<PrinterState>()(
                 response?: { data?: { error?: string; detail?: string } };
                 message?: string;
               };
+              if (!e.response) {
+                // The request never reached the backend (timeout, dropped
+                // Wi-Fi), so nothing server-side queued it: queue the retry
+                // here. A failure the backend answered is already queued
+                // server-side in print_jobs.
+                try {
+                  enqueuePendingPrintJob({
+                    kind: 'kot',
+                    orderId: order.id,
+                    ...(opts?.items ? { itemIds: kotPendingUnmarkedItemIds(order, opts) } : {}),
+                    ...(opts?.stationName ? { stationName: opts.stationName } : {}),
+                    lastError: e.message || 'KOT print failed',
+                  });
+                } catch {
+                  // Queueing must never mask the print error itself.
+                }
+              }
               throw new Error(
                 e.response?.data?.detail ||
                   e.response?.data?.error ||
@@ -801,7 +881,27 @@ export const usePrinterStore = create<PrinterState>()(
               throw new Error(refusal);
             }
             set({ lastPrintedBytes: output });
-            await printerService.print(output);
+            try {
+              await printerService.print(output);
+            } catch (err) {
+              // The WebUSB dispatch itself failed; the backend never saw
+              // it, so queue the retry here.
+              try {
+                enqueuePendingPrintJob({
+                  kind: 'kot',
+                  orderId: order.id,
+                  ...(opts?.items ? { itemIds: kotPendingUnmarkedItemIds(order, opts) } : {}),
+                  ...(opts?.stationName ? { stationName: opts.stationName } : {}),
+                  lastError: (err as Error)?.message || 'KOT print failed',
+                });
+              } catch {
+                // Queueing must never mask the print error itself.
+              }
+              throw err;
+            }
+            // The ticket printed: stamp the F-004 marker for exactly the
+            // items this ticket carried, so a retry skips them.
+            await reportKotPrinted(order.id, kotPendingUnmarkedItemIds(orderForPrint));
             return [
               ...failedLanguages.map((language) => ({
                 field: 'kot language',
