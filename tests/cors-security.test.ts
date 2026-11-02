@@ -1,10 +1,16 @@
-import { isAllowedPrivateIp, rateLimit, staticRouteRateLimit } from '../main/middleware/security';
+import {
+  isAllowedPrivateIp,
+  rateLimit,
+  staticRouteRateLimit,
+  generalApiRateLimit,
+  LAN_RATE_LIMIT_MULTIPLIER,
+} from '../main/middleware/security';
 import express from 'express';
 import request from 'supertest';
 
 async function run() {
   console.log('Testing CORS IP Validation...');
-  
+
   const assert = (condition: boolean, msg: string) => {
     if (!condition) {
       throw new Error(`Assertion failed: ${msg}`);
@@ -30,7 +36,10 @@ async function run() {
   assert(isAllowedPrivateIp('8.8.8.8') === false, 'Should reject public IP');
   assert(isAllowedPrivateIp('100.63.255.255') === false, 'Should reject out of bound CGNAT (low)');
   assert(isAllowedPrivateIp('100.128.0.0') === false, 'Should reject out of bound CGNAT (high)');
-  assert(isAllowedPrivateIp('172.15.255.255') === false, 'Should reject out of bound Class B (low)');
+  assert(
+    isAllowedPrivateIp('172.15.255.255') === false,
+    'Should reject out of bound Class B (low)',
+  );
   assert(isAllowedPrivateIp('172.32.0.0') === false, 'Should reject out of bound Class B (high)');
   assert(isAllowedPrivateIp('192.169.0.1') === false, 'Should reject out of bound Class C');
 
@@ -39,16 +48,21 @@ async function run() {
   assert(isAllowedPrivateIp('100.64.0') === false, 'Should reject incomplete IP');
   assert(isAllowedPrivateIp('localhost') === false, 'localhost string itself is not an IP');
 
-  // 6. Rate Limiter Bypass Tests
-  console.log('Testing Rate Limiter Bypass...');
-  
-  const createRateLimitedApp = (maxRequests: number, ipOverride?: string, extraOptions?: Record<string, any>) => {
+  // 6. Rate Limiter LAN Ceiling Tests (F-031: no client skips the limit;
+  // private/LAN IPs get a generous per-IP ceiling instead of a bypass)
+  console.log('Testing Rate Limiter LAN Ceiling...');
+
+  const createRateLimitedApp = (
+    maxRequests: number,
+    ipOverride?: string,
+    extraOptions?: Record<string, any>,
+  ) => {
     const app = express();
     if (ipOverride) {
       app.use((req, res, next) => {
         Object.defineProperty(req, 'ip', {
           get: () => ipOverride,
-          configurable: true
+          configurable: true,
         });
         next();
       });
@@ -69,30 +83,50 @@ async function run() {
   res = await request(publicApp).get('/test');
   assert(res.status === 429, 'Public IP third request should be rate limited');
 
-  // Test that private/local IPs do NOT get rate limited
+  // Test that private/local IPs get the generous LAN ceiling (max * multiplier),
+  // not the strict limit and not a bypass: 12 pass, the 13th is throttled.
+  const lanCeiling = 2 * LAN_RATE_LIMIT_MULTIPLIER;
   const privateApp = createRateLimitedApp(2, '192.168.1.100');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < lanCeiling; i++) {
     const resPrivate = await request(privateApp).get('/test');
-    assert(resPrivate.status === 200, `Private IP request ${i + 1} should bypass rate limiting`);
+    assert(
+      resPrivate.status === 200,
+      `Private IP request ${i + 1} within the LAN ceiling should be OK`,
+    );
   }
+  res = await request(privateApp).get('/test');
+  assert(res.status === 429, 'Private IP past the LAN ceiling should be rate limited (F-031)');
 
-  // Test IPv6 loopback
+  // Test IPv6 loopback gets the same LAN ceiling
   const loopbackV6App = createRateLimitedApp(2, '::1');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < lanCeiling; i++) {
     const resPrivate = await request(loopbackV6App).get('/test');
-    assert(resPrivate.status === 200, `IPv6 loopback request ${i + 1} should bypass rate limiting`);
+    assert(
+      resPrivate.status === 200,
+      `IPv6 loopback request ${i + 1} within the LAN ceiling should be OK`,
+    );
   }
+  res = await request(loopbackV6App).get('/test');
+  assert(res.status === 429, 'IPv6 loopback past the LAN ceiling should be rate limited (F-031)');
 
-  // Test IPv4-mapped IPv6 address (::ffff:127.0.0.1)
+  // Test IPv4-mapped IPv6 address (::ffff:127.0.0.1) gets the same LAN ceiling
   const mappedV4App = createRateLimitedApp(2, '::ffff:127.0.0.1');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < lanCeiling; i++) {
     const resPrivate = await request(mappedV4App).get('/test');
-    assert(resPrivate.status === 200, `IPv4-mapped IPv6 request ${i + 1} should bypass rate limiting`);
+    assert(
+      resPrivate.status === 200,
+      `IPv4-mapped IPv6 request ${i + 1} within the LAN ceiling should be OK`,
+    );
   }
+  res = await request(mappedV4App).get('/test');
+  assert(
+    res.status === 429,
+    'IPv4-mapped IPv6 past the LAN ceiling should be rate limited (F-031)',
+  );
 
-  // Test that private IPs ARE rate-limited when bypassPrivateIp:false (auth endpoints, vuln-0003)
-  console.log('Testing Auth Rate Limit (bypassPrivateIp: false)...');
-  const authApp = createRateLimitedApp(2, '192.168.1.100', { bypassPrivateIp: false });
+  // Test that private IPs share the STRICT limit when lanCeiling:false (auth endpoints, vuln-0003)
+  console.log('Testing Auth Rate Limit (lanCeiling: false)...');
+  const authApp = createRateLimitedApp(2, '192.168.1.100', { lanCeiling: false });
   let authRes = await request(authApp).get('/test');
   assert(authRes.status === 200, 'Auth: private IP first request OK');
   authRes = await request(authApp).get('/test');
@@ -100,14 +134,17 @@ async function run() {
   authRes = await request(authApp).get('/test');
   assert(authRes.status === 429, 'Auth: private IP third request rate-limited (vuln-0003)');
 
-  // Loopback should also be rate-limited when bypassPrivateIp:false
-  const authLoopbackApp = createRateLimitedApp(2, '127.0.0.1', { bypassPrivateIp: false });
+  // Loopback should also be rate-limited when lanCeiling:false
+  const authLoopbackApp = createRateLimitedApp(2, '127.0.0.1', { lanCeiling: false });
   authRes = await request(authLoopbackApp).get('/test');
   assert(authRes.status === 200, 'Auth: loopback first request OK');
   authRes = await request(authLoopbackApp).get('/test');
   assert(authRes.status === 200, 'Auth: loopback second request OK');
   authRes = await request(authLoopbackApp).get('/test');
-  assert(authRes.status === 429, 'Auth: loopback third request rate-limited when bypass disabled (vuln-0003)');
+  assert(
+    authRes.status === 429,
+    'Auth: loopback third request rate-limited when bypass disabled (vuln-0003)',
+  );
 
   // 7. Equivalent IP forms share one rate-limit bucket (GHSA-wp3q-hc3p-v36c)
   console.log('Testing equivalent IP-form bucket sharing...');
@@ -136,7 +173,10 @@ async function run() {
   sharedRes = await request(sharedBucketApp).get('/test').set('x-test-ip', '::ffff:8.8.8.8');
   assert(sharedRes.status === 200, 'shared bucket: mapped IPv6 second request OK');
   sharedRes = await request(sharedBucketApp).get('/test').set('x-test-ip', '8.8.8.8');
-  assert(sharedRes.status === 429, 'shared bucket: third request across equivalent forms throttled (429)');
+  assert(
+    sharedRes.status === 429,
+    'shared bucket: third request across equivalent forms throttled (429)',
+  );
 
   // Uppercase-mapped form must canonicalize to the same bucket as lowercase/plain.
   const caseBucketApp = createRotatingIpApp(1);
@@ -145,13 +185,16 @@ async function run() {
   caseRes = await request(caseBucketApp).get('/test').set('x-test-ip', '8.8.8.8');
   assert(caseRes.status === 429, 'case bucket: plain IPv4 shares the same budget (429)');
 
-  // IPv4-mapped private IPv6 must still be recognized as private and bypass.
+  // IPv4-mapped private IPv6 must still be recognized as private (LAN ceiling applies).
   assert(isAllowedPrivateIp('::ffff:192.168.1.100') === true, 'Should allow mapped private IPv6');
   assert(isAllowedPrivateIp('::ffff:127.0.0.1') === true, 'Should allow mapped loopback IPv6');
   assert(isAllowedPrivateIp('::ffff:8.8.8.8') === false, 'Should reject mapped public IPv6');
 
   // Malformed / non-IP / reserved IPv6 must not bypass and must not crash.
-  assert(isAllowedPrivateIp('::ffff:999.999.999.999') === false, 'Should reject malformed mapped IPv6');
+  assert(
+    isAllowedPrivateIp('::ffff:999.999.999.999') === false,
+    'Should reject malformed mapped IPv6',
+  );
   assert(isAllowedPrivateIp('fe80::1') === false, 'Should reject link-local IPv6');
   assert(isAllowedPrivateIp('fc00::1') === false, 'Should reject unique-local IPv6');
   const malformedApp = createRotatingIpApp(1);
@@ -168,7 +211,9 @@ async function run() {
     let statusCode = 200;
     const req: any = { ip, socket: { remoteAddress: ip } };
     const res: any = {
-      setHeader: (k: string, v: string) => { headers[k] = v; },
+      setHeader: (k: string, v: string) => {
+        headers[k] = v;
+      },
       status: (code: number) => {
         statusCode = code;
         return {
@@ -177,7 +222,9 @@ async function run() {
       },
     };
     let nextCalled = false;
-    const next = () => { nextCalled = true; };
+    const next = () => {
+      nextCalled = true;
+    };
     return { req, res, next, getNext: () => nextCalled, getStatus: () => statusCode };
   };
 
@@ -189,13 +236,13 @@ async function run() {
     assert(ctx.getNext() === true, `cleanup seed request ${i + 1} OK`);
   }
   // Wait for the window to expire
-  await new Promise(resolve => setTimeout(resolve, 25));
+  await new Promise((resolve) => setTimeout(resolve, 25));
   // The next request with a new IP triggers the table sweep (> 1000 items threshold)
   const sweepCtx = makeMockReqRes('203.0.113.1');
   limiter(sweepCtx.req, sweepCtx.res, sweepCtx.next);
   assert(sweepCtx.getNext() === true, 'cleanup: request after expiry triggers sweep and succeeds');
 
-  // 9. Static/SPA route rate limiter (express-rate-limit + private-IP skip)
+  // 9. Static/SPA route rate limiter (express-rate-limit + LAN ceiling, F-031)
   console.log('Testing static route rate limiter...');
   const createStaticRouteApp = (limit: number) => {
     const app = express();
@@ -219,17 +266,59 @@ async function run() {
   staticRes = await request(staticPublicApp).get('/page').set('x-test-ip', '8.8.8.8');
   assert(staticRes.status === 429, 'static: public IP third request throttled (429)');
 
+  // A private IP gets the LAN ceiling (limit * multiplier), not a bypass.
   const staticPrivateApp = createStaticRouteApp(2);
-  for (let i = 0; i < 5; i++) {
+  const staticLanCeiling = 2 * LAN_RATE_LIMIT_MULTIPLIER;
+  for (let i = 0; i < staticLanCeiling; i++) {
     staticRes = await request(staticPrivateApp).get('/page').set('x-test-ip', '192.168.1.100');
-    assert(staticRes.status === 200, `static: private IP request ${i + 1} bypasses rate limiting`);
+    assert(
+      staticRes.status === 200,
+      `static: private IP request ${i + 1} within the LAN ceiling should be OK`,
+    );
   }
+  staticRes = await request(staticPrivateApp).get('/page').set('x-test-ip', '192.168.1.100');
+  assert(staticRes.status === 429, 'static: private IP past the LAN ceiling throttled (429)');
+
+  // 10. General API limiter factory (the production /api limiter, F-031):
+  // public IPs stop at 100/min, LAN IPs keep going to 600/min, then stop.
+  console.log('Testing general API rate limiter...');
+  const createGeneralApiApp = () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      const headerIp = req.get('x-test-ip');
+      if (headerIp) {
+        Object.defineProperty(req, 'ip', { get: () => headerIp, configurable: true });
+      }
+      next();
+    });
+    app.use('/api', generalApiRateLimit());
+    app.get('/api/test', (_req, res) => res.status(200).json({ ok: true }));
+    return app;
+  };
+
+  const generalPublicApp = createGeneralApiApp();
+  for (let i = 0; i < 100; i++) {
+    const generalRes = await request(generalPublicApp).get('/api/test').set('x-test-ip', '8.8.8.8');
+    assert(generalRes.status === 200, `general API: public IP request ${i + 1} should be OK`);
+  }
+  let generalRes = await request(generalPublicApp).get('/api/test').set('x-test-ip', '8.8.8.8');
+  assert(generalRes.status === 429, 'general API: public IP 101st request throttled (429)');
+
+  const generalLanApp = createGeneralApiApp();
+  for (let i = 0; i < 600; i++) {
+    generalRes = await request(generalLanApp).get('/api/test').set('x-test-ip', '192.168.1.100');
+    assert(
+      generalRes.status === 200,
+      `general API: LAN IP request ${i + 1} within the ceiling should be OK`,
+    );
+  }
+  generalRes = await request(generalLanApp).get('/api/test').set('x-test-ip', '192.168.1.100');
+  assert(generalRes.status === 429, 'general API: LAN IP 601st request throttled (429)');
 
   console.log('✅ All CORS IP Validation & Rate Limiter tests passed!');
-
 }
 
-run().catch(err => {
+run().catch((err) => {
   console.error(err);
   process.exit(1);
 });
