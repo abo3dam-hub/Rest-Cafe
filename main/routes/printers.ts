@@ -1,22 +1,12 @@
 import { Router, Request, Response } from 'express';
-import {
-  getDatabase,
-  now,
-  attachEffectiveAddons,
-  isKotPrintingEnabled,
-  isServerBillPrintingEnabled,
-  parseItemJson,
-} from '../db';
+import { getDatabase, now, isKotPrintingEnabled, isServerBillPrintingEnabled } from '../db';
 import { getOrderWithItems } from './bills';
-import { resolveBrandLogo } from '../branding';
 import { loadProductRelationsBatch } from './products';
 import { randomUUID } from 'node:crypto';
 import {
   printViaNetwork,
   printViaUSB,
   buildTestPage,
-  printReceiptDetailed,
-  printKOTDetailed,
   printDeliverySlipDetailed,
   detectConnectedPrinters,
   prepareReceipt,
@@ -31,19 +21,6 @@ import { buildMenuDocument } from '../printers/document-menu';
 import { detectPrintLanguageDirection } from '../printers/document-classic';
 import type { DeliverySlipPaymentBill } from '../../shared/print';
 import {
-  BILL_LANGUAGE_POLICY_KEY,
-  KOT_LANGUAGE_POLICY_KEY,
-  parseStoredLanguagePolicy,
-} from '../lib/print-language-settings';
-import {
-  resolveKotLanguage,
-  resolveReceiptLanguages,
-  shouldShowCustomerNumber,
-  type KotLanguagePolicy,
-  type ReceiptLanguagePolicy,
-  isKotItemPending,
-} from '../../shared/print';
-import {
   getSupportedPrinterProfiles,
   resolvePrinterProfile,
   capabilitiesForPrinter,
@@ -51,12 +28,21 @@ import {
 import { hasPermission, requirePermission, requireAnyPermission } from '../services/authorization';
 import { getOpenSession } from '../services/shift-session-gate';
 import {
+  dispatchKotForOrder,
+  getEffectiveOrderItems,
+  getUnprintedKotItemIds,
+  markKotItemsPrinted,
+} from '../services/kot-print';
+import {
+  buildReceiptBusiness,
+  dispatchBillPrint,
+  enqueuePrintJob,
+  resolveReceiptLanguagesForTenant,
+} from '../services/print-queue';
+import {
   formatBusinessDateTime,
   formatCurrencyForTenant,
-  getCountryByCode,
-  getCurrencySymbol,
   resolveRegionalSnapshot,
-  resolveTenantCurrency,
   RegionalNotConfiguredError,
 } from '../countries';
 import { asyncHandler } from '../middleware/async-handler';
@@ -195,16 +181,6 @@ function getDefaultPrinter(db: ReturnType<typeof getDatabase>): DefaultPrinter |
   return db.prepare('SELECT * FROM printers WHERE is_default = 1').get() as
     | DefaultPrinter
     | undefined;
-}
-
-// Hydrates order items with add-ons from normalized order_item_addons.
-export function getEffectiveOrderItems(db: any, orderId: string): any[] {
-  return attachEffectiveAddons(
-    db,
-    (db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId) as any[]).map(
-      parseItemJson,
-    ),
-  );
 }
 
 // GET /api/printers
@@ -992,102 +968,12 @@ router.post(
         }
       }
 
-      // Fetch business settings for bill template
-      const settingsRows = db.prepare('SELECT key, value FROM settings').all() as {
-        key: string;
-        value: string;
-      }[];
-      const settings: Record<string, string> = Object.fromEntries(
-        settingsRows.map((r) => [r.key, r.value]),
-      );
-
-      // Customer + loyalty context, only relevant when the bill is tied to a customer
-      let customer: any = null;
-      let pointsEarned = 0;
-      let pointsRedeemed = 0;
-      let pointsBalance: number | null = null;
-      if (bill.customer_id) {
-        customer = db
-          .prepare('SELECT name, phone, country_code FROM customers WHERE id = ?')
-          .get(bill.customer_id);
-
-        const earned = db
-          .prepare(
-            `SELECT COALESCE(SUM(amount), 0) as total FROM loyalty_ledger WHERE bill_id = ? AND type = 'credit'`,
-          )
-          .get(bill.id) as { total: number };
-        pointsEarned = earned.total;
-
-        const redeemed = db
-          .prepare(
-            `SELECT COALESCE(SUM(amount), 0) as total FROM loyalty_ledger WHERE bill_id = ? AND type = 'debit'`,
-          )
-          .get(bill.id) as { total: number };
-        pointsRedeemed = redeemed.total;
-
-        if (['true', '1'].includes(settings.loyalty_enabled || '')) {
-          const credits = db
-            .prepare(
-              `SELECT COALESCE(SUM(amount), 0) as total FROM loyalty_ledger WHERE customer_id = ? AND type = 'credit'`,
-            )
-            .get(bill.customer_id) as { total: number };
-          const debits = db
-            .prepare(
-              `SELECT COALESCE(SUM(amount), 0) as total FROM loyalty_ledger WHERE customer_id = ? AND type = 'debit'`,
-            )
-            .get(bill.customer_id) as { total: number };
-          pointsBalance = Math.max(0, credits.total - debits.total);
-        }
-      }
-
-      const country = settings.country || '';
-      const currency = resolveTenantCurrency(settings.currency, country);
-      const business = {
-        name: settings.business_name || '',
-        address: settings.business_address || '',
-        phone: settings.business_phone || '',
-        taxRegistrationNumber: settings.tax_registration_number || '',
-        currency,
-        // Rest&Cafe: the currency unit is the owner's own setting (e.g. SP);
-        // CLDR is only the fallback when no unit is stored.
-        currency_symbol:
-          settings.currency_symbol ||
-          getCurrencySymbol(currency, getCountryByCode(country)?.locale) ||
-          currency,
-        country,
-        instagram_handle: settings.instagram_handle || '',
-        customer_name: customer?.name || '',
-        customer_phone: customer?.phone
-          ? customer.country_code && !customer.phone.startsWith(customer.country_code)
-            ? `${customer.country_code} ${customer.phone}`
-            : customer.phone
-          : '',
-        // One shared rule, so the receipt and the slip cannot disagree.
-        show_customer_phone: shouldShowCustomerNumber({
-          showOnReceipts: settings.bill_show_customer_phone !== 'false',
-          alwaysForDeliveryOrders: settings.bill_delivery_show_customer_phone_always !== 'false',
-          orderType: String(order?.type ?? ''),
-        }),
-        points_earned: pointsEarned,
-        points_redeemed: pointsRedeemed,
-        points_balance: pointsBalance,
-        trim_decimals: settings.printer_trim_decimals === 'true',
-        timezone: settings.timezone || '',
-        show_name: settings.bill_show_name !== 'false',
-        show_address: settings.bill_show_address !== 'false',
-        show_phone: settings.bill_show_phone !== 'false',
-        show_tax_id: settings.bill_show_tax_id === 'true',
-        show_tax_breakdown: settings.bill_show_tax_breakdown !== 'false',
-        show_customer_name: settings.bill_show_customer_name !== 'false',
-        show_table_number: settings.bill_show_table_number !== 'false',
-        show_logo: settings.bill_show_logo === 'true',
-        receipt_logo: resolveBrandLogo(settings.receipt_logo),
-        receipt_logo_raster: settings.receipt_logo_raster || '',
-        footer_note: settings.bill_footer_message || '',
-      };
-      const billTemplate = settings.bill_template;
+      // Business block and receipt languages are shared with the
+      // pending-print queue worker, which re-runs this dispatch on retry.
+      const business = buildReceiptBusiness(db, bill, order);
+      const billTemplate = tenantSettingValue(db, 'bill_template');
       // Resolves primary and optional secondary receipt languages from tenant policy.
-      const receiptLanguages = resolveTenantReceiptLanguages(db);
+      const receiptLanguages = resolveReceiptLanguagesForTenant(db);
       console.log('[Print Bill] Preparing receipt', { template: billTemplate || 'classic' });
 
       if (preview === true) {
@@ -1121,18 +1007,14 @@ router.post(
 
       // Use existing printReceipt function with template support
       console.log('[Print Bill] Calling printReceipt...');
-      const result = await printReceiptDetailed(
-        order,
+      const result = await dispatchBillPrint(db, {
         bill,
-        business,
-        billTemplate || 'classic',
-        useUnicode,
+        order,
         isReprint,
-        getHttpRequestSignal(req),
-        arabicShapingOverride,
-        receiptLanguages.primary,
-        receiptLanguages.additional,
-      );
+        useUnicode,
+        ...(arabicShapingOverride !== undefined ? { arabicShaping: arabicShapingOverride } : {}),
+        signal: getHttpRequestSignal(req),
+      });
       console.log('[Print Bill] Print completed', {
         ok: result.ok,
         code: result.code,
@@ -1145,6 +1027,25 @@ router.post(
       if (result.ok) {
         res.json({ success: true, warnings: result.warnings || [] });
       } else {
+        // Durable retry (F-009): a stored bill's failed print is queued for
+        // the background worker. A synthetic bill (id 0, no stored row) has
+        // nothing to re-read, so it is not queued. The no-printer 400 above
+        // is not queued either: the POS falls back to browser print there,
+        // and a queued thermal print would duplicate it.
+        if (Number(bill.id) > 0) {
+          enqueuePrintJob(db, {
+            kind: 'receipt',
+            orderId: Number(order.id),
+            billId: Number(bill.id),
+            payload: {
+              isReprint,
+              useUnicode,
+              ...(arabicShapingOverride !== undefined
+                ? { arabicShaping: arabicShapingOverride }
+                : {}),
+            },
+          });
+        }
         res.status(502).json({
           error: result.detail || 'Print failed. Check printer connection and settings.',
           detail: result.detail,
@@ -1163,69 +1064,11 @@ router.post(
   }),
 );
 
-// Routes items to kitchen stations by category, falling back to default kitchen.
-export function routeItemsToStations(
-  db: any,
-  orderItems: any[],
-): { stationName: string; printer: any; items: any[] }[] {
-  const rawStations = db
-    .prepare(
-      `SELECT * FROM kitchen_stations WHERE is_active = 1 AND printer_id IS NOT NULL AND category_ids IS NOT NULL AND category_ids != ''`,
-    )
-    .all() as any[];
-
-  const stations = rawStations
-    .map((s) => {
-      let categoryIds: string[] = [];
-      try {
-        categoryIds = JSON.parse(s.category_ids) || [];
-      } catch {
-        categoryIds = [];
-      }
-      const printer = db
-        .prepare(
-          `SELECT * FROM printers
-         WHERE id = ? AND connection_type != 'webusb'`,
-        )
-        .get(s.printer_id);
-      return { ...s, categoryIds, printer };
-    })
-    .filter((s) => s.categoryIds.length > 0 && s.printer);
-
-  if (stations.length === 0) {
-    return [{ stationName: 'Kitchen', printer: null, items: orderItems }];
-  }
-
-  const groups = new Map<string, { stationName: string; printer: any; items: any[] }>();
-  const unrouted: any[] = [];
-
-  for (const item of orderItems) {
-    const product: any = item.product_id
-      ? db.prepare('SELECT category_id FROM products WHERE id = ?').get(item.product_id)
-      : null;
-    const categoryId = product?.category_id;
-    const matched = categoryId
-      ? stations.find((s) => s.categoryIds.includes(categoryId))
-      : undefined;
-    if (matched) {
-      if (!groups.has(matched.id)) {
-        groups.set(matched.id, { stationName: matched.name, printer: matched.printer, items: [] });
-      }
-      groups.get(matched.id)!.items.push(item);
-    } else {
-      unrouted.push(item);
-    }
-  }
-
-  const result = Array.from(groups.values());
-  if (unrouted.length > 0) {
-    result.push({ stationName: 'Kitchen', printer: null, items: unrouted });
-  }
-  return result;
-}
-
 // POST /api/printers/print-kot — print KOT via backend (desktop app).
 // Uses `sales` so the waiter terminal's "server" role can print its own orders.
+// Only still-pending, never-printed items are sent (F-004); each station
+// group is marked printed the moment its dispatch reports success, so a
+// retry or manual reprint sends only what never reached the kitchen.
 router.post(
   '/print-kot',
   requirePermission('printing.execute'),
@@ -1255,6 +1098,34 @@ router.post(
         .get();
 
       if (!printer) {
+        // Durable retry (F-009): a printer configured after this attempt
+        // still gets the ticket. Only a real order is queued (the foreign
+        // key would refuse a missing one); the 400 response is unchanged.
+        const existingOrder = db.prepare('SELECT id FROM orders WHERE id = ?').get(orderId) as
+          | { id: number }
+          | undefined;
+        if (existingOrder) {
+          const scopedIds = Array.isArray(items)
+            ? items
+                .map((item) => Number(item?.id ?? item))
+                .filter((id: number) => Number.isSafeInteger(id))
+            : undefined;
+          const candidateIds = getUnprintedKotItemIds(db, Number(orderId), scopedIds);
+          if (candidateIds.length > 0) {
+            enqueuePrintJob(db, {
+              kind: 'kot',
+              orderId: Number(orderId),
+              payload: {
+                itemIds: candidateIds,
+                ...(stationName ? { stationName: String(stationName) } : {}),
+                useUnicode,
+                ...(arabicShapingOverride !== undefined
+                  ? { arabicShaping: arabicShapingOverride }
+                  : {}),
+              },
+            });
+          }
+        }
         return res
           .status(400)
           .json({ error: 'No default printer configured. Add a printer in Settings.' });
@@ -1265,73 +1136,45 @@ router.post(
         return res.status(404).json({ error: 'Order not found' });
       }
 
-      const kotLanguage = resolveTenantKotLanguage(db);
+      // Caller-supplied items only scope the dispatch by id; the database
+      // rows are authoritative for status and the printed marker.
+      const itemIds = Array.isArray(items)
+        ? items
+            .map((item) => Number(item?.id ?? item))
+            .filter((id: number) => Number.isSafeInteger(id))
+        : undefined;
+      const dispatch = await dispatchKotForOrder(db, {
+        orderId: Number(orderId),
+        ...(itemIds !== undefined ? { itemIds } : {}),
+        ...(stationName ? { stationName: String(stationName) } : {}),
+        useUnicode,
+        ...(arabicShapingOverride !== undefined ? { arabicShaping: arabicShapingOverride } : {}),
+        signal: getHttpRequestSignal(req),
+      });
 
-      // Fetch order items from database
-      const orderItems: any[] = getEffectiveOrderItems(db, orderId);
-
-      // Fetch table/customer info if available so backend KOT metadata matches
-      // the browser and WebUSB paths.
-      if (order.table_id) {
-        const table: any = db.prepare('SELECT * FROM tables WHERE id = ?').get(order.table_id);
-        if (table) {
-          order.table = { name: table.number };
-        }
-      }
-      if (order.customer_id) {
-        const customer = db
-          .prepare('SELECT name FROM customers WHERE id = ?')
-          .get(order.customer_id) as { name: string } | null;
-        if (customer) order.customer = { name: customer.name };
-      }
-
-      // Specific station prints one ticket; unassigned item overrides route by station.
-      let success = true;
-      const warnings: NonNullable<Awaited<ReturnType<typeof printKOTDetailed>>['warnings']> = [];
-      let failure: Awaited<ReturnType<typeof printKOTDetailed>> | null = null;
-      const kotSourceItems = (Array.isArray(items) ? items : orderItems).filter((item: any) =>
-        isKotItemPending(item?.status),
-      );
-
-      if (stationName) {
-        const station = stationName || 'Kitchen';
-        if (kotSourceItems.length > 0) {
-          const result = await printKOTDetailed(
-            order,
-            kotSourceItems,
-            station,
-            useUnicode,
-            undefined,
-            getHttpRequestSignal(req),
-            arabicShapingOverride,
-            kotLanguage,
-          );
-          success = result.ok;
-          failure = result.ok ? null : result;
-          warnings.push(...(result.warnings || []));
-        }
+      if (dispatch.ok) {
+        res.json({ success: true, warnings: dispatch.warnings });
       } else {
-        const groups = routeItemsToStations(db, kotSourceItems).filter((g) => g.items.length > 0);
-        for (const group of groups) {
-          const result = await printKOTDetailed(
-            order,
-            group.items,
-            group.stationName,
-            useUnicode,
-            group.printer || undefined,
-            getHttpRequestSignal(req),
-            arabicShapingOverride,
-            kotLanguage,
-          );
-          success = success && result.ok;
-          warnings.push(...(result.warnings || []));
-          if (!result.ok && !failure) failure = result;
+        // Durable retry (F-009): only the groups that failed are queued,
+        // so the worker re-sends exactly those items; printed groups stay
+        // marked and are never sent twice.
+        const retryIds =
+          dispatch.failedItemIds.length > 0 ? dispatch.failedItemIds : dispatch.candidateItemIds;
+        if (retryIds.length > 0) {
+          enqueuePrintJob(db, {
+            kind: 'kot',
+            orderId: Number(orderId),
+            payload: {
+              itemIds: retryIds,
+              ...(stationName ? { stationName: String(stationName) } : {}),
+              useUnicode,
+              ...(arabicShapingOverride !== undefined
+                ? { arabicShaping: arabicShapingOverride }
+                : {}),
+            },
+          });
         }
-      }
-
-      if (success) {
-        res.json({ success: true, warnings });
-      } else {
+        const failure = dispatch.failure;
         res.status(502).json({
           error: failure?.detail || 'KOT print failed. Check printer connection.',
           detail: failure?.detail,
@@ -1343,6 +1186,38 @@ router.post(
       }
     } catch (error: any) {
       console.error('[Print KOT] Error:', error);
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }),
+);
+
+// POST /api/printers/kot-printed — record that a frontend (WebUSB) KOT
+// dispatch succeeded, so a later retry or reprint skips those items (F-004).
+// The print itself already happened; this only stamps the marker.
+router.post(
+  '/kot-printed',
+  requirePermission('printing.execute'),
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const { orderId, itemIds } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ error: 'orderId is required' });
+      }
+      const db = getDatabase();
+      const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as
+        | { id: number }
+        | undefined;
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      const ids = Array.isArray(itemIds)
+        ? itemIds.map((id) => Number(id)).filter((id: number) => Number.isSafeInteger(id))
+        : [];
+      const marked = markKotItemsPrinted(db, Number(orderId), ids);
+      res.json({ success: true, marked });
+    } catch (error: any) {
+      console.error('[KOT Printed] Error:', error);
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1448,7 +1323,7 @@ router.post(
           : customer.phone
         : '';
 
-      const language = resolveTenantReceiptLanguages(db).primary;
+      const language = resolveReceiptLanguagesForTenant(db).primary;
       // The delivery exception, or the receipt setting when it is off. Blank only
       // when both say hide, so the slip and a delivery receipt cannot disagree.
       const showCustomerPhone =
@@ -1524,28 +1399,4 @@ function tenantSettingValue(db: ReturnType<typeof getDatabase>, key: string): st
   } catch {
     return undefined;
   }
-}
-
-/** Resolves primary and optional secondary receipt languages from tenant policy. */
-function resolveTenantReceiptLanguages(db: ReturnType<typeof getDatabase>): {
-  primary: string;
-  additional?: string;
-} {
-  const policy = parseStoredLanguagePolicy(
-    BILL_LANGUAGE_POLICY_KEY,
-    tenantSettingValue(db, BILL_LANGUAGE_POLICY_KEY),
-  ) as ReceiptLanguagePolicy;
-  const languages = resolveReceiptLanguages(policy, tenantLanguage(db));
-  return languages.length > 1
-    ? { primary: languages[0], additional: languages[1] }
-    : { primary: languages[0] };
-}
-
-/** Resolves kitchen ticket label language from tenant policy. */
-function resolveTenantKotLanguage(db: ReturnType<typeof getDatabase>): string {
-  const policy = parseStoredLanguagePolicy(
-    KOT_LANGUAGE_POLICY_KEY,
-    tenantSettingValue(db, KOT_LANGUAGE_POLICY_KEY),
-  ) as KotLanguagePolicy;
-  return resolveKotLanguage(policy, tenantLanguage(db));
 }
