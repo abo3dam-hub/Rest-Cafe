@@ -36,7 +36,7 @@ import {
   makeFinancialPrintRefusalMessage,
   type PrintWarning,
 } from '@/lib/printer/warnings';
-import api from '@/lib/api';
+import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import toast from 'react-hot-toast';
 import type { Bill, Tenant, Order, OrderItem } from '@/lib/types';
 import { type Language } from '@/lib/i18n/languages';
@@ -336,6 +336,7 @@ export const usePrinterStore = create<PrinterState>()(
                   arabicShaping: printerArabicShaping,
                   isReprint,
                 },
+                { timeout: LONG_API_REQUEST_TIMEOUT_MS },
               );
               if (reservedWindow && !reservedWindow.closed) reservedWindow.close();
               windowTransferred = true;
@@ -675,6 +676,7 @@ export const usePrinterStore = create<PrinterState>()(
                   useUnicode: printerUseUnicode,
                   arabicShaping: printerArabicShaping,
                 },
+                { timeout: LONG_API_REQUEST_TIMEOUT_MS },
               );
               return response.data.warnings || [];
             } catch (err: unknown) {
@@ -893,6 +895,7 @@ export const usePrinterStore = create<PrinterState>()(
                   useUnicode: printerUseUnicode,
                   arabicShaping: printerArabicShaping,
                 },
+                { timeout: LONG_API_REQUEST_TIMEOUT_MS },
               );
               if (reservedPopup && !reservedPopup.closed) reservedPopup.close();
               return response.data.warnings || [];
