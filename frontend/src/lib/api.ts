@@ -2,6 +2,33 @@ import axios from 'axios';
 
 let authRedirectInProgress = false;
 
+/** Request ceiling for the shared client, matching the KDS REST poll (10 s):
+ * a half-open connection fails visibly instead of hanging the till. */
+export const API_REQUEST_TIMEOUT_MS = 10_000;
+/** Longer ceiling for requests that await a physical print dispatch or a
+ * printer scan: the backend CUPS dispatch alone allows 20 s, and printer
+ * detection caps at 10 s, so the 10 s default would cut off their reply. */
+export const LONG_API_REQUEST_TIMEOUT_MS = 30_000;
+
+/** Last known reachability of the backend, from real request outcomes. */
+let apiReachable = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+
+function reportApiReachability(reachable: boolean): void {
+  if (reachable === apiReachable || typeof window === 'undefined') return;
+  apiReachable = reachable;
+  window.dispatchEvent(new Event(reachable ? 'flo:api-online' : 'flo:api-offline'));
+}
+
+/** True when a request failure is worth retrying: no response arrived
+ * (transport/timeout/offline) or the server itself failed (5xx). A 4xx
+ * answer is definitive — retrying it cannot help. */
+export function isTransientRequestError(error: unknown): boolean {
+  const response = (error as { response?: { status?: unknown } } | null)?.response;
+  if (!response) return true;
+  const status = Number(response.status);
+  return Number.isInteger(status) && status >= 500;
+}
+
 export type ClientFailureOperation =
   | 'order.create'
   | 'payment.create'
@@ -97,6 +124,7 @@ export async function captureClientOperationFailure(input: {
 // Base URL derived from window.location.origin so LAN clients connect to host IP.
 const api = axios.create({
   baseURL: typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api',
+  timeout: API_REQUEST_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -116,8 +144,13 @@ api.interceptors.request.use((config) => {
 
 // Handle 401 responses
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    reportApiReachability(true);
+    return response;
+  },
   (error) => {
+    // No response arrived at all: the backend is unreachable from here.
+    if (!error.response) reportApiReachability(false);
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       // KDS routes render inline login; avoid redirecting away to /auth/login.
       const isKdsPath = window.location.pathname.startsWith('/kds');
