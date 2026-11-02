@@ -31,7 +31,7 @@ import {
 import { API_JSON_BODY_LIMIT } from './http-limits';
 import { buildCspHeader } from './csp';
 import { resolveContainedPath } from './lib/path-containment';
-import { setServerPort } from './server-state';
+import { setServerPort, recordPortBump } from './server-state';
 export { getServerPort, getLocalIP, getAllLocalIPs } from './server-state';
 
 let server: http.Server | null = null;
@@ -285,13 +285,9 @@ export function startServer(): Promise<void> {
       // The KDS page route must stay servable here: WebSocket upgrades on the
       // exact /kds path are handled by the HTTP upgrade listener, never by
       // this GET fallback, so excluding the prefix only breaks page loads.
-      app.get(
-        /^(?!\/api(?:\/|$)).*$/,
-        staticRouteRateLimit(),
-        (req: Request, res: Response) => {
-          res.sendFile(resolveStaticPage(frontendDir, req.path), { dotfiles: 'allow' });
-        },
-      );
+      app.get(/^(?!\/api(?:\/|$)).*$/, staticRouteRateLimit(), (req: Request, res: Response) => {
+        res.sendFile(resolveStaticPage(frontendDir, req.path), { dotfiles: 'allow' });
+      });
     } else {
       console.warn('[Server] Frontend build not found. Run `npm run build:frontend` first.');
       app.get('/', (_req: Request, res: Response) => {
@@ -414,6 +410,7 @@ export function startServer(): Promise<void> {
           }
           currentPort++;
           console.log(`[Server] Port ${attemptedPort} in use (${err.code}), trying ${currentPort}`);
+          recordPortBump('api', attemptedPort, currentPort, err.code);
           tryListen();
           return;
         }
