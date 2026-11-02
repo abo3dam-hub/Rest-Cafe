@@ -2,19 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  diffNewOrders,
   getAudioMode,
   isAudioPrimed,
+  loadSeenOrderIds,
   playNewOrderChime,
   primeAudio,
+  saveSeenOrderIds,
+  type OrderAlertSurface,
 } from '@/lib/order-alert';
+
+export type { OrderAlertSurface } from '@/lib/order-alert';
 
 /**
  * Watches the live orders feed a surface already receives (the KDS
  * WebSocket/REST stream from useKdsConnection, or the POS equivalent) and
  * raises a sound + visual alert when genuinely new order ids appear.
  *
- * The first snapshot a surface receives only seeds the seen-id set, so
- * orders that were already on the board never chime. Reconnect snapshots
+ * The seen-id set is persisted per surface, so a remount after a
+ * disconnect diffs the first snapshot against the pre-outage set: orders
+ * that arrived during the outage chime once as catch-up, while orders
+ * that were already on the board never chime. A brand-new board (nothing
+ * persisted) seeds silently from its first snapshot. Reconnect snapshots
  * re-send the same ids and are equally silent.
  */
 
@@ -30,8 +39,6 @@ export interface NewOrderAlert {
   latestTableLabel: string | null;
   latestOrderNumber: string | null;
 }
-
-export type OrderAlertSurface = 'kds' | 'pos';
 
 export interface UseNewOrderAlertOptions {
   /** Defaults to the localStorage-backed toggle for the surface (default ON). */
@@ -103,21 +110,27 @@ export function useNewOrderAlert(
   // Diff each new snapshot against the seen-id set.
   useEffect(() => {
     if (seenIdsRef.current === null) {
-      // First snapshot: seed only — pre-existing orders never chime.
-      seenIdsRef.current = new Set(orders.map((order) => order.id));
-      return;
+      // First snapshot after mount: seed from the persisted set when the
+      // surface had one, so orders that arrived during a disconnect chime
+      // once as catch-up; a brand-new board (nothing persisted) still
+      // seeds silently.
+      const persisted = loadSeenOrderIds(surface);
+      if (persisted === null) {
+        seenIdsRef.current = new Set(orders.map((order) => order.id));
+        saveSeenOrderIds(surface, seenIdsRef.current);
+        return;
+      }
+      seenIdsRef.current = persisted;
     }
-    const seen = seenIdsRef.current;
-    const fresh = orders.filter((order) => !seen.has(order.id));
-    for (const order of orders) seen.add(order.id);
+    const { fresh, nextSeen } = diffNewOrders(orders, seenIdsRef.current);
+    seenIdsRef.current = nextSeen;
+    saveSeenOrderIds(surface, nextSeen);
     if (fresh.length === 0) return;
 
     const latest = fresh[fresh.length - 1];
     const latestTableLabel =
       latest.table?.name ??
-      (latest.table_id !== null && latest.table_id !== undefined
-        ? String(latest.table_id)
-        : null);
+      (latest.table_id !== null && latest.table_id !== undefined ? String(latest.table_id) : null);
     if (enabled) playNewOrderChime();
     setAlert((prev) => ({
       count: (prev?.count ?? 0) + fresh.length,
@@ -126,7 +139,7 @@ export function useNewOrderAlert(
     }));
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     dismissTimerRef.current = setTimeout(() => setAlert(null), ALERT_VISIBLE_MS);
-  }, [orders, enabled]);
+  }, [orders, enabled, surface]);
 
   useEffect(
     () => () => {
