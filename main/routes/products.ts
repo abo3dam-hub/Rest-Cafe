@@ -7,11 +7,7 @@ import {
 import { Router, Request, Response } from 'express';
 import { getDatabase, now, generateShortId, getSettingValue } from '../db';
 import { isBlockedSsrfTarget } from '../middleware/security';
-import {
-  hasPermission,
-  requireAnyPermission,
-  requirePermission,
-} from '../services/authorization';
+import { hasPermission, requireAnyPermission, requirePermission } from '../services/authorization';
 import { getHttpRequestSignal } from '../shutdown';
 import { getActiveCountryPack, hasConfiguredTaxCategories } from '../services/tax';
 import { adjustProductStock } from '../services/inventory';
@@ -1251,7 +1247,7 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
     });
 
     res.json({ products: productsWithRelations });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1308,7 +1304,7 @@ router.get(
         'Cache-Control': 'no-cache', // Always revalidate — instant cross-terminal updates
       });
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -1346,7 +1342,7 @@ router.get('/:id', requirePermission('catalog.view'), (req: Request, res: Respon
         variants: rel.variants,
       }),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1502,7 +1498,7 @@ router.post(
         requestSignal?.removeEventListener('abort', abortForShutdown);
         offlineSignal.removeEventListener('abort', abortForShutdown);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -2130,7 +2126,7 @@ router.delete('/:id', requirePermission('catalog.manage'), (req: Request, res: R
 
     db.prepare('UPDATE products SET deleted_at = ? WHERE id = ?').run(now(), req.params.id);
     res.json({ message: 'Product deleted' });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -2209,7 +2205,7 @@ router.get(
         )
         .get() as { count: number };
       res.json({ count: row.count });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -2227,7 +2223,7 @@ router.post(
         )
         .run(now());
       res.json({ updated: result.changes });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -2285,93 +2281,81 @@ router.patch(
         'UPDATE products SET is_sold_out = ?, sold_out_at = ?, updated_at = ? WHERE id = ?',
       ).run(soldOut ? 1 : 0, soldOut ? now() : null, now(), req.params.id);
       res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   },
 );
 
-router.patch(
-  '/:id/pin',
-  requirePermission('catalog.manage'),
-  (req: Request, res: Response) => {
-    try {
-      const { pinned } = req.body ?? {};
-      if (typeof pinned !== 'boolean') {
-        return res.status(400).json({ error: 'pinned must be a boolean' });
-      }
-      const db = getDatabase();
-      const product = db
-        .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
-        .get(req.params.id);
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      db.prepare('UPDATE products SET is_pinned = ?, updated_at = ? WHERE id = ?').run(
-        pinned ? 1 : 0,
-        now(),
-        req.params.id,
-      );
-      res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
-    } catch (error: any) {
-      console.error('[API] Internal error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+router.patch('/:id/pin', requirePermission('catalog.manage'), (req: Request, res: Response) => {
+  try {
+    const { pinned } = req.body ?? {};
+    if (typeof pinned !== 'boolean') {
+      return res.status(400).json({ error: 'pinned must be a boolean' });
     }
-  },
-);
+    const db = getDatabase();
+    const product = db
+      .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+      .get(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    db.prepare('UPDATE products SET is_pinned = ?, updated_at = ? WHERE id = ?').run(
+      pinned ? 1 : 0,
+      now(),
+      req.params.id,
+    );
+    res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
+  } catch (error) {
+    console.error('[API] Internal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Bulk repricing for fast menu-wide adjustments: every entry is validated
 // and resolved before the single transaction writes, so one bad id or price
 // leaves the whole menu untouched. Prices are stored exactly as the
 // single-product update stores them (the raw number on the product row).
-router.post(
-  '/bulk-prices',
-  requirePermission('catalog.manage'),
-  (req: Request, res: Response) => {
-    try {
-      const items = (req.body ?? {}).items;
-      if (!Array.isArray(items)) {
-        return res.status(400).json({ error: 'items must be an array' });
-      }
-      const priceById = new Map<string, number>();
-      for (const entry of items) {
-        if (!entry || typeof entry.id !== 'string' || !entry.id) {
-          return res.status(400).json({ error: 'each item needs a product id' });
-        }
-        if (
-          typeof entry.price !== 'number' ||
-          !Number.isFinite(entry.price) ||
-          entry.price < 0
-        ) {
-          return res
-            .status(400)
-            .json({ error: `price for product ${entry.id} must be a finite non-negative number` });
-        }
-        priceById.set(entry.id, entry.price);
-      }
-      const db = getDatabase();
-      for (const id of priceById.keys()) {
-        const product = db
-          .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
-          .get(id);
-        if (!product) {
-          return res.status(400).json({ error: `Product not found: ${id}` });
-        }
-      }
-      const update = db.prepare('UPDATE products SET price = ?, updated_at = ? WHERE id = ?');
-      const applyAll = db.transaction(() => {
-        for (const [id, price] of priceById) {
-          update.run(price, now(), id);
-        }
-      });
-      applyAll();
-      res.json({ updated: priceById.size });
-    } catch (error: any) {
-      console.error('[API] Internal error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+router.post('/bulk-prices', requirePermission('catalog.manage'), (req: Request, res: Response) => {
+  try {
+    const items = (req.body ?? {}).items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'items must be an array' });
     }
-  },
-);
+    const priceById = new Map<string, number>();
+    for (const entry of items) {
+      if (!entry || typeof entry.id !== 'string' || !entry.id) {
+        return res.status(400).json({ error: 'each item needs a product id' });
+      }
+      if (typeof entry.price !== 'number' || !Number.isFinite(entry.price) || entry.price < 0) {
+        return res
+          .status(400)
+          .json({ error: `price for product ${entry.id} must be a finite non-negative number` });
+      }
+      priceById.set(entry.id, entry.price);
+    }
+    const db = getDatabase();
+    for (const id of priceById.keys()) {
+      const product = db
+        .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+        .get(id);
+      if (!product) {
+        return res.status(400).json({ error: `Product not found: ${id}` });
+      }
+    }
+    const update = db.prepare('UPDATE products SET price = ?, updated_at = ? WHERE id = ?');
+    const applyAll = db.transaction(() => {
+      for (const [id, price] of priceById) {
+        update.run(price, now(), id);
+      }
+    });
+    applyAll();
+    res.json({ updated: priceById.size });
+  } catch (error) {
+    console.error('[API] Internal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 export const productRoutes = router;
