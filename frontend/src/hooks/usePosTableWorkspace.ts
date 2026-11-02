@@ -127,6 +127,9 @@ export function usePosTableWorkspace({
       try {
         await api.post(`/bills/${bill.id}/print`, {
           print_type: isReprint ? 'reprint' : 'receipt',
+          // The bytes were dispatched: record the confirmation and any
+          // warnings the dispatch produced with the bill (F-017, F-026).
+          warnings,
         });
       } catch {
         /* best-effort history tracking */
