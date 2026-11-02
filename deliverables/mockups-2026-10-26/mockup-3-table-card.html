@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Noto Sans Arabic","Segoe UI",Tahoma,sans-serif; }
+  body { width:1366px; height:768px; overflow:hidden; background:#f3f1ec; color:#1f2430; position:relative; }
+
+  /* dimmed map behind */
+  .map { position:absolute; inset:0; padding:26px 34px; filter:saturate(.55); opacity:.5; }
+  .map h2 { font-size:19px; font-weight:800; margin-bottom:18px; }
+  .grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
+  .tbl { height:118px; border-radius:14px; border:2px solid #c9c2ae; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+  .tbl .nm { font-size:20px; font-weight:800; }
+  .tbl .st { font-size:12px; font-weight:700; color:#8a8574; }
+  .tbl.oc { border-color:#2563eb; background:#eff6ff; } .tbl.oc .st { color:#2563eb; }
+  .tbl.bill { border-color:#d97706; background:#fffbeb; } .tbl.bill .st { color:#b45309; }
+  .tbl.target { outline:4px solid #f59e0b; outline-offset:2px; }
+  .veil { position:absolute; inset:0; background:rgba(28,27,25,.48); }
+
+  /* touch card (bottom sheet) */
+  .card { position:absolute; inset-inline:0; bottom:0; margin:0 auto; width:880px; background:#fff; border-radius:22px 22px 0 0;
+          box-shadow:0 -14px 44px rgba(0,0,0,.35); padding:20px 30px 24px; }
+  .grab { width:52px; height:5px; border-radius:99px; background:#ddd6c4; margin:0 auto 14px; }
+  .chead { display:flex; align-items:flex-start; gap:12px; }
+  .chead .tt { font-size:26px; font-weight:800; }
+  .badge { font-size:12.5px; font-weight:800; padding:4px 12px; border-radius:999px; background:#eff6ff; color:#2563eb; border:1.5px solid #2563eb; margin-top:6px; }
+  .x { margin-inline-start:auto; width:42px; height:42px; border-radius:50%; border:0; background:#f3f1ec; font-size:17px; color:#55503f; cursor:pointer; }
+  .meta { display:flex; gap:26px; margin-top:12px; padding:12px 16px; background:#faf8f3; border:1px solid #eee7d5; border-radius:14px; }
+  .meta .m { font-size:13px; color:#6b675a; }
+  .meta .m b { display:block; font-size:15.5px; color:#1f2430; margin-top:2px; }
+  .krow { display:flex; gap:8px; margin-top:14px; align-items:center; }
+  .krow .lbl { font-size:13px; font-weight:800; color:#44403a; }
+  .kchip { font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:999px; background:#eef2ff; color:#3730a3; }
+  .kchip.rdy { background:#dcfce7; color:#166534; }
+  .kchip.wait { background:#fef3c7; color:#92400e; }
+  .items { margin-top:12px; font-size:13.5px; color:#44403a; }
+  .items .it { display:flex; justify-content:space-between; padding:7px 2px; border-bottom:1px dashed #eee7d5; }
+  .items .it b { font-weight:800; color:#1f2430; }
+  .total { display:flex; justify-content:space-between; align-items:center; margin-top:13px; font-size:16px; font-weight:800; }
+  .total b { font-size:21px; color:#0f766e; }
+  .acts { display:flex; gap:12px; margin-top:16px; }
+  .open { flex:1.6; height:58px; border:0; border-radius:14px; background:#0f766e; color:#fff; font-size:18px; font-weight:800; cursor:pointer; }
+  .sec { flex:1; height:58px; border-radius:14px; border:2px solid #d8d2bf; background:#fff; font-size:15px; font-weight:800; color:#44403a; cursor:pointer; }
+  .sec.amber { border-color:#d97706; color:#b45309; background:#fffbeb; }
+  .foot { margin-top:14px; text-align:center; font-size:12.5px; color:#8a8574; }
+</style>
+</head>
+<body>
+
+  <div class="map">
+    <h2>الطاولات · الصالة الرئيسية</h2>
+    <div class="grid">
+      <div class="tbl oc"><span class="nm">T1</span><span class="st">مشغولة</span></div>
+      <div class="tbl"><span class="nm">T2</span><span class="st">متوفرة</span></div>
+      <div class="tbl oc"><span class="nm">T3</span><span class="st">مشغولة</span></div>
+      <div class="tbl bill"><span class="nm">T4</span><span class="st">طُلب الحساب</span></div>
+      <div class="tbl oc"><span class="nm">T5</span><span class="st">مشغولة</span></div>
+      <div class="tbl"><span class="nm">T6</span><span class="st">متوفرة</span></div>
+      <div class="tbl"><span class="nm">T7</span><span class="st">محجوزة</span></div>
+      <div class="tbl oc target"><span class="nm">T8</span><span class="st">مشغولة</span></div>
+      <div class="tbl oc"><span class="nm">T9</span><span class="st">مشغولة</span></div>
+      <div class="tbl"><span class="nm">T10</span><span class="st">متوفرة</span></div>
+      <div class="tbl oc"><span class="nm">T11</span><span class="st">مشغولة</span></div>
+      <div class="tbl bill"><span class="nm">T12</span><span class="st">طُلب الحساب</span></div>
+      <div class="tbl"><span class="nm">T13</span><span class="st">متوفرة</span></div>
+      <div class="tbl oc"><span class="nm">T14</span><span class="st">مشغولة</span></div>
+      <div class="tbl"><span class="nm">T15</span><span class="st">متوفرة</span></div>
+    </div>
+  </div>
+  <div class="veil"></div>
+
+  <div class="card">
+    <div class="grab"></div>
+    <div class="chead">
+      <span class="tt">طاولة T8</span>
+      <span class="badge">مشغولة</span>
+      <button class="x">✕</button>
+    </div>
+
+    <div class="meta">
+      <div class="m">رقم الطلب<b>#1057</b></div>
+      <div class="m">فُتح أول طلب<b>19:42</b></div>
+      <div class="m">النادل<b>سامر</b></div>
+      <div class="m">الضيوف<b>2</b></div>
+      <div class="m">الصالة<b>الرئيسية</b></div>
+    </div>
+
+    <div class="krow">
+      <span class="lbl">المطبخ:</span>
+      <span class="kchip wait">⏳ 1 بانتظار</span>
+      <span class="kchip">🔥 2 قيد التحضير</span>
+      <span class="kchip rdy">✓ 1 جاهز</span>
+    </div>
+
+    <div class="items">
+      <div class="it"><span>شاورما دجاج كبير × 1</span><b>45,000</b></div>
+      <div class="it"><span>فتوش × 1</span><b>25,000</b></div>
+      <div class="it"><span>مشروب غازي × 2</span><b>16,000</b></div>
+    </div>
+
+    <div class="total"><span>المجموع الجاري</span><b>86,000 ل.س</b></div>
+
+    <div class="acts">
+      <button class="open">فتح الطلب</button>
+      <button class="sec amber">🧾 طلب الحساب</button>
+      <button class="sec">🔀 دمج مع…</button>
+    </div>
+
+    <div class="foot">هذه بطاقة اللمس: النقر على الطاولة يفتحها أولاً — نفس محتوى تلميح الماوس، وتحمي من لمس الطاولة الخاطئة</div>
+  </div>
+
+</body>
+</html>

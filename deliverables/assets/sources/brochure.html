@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<title>بروشور Rest&Cafe التسويقي</title>
+<style>
+  :root{ --ink:#1f2430; --muted:#6b7280; --brand:#c2410c; --brand2:#ea580c; --cream:#faf6f0; --line:#e7ded2; }
+  @page{ size:A4; margin:16mm 15mm; @bottom-center{ content:"Rest&Cafe — نظام إدارة ونقاط بيع للمطاعم والكافيهات · Powered by Ali.J"; font-family:'Noto Sans Arabic'; font-size:8pt; color:#b6a98f; } }
+  @page cover{ margin:0; @bottom-center{content:none} }
+  *{ box-sizing:border-box; }
+  body{ font-family:'Noto Sans Arabic',sans-serif; color:var(--ink); font-size:11pt; line-height:1.8; margin:0; }
+  h1,h2,h3{ font-family:'Noto Kufi Arabic',sans-serif; color:#7c2d12; line-height:1.5; }
+  h2{ font-size:17pt; margin:0 0 10px 0; }
+  h2 .accent{ color:var(--brand2); }
+  p{ margin:6px 0; text-align:justify; }
+  .page{ page-break-before:always; }
+  .cover{ page:cover; height:297mm; background:linear-gradient(155deg,#431407 0%,#7c2d12 55%,#9a3412 100%); color:#fff; padding:20mm 18mm; position:relative; }
+  .cover .logo{ width:84px; background:#fff; border-radius:18px; padding:8px; }
+  .cover h1{ color:#fff; font-size:30pt; margin:10mm 0 3mm 0; }
+  .cover .sub{ font-size:14pt; color:#fed7aa; font-family:'Noto Kufi Arabic'; }
+  .cover p{ color:#ffedd5; font-size:11.5pt; max-width:125mm; text-align:right; }
+  .cover .hero{ position:absolute; bottom:18mm; right:18mm; left:18mm; }
+  .cover .hero img{ width:100%; border-radius:12px; border:3px solid rgba(255,255,255,.35); }
+  .cover .meta{ position:absolute; top:20mm; left:18mm; color:#fdba74; font-size:10pt; font-family:'Noto Kufi Arabic'; }
+  .pains{ display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
+  .pain{ flex:1 1 45%; background:#fff7ed; border:1px solid #fed7aa; border-radius:11px; padding:11px 13px; }
+  .pain h3{ margin:0 0 3px 0; font-size:12pt; color:#9a3412; }
+  .pain p{ margin:0; font-size:10.3pt; }
+  .feat{ display:flex; gap:14px; margin:15px 0; page-break-inside:avoid; align-items:flex-start; }
+  .feat .txt{ flex:1.05; }
+  .feat .img{ flex:1; }
+  .feat img{ width:100%; border-radius:10px; border:1px solid var(--line); box-shadow:0 4px 14px rgba(124,45,18,.12); }
+  .feat h3{ margin:0 0 4px 0; font-size:13.5pt; }
+  .feat .ben{ background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:6px 10px; font-size:10.2pt; margin-top:7px; }
+  .feat .ben b{ color:#15803d; }
+  .flow{ display:flex; align-items:stretch; gap:6px; margin:12px 0; }
+  .flow .f{ flex:1; background:var(--cream); border:1.5px solid #d6c9b8; border-radius:9px; padding:9px 7px; text-align:center; font-size:9.8pt; }
+  .flow .f b{ display:block; font-family:'Noto Kufi Arabic'; color:#9a3412; font-size:10.5pt; }
+  .flow .arr{ align-self:center; color:var(--brand2); font-size:14pt; }
+  .why{ display:flex; flex-wrap:wrap; gap:10px; margin:10px 0; }
+  .why .w{ flex:1 1 30%; background:var(--cream); border:1px solid var(--line); border-radius:11px; padding:11px 12px; }
+  .why .w h3{ margin:0 0 3px 0; font-size:11.5pt; color:#9a3412; }
+  .why .w p{ margin:0; font-size:10pt; }
+  .cta{ background:linear-gradient(150deg,#7c2d12,#9a3412); color:#fff; border-radius:14px; padding:18px 20px; margin-top:14px; }
+  .cta h2{ color:#fff; margin:0 0 6px 0; }
+  .cta p{ color:#ffedd5; }
+  .ph{ display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
+  .ph div{ flex:1 1 45%; background:rgba(255,255,255,.12); border:1.5px dashed rgba(255,255,255,.55); border-radius:9px; padding:8px 12px; font-size:10.5pt; color:#fff; }
+  .quote{ background:var(--cream); border-right:4px solid var(--brand2); padding:10px 14px; border-radius:8px; font-size:11pt; margin:12px 0; }
+  ul.chk{ list-style:none; padding:0; margin:8px 0; }
+  ul.chk li{ padding-right:24px; position:relative; margin:5px 0; }
+  ul.chk li::before{ content:"✓"; position:absolute; right:0; color:#15803d; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- الغلاف -->
+<div class="cover">
+  <img class="logo" src="../deliverables/assets/app-icon-512.png" alt="Rest&Cafe">
+  <div class="meta">نظام إدارة المطاعم والكافيهات</div>
+  <h1>مطعمك كلّه…<br>في نظام واحد</h1>
+  <div class="sub">طاولات، طلبات، مطبخ، فواتير، وتقارير — بلا ورق، بلا فوضى، بلا إنترنت</div>
+  <p>Rest&amp;Cafe نظام نقاط بيع وإدارة مطاعم يعمل على جهازك داخل مطعمك: يُنظّم الصالة لحظة بلحظة، يرسل الطلب إلى المطبخ فورًا، ويحسب فاتورتك بدقة — وبالعربية أولًا.</p>
+  <div class="hero"><img src="../deliverables/screenshots/04b-pos-cart.png" alt="نقطة بيع Rest&Cafe"></div>
+</div>
+
+<!-- المشكلة -->
+<div class="page">
+  <h2>صوتٌ مألوف في <span class="accent">مطعمك؟</span></h2>
+  <div class="pains">
+    <div class="pain"><h3>«وين طلب الطاولة 5؟»</h3><p>طلبات ورقية تضيع، وخطّ يد لا يُقرأ، وأصناف تصل خطأ — والزبون يدفع ثمن الفوضى تقييمًا سيئًا.</p></div>
+    <div class="pain"><h3>«هالطاولة دفعت ولا لسه؟»</h3><p>لا أحد يعرف حالة كل طاولة الآن: من طلب؟ من دفع؟ من ينتظر الحساب منذ عشر دقائق؟</p></div>
+    <div class="pain"><h3>أخطاء في الحساب كل يوم</h3><p>جمع يدوي على عجل: خصم منسي، صنف لم يُحسب، دفعة مقسّمة اختلطت — والفرق يخرج من ربحك.</p></div>
+    <div class="pain"><h3>أرقام الشهر؟ «تقريبًا...»</h3><p>كم بعت؟ ما أكثر صنف يربحك؟ كم فرق الصندوق هذا الشهر؟ إجابات تقديرية لا تُبنى عليها قرارات.</p></div>
+    <div class="pain"><h3>انقطع الإنترنت... توقفنا</h3><p>أنظمة سحابية تشلّ مطعمك عند أول انقطاع — وفي ذروة الغداء تحديدًا.</p></div>
+    <div class="pain"><h3>رسوم وضرائب مربكة</h3><p>رسم الإنفاق الاستهلاكي حسب تصنيف منشأتك يُحسب يدويًا على كل فاتورة — بلا خطأ مسموح.</p></div>
+  </div>
+  <div class="quote">كل مشكلة منها ليست «إزعاجًا» فحسب — إنها مال يتسرب كل يوم: أصناف لم تُحاسب، طاولات تدور ببطء، وزبائن لا يعودون.</div>
+</div>
+
+<!-- الحل -->
+<div class="page">
+  <h2>تعرّف على <span class="accent">Rest&amp;Cafe</span></h2>
+  <p>نظام واحد يغطي رحلة الزبون كاملة داخل مطعمك، يعمل على كمبيوتر المطعم نفسه وتتصل به شاشات المطبخ والندلاء عبر شبكتك المحلية. عربي أولًا، مصمم لطريقة عمل المطاعم عندنا، وجاهز لرسم الإنفاق الاستهلاكي السوري من أول فاتورة.</p>
+  <h3 style="margin-top:14px;">كيف تسير الخدمة؟</h3>
+  <div class="flow">
+    <div class="f"><b>الزبون</b>يجلس، أو يطلب بنفسه بمسح QR على طاولته</div><div class="arr">←</div>
+    <div class="f"><b>النادل / الكاشير</b>يُدخل الطلب من الخريطة أو جهازه</div><div class="arr">←</div>
+    <div class="f"><b>المطبخ</b>يستقبل الطلب على شاشته مع تنبيه صوتي وتذكرة مطبوعة</div><div class="arr">←</div>
+    <div class="f"><b>الكاشير</b>يصدر الفاتورة ويقبض — كاملًا أو جزئيًا أو مقسّمًا</div><div class="arr">←</div>
+    <div class="f"><b>أنت</b>ترى اليوم كله في لوحة التحكم وتغلقه بمطابقة صندوق</div>
+  </div>
+  <ul class="chk">
+    <li>خريطة طاولات حية لكل صالاتك — الحالة والمبلغ والأصناف من نظرة واحدة.</li>
+    <li>قائمة كاملة بأحجام وإضافات، وزر «نفد» يوقف بيع الصنف على كل الشاشات فورًا.</li>
+    <li>دفع مرن: جزئي، مقسّم نقدي/بطاقة، خصومات بموافقة، وتقسيم الفاتورة بين الضيوف.</li>
+    <li>إغلاق يومي يطابق صندوقك — والتقارير تجيب عن أسئلتك بالأرقام لا بالانطباعات.</li>
+  </ul>
+  <figure style="margin:10px 0;"><img src="../deliverables/screenshots/03-tables.png" style="width:100%; border-radius:10px; border:1px solid #e7ded2;" alt="خريطة الطاولات">
+  <figcaption style="font-size:9.3pt; color:#6b7280; text-align:center;">خريطة الطاولات الحية: مشغولة ومتوفرة ومحجوزة — مع مبلغ كل طلب وأصنافه.</figcaption></figure>
+</div>
+
+<!-- الميزات 1 -->
+<div class="page">
+  <h2>ميزات تصنع <span class="accent">يومًا أهدأ</span></h2>
+  <div class="feat">
+    <div class="txt"><h3>نقطة بيع بسرعة الذروة</h3>
+      <p>شبكة أصناف ملوّنة باللمس، بحث فوري وباركود، واختصارات لوحة مفاتيح للكاشير المتمرّس. طلب الصالة والسفري والتوصيل من نفس الشاشة.</p>
+      <div class="ben"><b>الفائدة:</b> طوابير أقصر عند الكاشير، وطلبات تُدخل مرة واحدة — صحيحة من أول مرة.</div></div>
+    <div class="img"><img src="../deliverables/screenshots/04-pos.png" alt="نقطة البيع"></div>
+  </div>
+  <div class="feat">
+    <div class="txt"><h3>مطبخ يسمع الطلب قبل أن يُنادى</h3>
+      <p>شاشة عرض مطبخ بتنبيه صوتي وعدّ تنازلي للألوان، مع تذكرة ورقية احتياطية تُعاد طباعتها تلقائيًا إن تعطلت الطابعة — لا طلب يضيع أبدًا بين الصالة والمطبخ.</p>
+      <div class="ben"><b>الفائدة:</b> سوء فهم أقل، أطباق تخرج بترتيبها الصحيح، وزبون لا يسأل «وين طلبي؟».</div></div>
+    <div class="img"><img src="../deliverables/screenshots/18-kds.png" alt="شاشة المطبخ"></div>
+  </div>
+  <div class="feat">
+    <div class="txt"><h3>زبونك يطلب بنفسه إن أحب</h3>
+      <p>رمز QR خاص بكل طاولة: يمسحه الزبون، يتصفح القائمة، ويطلب — فيصل الطلب مرتبطًا بطاولته إلى مطبخك مباشرة، دون تطبيقات ودون حسابات.</p>
+      <div class="ben"><b>الفائدة:</b> تخفيف ضغط الذروة عن الندلاء، وتجربة عصرية يحبها الزبائن.</div></div>
+    <div class="img"><img src="../deliverables/screenshots/19-server-app.png" alt="واجهات الشبكة المحلية"></div>
+  </div>
+</div>
+
+<!-- الميزات 2 -->
+<div class="page">
+  <h2>ومالُك… <span class="accent">تحت عينك</span></h2>
+  <div class="feat">
+    <div class="txt"><h3>فاتورة لا تخطئ، ودفع بكل الطرق</h3>
+      <p>حساب تلقائي من الأصناف المسجلة، دفع كامل أو جزئي أو مقسّم بين نقدي وبطاقة وطرق محلية تضيفها، خصومات بموافقة المشرف، وتقسيم الفاتورة بين الضيوف صنفًا صنفًا.</p>
+      <div class="ben"><b>الفائدة:</b> نزاعات حساب أقل، وتسرب إيراد أقل — كل ليرة موثقة باسم من قبضها ووافق عليها.</div></div>
+    <div class="img"><img src="../deliverables/screenshots/08b-bill-payment.png" alt="نافذة الدفع"></div>
+  </div>
+  <div class="feat">
+    <div class="txt"><h3>رسم الإنفاق الاستهلاكي — بسؤال واحد</h3>
+      <p>اختر تصنيف منشأتك (شعبية 0٪، نجمتان–ثلاث 5٪، أربع–خمس 10٪، ملهى 20٪) فيُضبط المعدل ويظهر سطرًا مستقلًا على كل فاتورة، محسوبًا عند الجهاز الرئيسي لا عند الكاشير. وضريبة المبيعات المعلنة لعام 2027 جاهزة كخيار تفعّله متى شملتك.</p>
+      <div class="ben"><b>الفائدة:</b> التزام ضريبي صحيح دون حساب يدوي على كل فاتورة، ودون خوف من تلاعب.</div></div>
+    <div class="img"><img src="../deliverables/screenshots/15-settings-tax.png" alt="إعدادات الضريبة"></div>
+  </div>
+  <div class="feat">
+    <div class="txt"><h3>لوحة تحكم تجيب قبل أن تسأل</h3>
+      <p>مبيعات اليوم مقارنة بالأسبوع الماضي، الطلبات الجارية، أفضل الأصناف، متوسط قيمة الطلب ومدة خدمة الطاولة — ثم إغلاق يومي يطابق صندوقك ليرة بليرة.</p>
+      <div class="ben"><b>الفائدة:</b> قرارات بالأرقام: قائمة تُضبط، مشتريات تُرشّد، وأخطاء صندوق تُكتشف في يومها.</div></div>
+    <div class="img"><img src="../deliverables/screenshots/02-dashboard.png" alt="لوحة التحكم"></div>
+  </div>
+</div>
+
+<!-- لماذا -->
+<div class="page">
+  <h2>لماذا <span class="accent">Rest&amp;Cafe</span> تحديدًا؟</h2>
+  <div class="why">
+    <div class="w"><h3>يعمل بلا إنترنت — نهائيًا</h3><p>النظام كله على جهازك وشبكتك المحلية. انقطع النت؟ مطعمك لا يشعر أصلًا.</p></div>
+    <div class="w"><h3>بياناتك ملكك وحدك</h3><p>لا سحابة ولا رفع بيانات ولا تتبّع. قاعدة بياناتك عندك، ونسخك الاحتياطية بيدك.</p></div>
+    <div class="w"><h3>عربي أولًا، لا ترجمة لاحقة</h3><p>واجهة وفواتير وتقارير مصممة بالعربية واتجاه RTL من الأساس — فريقك يتعلمها بساعات.</p></div>
+    <div class="w"><h3>مفصّل على السوق السوري</h3><p>رسم الإنفاق الاستهلاكي بتصنيفاته، ليرة سورية أو دولار، وتواريخ وأرقام كما يعرفها محاسبك.</p></div>
+    <div class="w"><h3>هوية مطعمك أنت</h3><p>اسمك وشعارك على الواجهة والفواتير والقوائم المطبوعة — النظام يلبس علامتك لا علامته.</p></div>
+    <div class="w"><h3>يكبر معك داخل مطعمك</h3><p>صالات متعددة، محطات مطبخ، شاشة زبون، طلب ذاتي بـ QR، مخزون ووصفات وتكاليف — عند حاجتك لا من أول يوم.</p></div>
+  </div>
+  <div class="quote">صُمم Rest&amp;Cafe في مطاعم حقيقية وبأيدي من يعرف ضغط ليلة الخميس: كل زر في مكانه لأن غيابه كلّف يومًا ما طبقًا باردًا أو فاتورة خاطئة.</div>
+  <div class="cta">
+    <h2>جاهز ترى مطعمك يعمل بهدوء؟</h2>
+    <p>اطلب عرضًا تجريبيًا على بيانات مطعمك الفعلية — قائمتك وطاولاتك وأسعارك — وقرّر بعد أن ترى فريقك يستخدمه، لا بعد وعودنا نحن.</p>
+    <div class="ph">
+      <div>الاسم / الشركة: ………………………………</div>
+      <div>الهاتف / واتساب: ………………………………</div>
+      <div>البريد الإلكتروني: ………………………………</div>
+      <div>الموقع الإلكتروني: ………………………………</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

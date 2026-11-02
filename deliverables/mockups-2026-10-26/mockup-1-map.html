@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Noto Sans Arabic","Segoe UI",Tahoma,sans-serif; }
+  body { width:1366px; height:768px; overflow:hidden; background:#f3f1ec; color:#1f2430; }
+  .app { display:flex; height:768px; }
+
+  /* slim app sidebar */
+  .side { width:64px; background:#23262d; color:#cfd3da; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px; flex:none; }
+  .side .logo { width:40px; height:40px; border-radius:10px; background:#b8860b; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; margin-bottom:14px; }
+  .side .ic { width:44px; height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; gap:2px; color:#aeb3bd; }
+  .side .ic b { font-size:16px; font-weight:400; }
+  .side .ic.on { background:#3a3f47; color:#fff; }
+  .side .sp { flex:1; }
+
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  /* header */
+  .head { height:64px; background:#fff; border-bottom:1px solid #e3ded2; display:flex; align-items:center; gap:14px; padding:0 20px; flex:none; }
+  .head h1 { font-size:20px; font-weight:800; }
+  .halls { display:flex; gap:6px; margin-inline-start:8px; }
+  .halls span { padding:7px 14px; border-radius:999px; font-size:13px; background:#f0ede6; color:#55503f; }
+  .halls span.on { background:#23262d; color:#fff; font-weight:700; }
+  .head .grow { flex:1; }
+  .btn-new { height:40px; padding:0 18px; border-radius:10px; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; border:2px solid; background:#fff; cursor:pointer; }
+  .btn-take { color:#0e7490; border-color:#0e7490; background:#ecfeff; }
+  .btn-del  { color:#b45309; border-color:#b45309; background:#fffbeb; }
+  .who { display:flex; align-items:center; gap:8px; font-size:13px; color:#555; }
+  .who .av { width:34px; height:34px; border-radius:50%; background:#0f766e; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; }
+
+  /* legend */
+  .legend { height:40px; display:flex; align-items:center; gap:18px; padding:0 20px; font-size:12.5px; color:#6b675a; flex:none; }
+  .legend .dot { width:11px; height:11px; border-radius:3px; display:inline-block; margin-inline-end:5px; vertical-align:-1px; }
+  .legend .grow { flex:1; }
+  .legend .shift { color:#8a8574; }
+
+  /* floor plan */
+  .plan-wrap { flex:1; padding:6px 20px 14px; }
+  .plan { position:relative; height:100%; background:
+      repeating-linear-gradient(0deg,#faf8f3 0 39px,#efece3 39px 40px),
+      repeating-linear-gradient(90deg,#faf8f3 0 39px,#efece3 39px 40px);
+    border:1.5px solid #ddd6c4; border-radius:16px; }
+  .zone { position:absolute; font-size:12px; color:#a29a83; border:1.5px dashed #ddd5bf; border-radius:12px; padding:6px 10px; }
+
+  .tbl { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+         border-radius:14px; border:2px solid; background:#fff; cursor:pointer; }
+  .tbl .nm { font-size:19px; font-weight:800; line-height:1.1; }
+  .tbl .st { font-size:11.5px; font-weight:700; }
+  .tbl .cap { font-size:10.5px; color:#8a8574; }
+  .tbl.av { border-color:#c9c2ae; background:#fdfcf9; }
+  .tbl.av .st { color:#8a8574; }
+  .tbl.oc { border-color:#2563eb; background:#eff6ff; }
+  .tbl.oc .st { color:#2563eb; }
+  .tbl.bill { border-color:#d97706; background:#fffbeb; }
+  .tbl.bill .st { color:#b45309; }
+  .tbl.rsv { border-color:#7c3aed; background:#f5f3ff; }
+  .tbl.rsv .st { color:#7c3aed; }
+  .tbl.round { border-radius:50%; }
+
+  /* hover tooltip demo on T5 */
+  .tip { position:absolute; width:262px; background:#23262d; color:#f3f4f6; border-radius:14px; padding:14px 16px;
+         box-shadow:0 14px 34px rgba(20,20,30,.35); z-index:5; }
+  .tip::after { content:""; position:absolute; bottom:-8px; inset-inline-start:44px; border:8px solid transparent; border-top-color:#23262d; border-bottom:0; }
+  .tip h3 { font-size:15px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+  .tip h3 .ord { color:#fbbf24; font-size:13px; }
+  .tip .row { display:flex; justify-content:space-between; font-size:12.5px; padding:4px 0; color:#d6d9df; }
+  .tip .row b { color:#fff; font-weight:700; }
+  .tip .sum { border-top:1px solid #3f434c; margin-top:7px; padding-top:9px; display:flex; justify-content:space-between; font-size:14px; }
+  .tip .sum b { color:#fbbf24; font-size:16px; }
+  .tip .kds { display:flex; gap:6px; margin-top:9px; }
+  .tip .kds span { font-size:11px; padding:3px 9px; border-radius:999px; background:#3a3f47; color:#e5e7eb; }
+  .tip .kds .rdy { background:#065f46; color:#a7f3d0; }
+
+  .foot { height:38px; display:flex; align-items:center; justify-content:center; font-size:12.5px; color:#8a8574; flex:none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <div class="logo">R</div>
+    <div class="ic"><b>▦</b>لوحة التحكم</div>
+    <div class="ic on"><b>▤</b>الطاولات</div>
+    <div class="ic"><b>🛒</b>البيع</div>
+    <div class="ic"><b>🧾</b>الطلبات</div>
+    <div class="ic"><b>👨‍🍳</b>المطبخ</div>
+    <div class="ic"><b>📦</b>الأصناف</div>
+    <div class="sp"></div>
+    <div class="ic"><b>⚙</b>الإعدادات</div>
+  </div>
+
+  <div class="main">
+    <div class="head">
+      <h1>الطاولات</h1>
+      <div class="halls"><span class="on">الصالة الرئيسية</span><span>صالة العائلات</span><span>التراس</span></div>
+      <div class="grow"></div>
+      <button class="btn-new btn-take">🛍 طلب سفري جديد</button>
+      <button class="btn-new btn-del">🛵 طلب توصيل جديد</button>
+      <div class="who"><div class="av">ك</div>الكاشير: محمد</div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:#d8d2bf"></i>متوفرة</span>
+      <span><i class="dot" style="background:#2563eb"></i>مشغولة</span>
+      <span><i class="dot" style="background:#d97706"></i>طُلب الحساب</span>
+      <span><i class="dot" style="background:#7c3aed"></i>محجوزة</span>
+      <span class="grow"></span>
+      <span class="shift">الوردية مفتوحة منذ 17:30 · الدرج: محمد</span>
+    </div>
+
+    <div class="plan-wrap">
+      <div class="plan">
+        <div class="zone" style="top:10px; inset-inline-start:14px;">قسم العائلات</div>
+        <div class="zone" style="top:10px; inset-inline-end:14px;">قرب النافذة</div>
+
+        <!-- row 1 -->
+        <div class="tbl oc"   style="top:52px;  inset-inline-start:36px;  width:128px; height:96px;"><span class="nm">T1</span><span class="st">مشغولة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl av"   style="top:52px;  inset-inline-start:196px; width:128px; height:96px;"><span class="nm">T2</span><span class="st">متوفرة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl round oc" style="top:46px; inset-inline-start:356px; width:108px; height:108px;"><span class="nm">T3</span><span class="st">مشغولة</span><span class="cap">2 مقعد</span></div>
+        <div class="tbl bill" style="top:52px;  inset-inline-start:496px; width:128px; height:96px;"><span class="nm">T4</span><span class="st">طُلب الحساب</span><span class="cap">6 مقاعد</span></div>
+        <div class="tbl oc"   style="top:52px;  inset-inline-start:656px; width:128px; height:96px; outline:3px solid #f59e0b; outline-offset:2px;"><span class="nm">T5</span><span class="st">مشغولة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl av"   style="top:52px;  inset-inline-start:816px; width:128px; height:96px;"><span class="nm">T6</span><span class="st">متوفرة</span><span class="cap">8 مقاعد</span></div>
+        <div class="tbl rsv"  style="top:52px;  inset-inline-start:976px; width:128px; height:96px;"><span class="nm">T7</span><span class="st">محجوزة 20:30</span><span class="cap">4 مقاعد</span></div>
+
+        <!-- row 2 -->
+        <div class="tbl av"   style="top:196px; inset-inline-start:36px;  width:128px; height:96px;"><span class="nm">T8</span><span class="st">متوفرة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl oc"   style="top:196px; inset-inline-start:196px; width:128px; height:96px;"><span class="nm">T9</span><span class="st">مشغولة</span><span class="cap">6 مقاعد</span></div>
+        <div class="tbl oc"   style="top:196px; inset-inline-start:356px; width:128px; height:96px;"><span class="nm">T10</span><span class="st">مشغولة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl round av" style="top:190px; inset-inline-start:516px; width:108px; height:108px;"><span class="nm">T11</span><span class="st">متوفرة</span><span class="cap">2 مقعد</span></div>
+        <div class="tbl av"   style="top:196px; inset-inline-start:656px; width:128px; height:96px;"><span class="nm">T12</span><span class="st">متوفرة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl bill" style="top:196px; inset-inline-start:816px; width:128px; height:96px;"><span class="nm">T13</span><span class="st">طُلب الحساب</span><span class="cap">2 مقعد</span></div>
+        <div class="tbl oc"   style="top:196px; inset-inline-start:976px; width:128px; height:96px;"><span class="nm">T14</span><span class="st">مشغولة</span><span class="cap">10 مقاعد</span></div>
+
+        <!-- row 3 -->
+        <div class="tbl oc"   style="top:340px; inset-inline-start:36px;  width:128px; height:96px;"><span class="nm">T15</span><span class="st">مشغولة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl av"   style="top:340px; inset-inline-start:196px; width:128px; height:96px;"><span class="nm">T16</span><span class="st">متوفرة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl rsv"  style="top:340px; inset-inline-start:356px; width:128px; height:96px;"><span class="nm">T17</span><span class="st">محجوزة 21:00</span><span class="cap">6 مقاعد</span></div>
+        <div class="tbl oc"   style="top:340px; inset-inline-start:496px; width:128px; height:96px;"><span class="nm">T18</span><span class="st">مشغولة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl av"   style="top:340px; inset-inline-start:656px; width:128px; height:96px;"><span class="nm">T19</span><span class="st">متوفرة</span><span class="cap">4 مقاعد</span></div>
+        <div class="tbl oc"   style="top:340px; inset-inline-start:816px; width:128px; height:96px;"><span class="nm">T20</span><span class="st">مشغولة</span><span class="cap">8 مقاعد</span></div>
+        <div class="tbl av"   style="top:340px; inset-inline-start:976px; width:128px; height:96px;"><span class="nm">T21</span><span class="st">متوفرة</span><span class="cap">2 مقعد</span></div>
+
+        <!-- hover tooltip over T5 -->
+        <div class="tip" style="top:170px; inset-inline-start:596px;">
+          <h3>طاولة T5 <span class="ord">طلب #1042</span></h3>
+          <div class="row"><span>فُتح أول طلب</span><b>19:05</b></div>
+          <div class="row"><span>النادل</span><b>أحمد</b></div>
+          <div class="row"><span>الضيوف</span><b>4</b></div>
+          <div class="kds"><span>⏳ 1 بانتظار</span><span>🔥 2 قيد التحضير</span><span class="rdy">✓ 1 جاهز</span></div>
+          <div class="sum"><span>المجموع الجاري</span><b>161,000 ل.س</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">مرّر فوق أي طاولة لعرض تلميح طلبها · انقر طاولة لفتح مكان شغلها · هذا النموذج مرسوم على شاشة 1366×768</div>
+  </div>
+</div>
+</body>
+</html>

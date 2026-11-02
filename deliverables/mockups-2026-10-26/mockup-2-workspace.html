@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Noto Sans Arabic","Segoe UI",Tahoma,sans-serif; }
+  body { width:1366px; height:768px; overflow:hidden; background:#f3f1ec; color:#1f2430; }
+  .app { display:flex; height:768px; }
+
+  /* mini-map strip */
+  .strip { width:148px; background:#2b2e35; color:#e5e7eb; display:flex; flex-direction:column; padding:12px 10px; gap:8px; flex:none; }
+  .back { height:52px; border:0; border-radius:12px; background:#f59e0b; color:#1f2430; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .strip .hall { font-size:11.5px; color:#9ca3af; text-align:center; margin-top:2px; }
+  .mini { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .mt { height:44px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; border:2px solid transparent; background:#3a3f47; color:#d6d9df; }
+  .mt.oc { background:#1e3a5f; border-color:#2563eb; color:#bfdbfe; }
+  .mt.bill { background:#4a3410; border-color:#d97706; color:#fde68a; }
+  .mt.rsv { background:#35245e; border-color:#7c3aed; color:#ddd6fe; }
+  .mt.sel { outline:3px solid #f59e0b; outline-offset:1px; background:#1e3a5f; color:#fff; }
+  .strip .tip2 { margin-top:auto; font-size:11px; color:#9ca3af; text-align:center; line-height:1.7; }
+
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  /* order header */
+  .ohead { height:60px; background:#fff; border-bottom:1px solid #e3ded2; display:flex; align-items:center; gap:12px; padding:0 18px; flex:none; }
+  .ohead .tt { font-size:19px; font-weight:800; }
+  .ohead .meta { font-size:12.5px; color:#6b675a; }
+  .ohead .grow { flex:1; }
+  .hbtn { height:40px; padding:0 14px; border-radius:10px; font-size:13.5px; font-weight:700; border:1.5px solid #d8d2bf; background:#fff; color:#44403a; cursor:pointer; }
+  .hbtn.amber { border-color:#d97706; color:#b45309; background:#fffbeb; }
+  .hbtn.danger { border-color:#fca5a5; color:#b91c1c; background:#fef2f2; }
+
+  .work { flex:1; display:flex; min-height:0; }
+
+  /* menu side */
+  .menu { flex:1; display:flex; flex-direction:column; padding:14px 16px; min-width:0; }
+  .cats { display:flex; gap:8px; flex:none; }
+  .cats span { padding:9px 16px; border-radius:999px; background:#fff; border:1.5px solid #e0dacb; font-size:13.5px; font-weight:700; color:#55503f; }
+  .cats span.on { background:#23262d; color:#fff; border-color:#23262d; }
+  .search { margin-inline-start:auto; }
+  .search div { width:190px; height:38px; border-radius:10px; background:#fff; border:1.5px solid #e0dacb; display:flex; align-items:center; padding:0 12px; font-size:13px; color:#a29a83; }
+  .grid { flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; align-content:start; }
+  .item { background:#fff; border:1.5px solid #e7e2d2; border-radius:14px; padding:12px 13px; height:104px; display:flex; flex-direction:column; }
+  .item .em { font-size:22px; }
+  .item .nm { font-size:14.5px; font-weight:800; margin-top:4px; }
+  .item .pr { margin-top:auto; display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#6b675a; }
+  .item .pr b { color:#1f2430; font-size:14px; }
+  .item .add { width:30px; height:30px; border-radius:9px; border:0; background:#0f766e; color:#fff; font-size:17px; font-weight:800; cursor:pointer; }
+  .item.hot { border-color:#0f766e; box-shadow:0 0 0 2px #99e5da inset; }
+
+  /* cart side */
+  .cart { width:336px; flex:none; background:#fff; border-inline-start:1px solid #e3ded2; display:flex; flex-direction:column; }
+  .cart h2 { font-size:15px; font-weight:800; padding:14px 16px 8px; display:flex; justify-content:space-between; align-items:center; }
+  .cart h2 span { font-size:12px; color:#8a8574; font-weight:600; }
+  .lines { flex:1; overflow:hidden; padding:2px 16px; }
+  .ln { padding:6.5px 0; border-bottom:1px dashed #eee7d5; }
+  .ln .r1 { display:flex; justify-content:space-between; font-size:13.5px; }
+  .ln .r1 .nm { font-weight:700; }
+  .ln .r1 .am { font-weight:800; }
+  .ln .r2 { display:flex; justify-content:space-between; align-items:center; margin-top:3px; }
+  .qty { display:flex; align-items:center; gap:9px; }
+  .qty button { width:26px; height:26px; border-radius:8px; border:1.5px solid #d8d2bf; background:#fff; font-size:15px; font-weight:800; color:#44403a; }
+  .qty b { font-size:14px; min-width:16px; text-align:center; }
+  .chip { font-size:10.5px; padding:2.5px 9px; border-radius:999px; font-weight:700; }
+  .chip.sent { background:#eef2ff; color:#3730a3; }
+  .chip.rdy { background:#dcfce7; color:#166534; }
+  .chip.new { background:#fef3c7; color:#92400e; }
+  .note { font-size:11.5px; color:#a16207; margin-top:3px; }
+  .tot { padding:9px 16px; border-top:1px solid #e3ded2; }
+  .tot .r { display:flex; justify-content:space-between; font-size:13px; color:#55503f; padding:2.5px 0; }
+  .tot .r.grand { font-size:17px; color:#1f2430; font-weight:800; border-top:1px dashed #e3ded2; margin-top:6px; padding-top:9px; }
+  .actions { padding:0 16px 16px; display:flex; flex-direction:column; gap:9px; }
+  .send { height:47px; border:0; border-radius:12px; background:#0f766e; color:#fff; font-size:15.5px; font-weight:800; cursor:pointer; }
+  .pay { height:47px; border:0; border-radius:12px; background:#23262d; color:#fff; font-size:15.5px; font-weight:800; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- mini-map strip -->
+  <div class="strip">
+    <button class="back">⬅ عودة للطاولات</button>
+    <div class="hall">الصالة الرئيسية</div>
+    <div class="mini">
+      <div class="mt oc">T1</div><div class="mt">T2</div>
+      <div class="mt oc">T3</div><div class="mt bill">T4</div>
+      <div class="mt oc sel">T5</div><div class="mt">T6</div>
+      <div class="mt rsv">T7</div><div class="mt">T8</div>
+      <div class="mt oc">T9</div><div class="mt oc">T10</div>
+      <div class="mt">T11</div><div class="mt">T12</div>
+      <div class="mt bill">T13</div><div class="mt oc">T14</div>
+      <div class="mt oc">T15</div><div class="mt">T16</div>
+    </div>
+    <div class="tip2">كبسة على أي طاولة<br>بتنقلك لطلبها فوراً</div>
+  </div>
+
+  <div class="main">
+    <div class="ohead">
+      <span class="tt">طاولة T5</span>
+      <span class="meta">طلب #1042 · فُتح 19:05 · النادل: أحمد · 4 ضيوف</span>
+      <div class="grow"></div>
+      <button class="hbtn">🔀 دمج مع…</button>
+      <button class="hbtn amber">🧾 طلب الحساب</button>
+      <button class="hbtn danger">✕ إلغاء الطلب</button>
+    </div>
+
+    <div class="work">
+      <!-- menu -->
+      <div class="menu">
+        <div class="cats">
+          <span class="on">الكل</span><span>مشويات</span><span>شاورما</span><span>بيتزا</span><span>مشروبات</span><span>حلويات</span>
+          <div class="search"><div>🔍 بحث في القائمة…</div></div>
+        </div>
+        <div class="grid">
+          <div class="item hot"><span class="em">🍗</span><span class="nm">شاورما دجاج كبير</span><div class="pr"><b>45,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🥙</span><span class="nm">شاورما لحم</span><div class="pr"><b>60,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🍖</span><span class="nm">مشاوي مشكّلة</span><div class="pr"><b>120,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🍕</span><span class="nm">بيتزا خضار</span><div class="pr"><b>85,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🥗</span><span class="nm">فتوش</span><div class="pr"><b>25,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🍟</span><span class="nm">بطاطا مقلية</span><div class="pr"><b>20,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🧆</span><span class="nm">حمص باللحمة</span><div class="pr"><b>40,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🥤</span><span class="nm">مشروب غازي</span><div class="pr"><b>8,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🍮</span><span class="nm">حلاوة الجبن</span><div class="pr"><b>30,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">☕</span><span class="nm">قهوة عربية</span><div class="pr"><b>10,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">🍵</span><span class="nm">شاي</span><div class="pr"><b>7,000</b><button class="add">+</button></div></div>
+          <div class="item"><span class="em">💧</span><span class="nm">مياه كبيرة</span><div class="pr"><b>5,000</b><button class="add">+</button></div></div>
+        </div>
+      </div>
+
+      <!-- cart -->
+      <div class="cart">
+        <h2>طلب الطاولة <span>5 أصناف</span></h2>
+        <div class="lines">
+          <div class="ln"><div class="r1"><span class="nm">شاورما دجاج كبير</span><span class="am">90,000</span></div>
+            <div class="r2"><div class="qty"><button>−</button><b>2</b><button>+</button></div><span class="chip sent">بالمطبخ · قيد التحضير</span></div></div>
+          <div class="ln"><div class="r1"><span class="nm">فتوش</span><span class="am">25,000</span></div>
+            <div class="r2"><div class="qty"><button>−</button><b>1</b><button>+</button></div><span class="chip rdy">✓ جاهز</span></div></div>
+          <div class="ln"><div class="r1"><span class="nm">مشروب غازي</span><span class="am">16,000</span></div>
+            <div class="r2"><div class="qty"><button>−</button><b>2</b><button>+</button></div><span class="chip sent">بالمطبخ · تم التسليم</span></div>
+            <div class="note">ملاحظة: واحد بدون سكر</div></div>
+          <div class="ln"><div class="r1"><span class="nm">بطاطا مقلية</span><span class="am">20,000</span></div>
+            <div class="r2"><div class="qty"><button>−</button><b>1</b><button>+</button></div><span class="chip sent">بالمطبخ · بانتظار</span></div></div>
+          <div class="ln"><div class="r1"><span class="nm">قهوة عربية</span><span class="am">10,000</span></div>
+            <div class="r2"><div class="qty"><button>−</button><b>1</b><button>+</button></div><span class="chip new">جديد · لم يُرسل بعد</span></div></div>
+        </div>
+        <div class="tot">
+          <div class="r"><span>المجموع الفرعي</span><span>161,000</span></div>
+          <div class="r"><span>خصم</span><span>—</span></div>
+          <div class="r grand"><span>المجموع</span><span>161,000 ل.س</span></div>
+        </div>
+        <div class="actions">
+          <button class="send">إرسال الجديد إلى المطبخ (1)</button>
+          <button class="pay">إتمام الدفع · 161,000</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
