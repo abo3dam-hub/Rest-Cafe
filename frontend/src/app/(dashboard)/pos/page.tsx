@@ -20,6 +20,8 @@ import TableCheckoutModal from '@/components/pos/TableCheckoutModal';
 import PaymentModal from '@/components/pos/PaymentModal';
 import PrepaidCheckoutModal from '@/components/pos/PrepaidCheckoutModal';
 import PosTopbar from '@/components/pos/PosTopbar';
+import PosOfflineIndicator from '@/components/pos/PosOfflineIndicator';
+import PosStaleAttemptBanner from '@/components/pos/PosStaleAttemptBanner';
 import PosSupportErrorBanner from '@/components/pos/PosSupportErrorBanner';
 import PosWorkspaceBanner from '@/components/pos/PosWorkspaceBanner';
 import PosTableRail from '@/components/pos/PosTableRail';
@@ -41,6 +43,7 @@ import { usePosKeyboardShortcuts } from '@/hooks/usePosKeyboardShortcuts';
 import { usePosOrderSubmission } from '@/hooks/usePosOrderSubmission';
 import { usePosTableWorkspace } from '@/hooks/usePosTableWorkspace';
 import { usePosCatalog } from '@/hooks/usePosCatalog';
+import { usePosConnectivity } from '@/hooks/usePosConnectivity';
 import { usePosFullscreen } from '@/hooks/usePosFullscreen';
 import { usePosOrderAlert } from '@/hooks/usePosOrderAlert';
 import { usePosProductActions } from '@/hooks/usePosProductActions';
@@ -93,7 +96,9 @@ export default function POSPage() {
     setShowSoldOutModal,
     handleToggleSoldOut,
     handleReactivateAllSoldOut,
+    catalogRetrying,
   } = usePosCatalog({ isRestaurant });
+  const online = usePosConnectivity();
   const { orderAlert, showPrimeBanner, handlePrimeBanner } = usePosOrderAlert();
 
   // Modal state
@@ -200,6 +205,10 @@ export default function POSPage() {
     handleAddCartToOrder,
     handlePaymentComplete,
     printBillForTenant,
+    stalePostpaidAttempt,
+    staleAttemptBusy,
+    recoverStalePostpaidAttempt,
+    dismissStalePostpaidAttempt,
   } = usePosOrderSubmission({
     pendingOrder,
     setPendingOrder,
@@ -447,6 +456,17 @@ export default function POSPage() {
         onToggleFullscreen={toggleFullscreen}
         onCustomerModalOpenChange={setTopbarCustomerModalOpen}
       />
+
+      <PosOfflineIndicator online={online} catalogRetrying={catalogRetrying} />
+
+      {stalePostpaidAttempt && (
+        <PosStaleAttemptBanner
+          attempt={stalePostpaidAttempt}
+          busy={staleAttemptBusy}
+          onRecover={() => void recoverStalePostpaidAttempt()}
+          onDismiss={dismissStalePostpaidAttempt}
+        />
+      )}
 
       {wsTable && (
         <PosWorkspaceBanner
