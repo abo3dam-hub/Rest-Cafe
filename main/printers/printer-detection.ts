@@ -34,7 +34,7 @@ function guessPaperWidth(name: string, model: string): string {
   if (profile) return profile.defaultPaperWidth;
   const s = (name + ' ' + model).toLowerCase();
   if (s.includes('58')) return 'cols-32';
-  return 'cols-42';
+  return 'cols-48';
 }
 
 function annotateProfile(info: Omit<PrinterInfo, 'profileId'>): PrinterInfo {
