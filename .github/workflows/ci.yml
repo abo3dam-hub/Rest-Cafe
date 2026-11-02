@@ -62,6 +62,10 @@ jobs:
           npm run test:run-test-wrapper
           npm run test:smoke
           npm run test:startup-cache
+          npm run test:server-ports
+          npm run test:wal-checkpoint
+          npm run test:autostart
+          npm run test:host-rediscovery
           npm run test:shutdown-lifecycle
           npm run test:full-house
           npm run test:restaurant-day-cycle
