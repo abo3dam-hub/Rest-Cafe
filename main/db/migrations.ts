@@ -3604,6 +3604,34 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       );
     },
   },
+  {
+    version: 124,
+    name: 'bill_print_warnings',
+    up: () => {
+      // Warnings a print dropped (F-017): a non-financial line the printer
+      // could not represent is recorded with the bill instead of vanishing
+      // with only a toast. print_log_id is null for queue/operator records,
+      // which have no print_logs row; source names the confirming party.
+      getRawDatabase().exec(`
+        CREATE TABLE IF NOT EXISTS bill_print_warnings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          bill_id INTEGER NOT NULL,
+          print_log_id INTEGER,
+          field TEXT NOT NULL DEFAULT '',
+          text TEXT NOT NULL DEFAULT '',
+          message TEXT NOT NULL DEFAULT '',
+          kind TEXT NOT NULL DEFAULT 'line',
+          source TEXT NOT NULL DEFAULT 'frontend',
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (bill_id) REFERENCES bills(id),
+          FOREIGN KEY (print_log_id) REFERENCES print_logs(id)
+        )
+      `);
+      getRawDatabase().exec(
+        'CREATE INDEX IF NOT EXISTS idx_bill_print_warnings_bill ON bill_print_warnings(bill_id)',
+      );
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
