@@ -48,7 +48,7 @@ router.get(
         requested_port: getDefaultKdsPort(),
         port_bumped: kdsPort !== getDefaultKdsPort(),
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
