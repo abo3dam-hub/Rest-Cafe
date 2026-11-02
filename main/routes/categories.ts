@@ -291,7 +291,7 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
     );
 
     res.json({ categories: categoriesWithChildren });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -328,7 +328,7 @@ router.get('/:id', requirePermission('catalog.view'), (req: Request, res: Respon
         products,
       }),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -397,7 +397,7 @@ function createCategory(req: Request, res: Response) {
         addon_group_ids: addonGroupValidation.ids || [],
       }),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -500,7 +500,7 @@ function updateCategory(req: Request, res: Response) {
     res.json({
       category: serializeCategory({ ...updated, addon_group_ids: updatedAddonGroupIds }),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -603,7 +603,7 @@ function deleteCategory(req: Request, res: Response) {
       return res.status(400).json({ error: error.message });
     }
     res.json({ message: 'Category deleted' });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
