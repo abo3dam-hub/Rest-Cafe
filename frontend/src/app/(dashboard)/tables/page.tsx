@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import api from '@/lib/api';
+import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import {
@@ -582,9 +582,13 @@ export default function TablesPage() {
       );
       showPrintWarningsToast(warnings);
       try {
-        await api.post(`/bills/${bill.id}/print`, {
-          print_type: isReprint ? 'reprint' : 'receipt',
-        });
+        await api.post(
+          `/bills/${bill.id}/print`,
+          {
+            print_type: isReprint ? 'reprint' : 'receipt',
+          },
+          { timeout: LONG_API_REQUEST_TIMEOUT_MS },
+        );
       } catch {
         /* best-effort history tracking */
       }
