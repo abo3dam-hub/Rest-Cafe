@@ -261,6 +261,8 @@ export interface OrderItem {
   addons: { id?: number | string | null; name: string; price?: number; quantity?: number }[] | null;
   special_instructions: string | null;
   status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'voided' | 'void_adjustment';
+  /** When the item last reached the kitchen printer (F-004 marker); null until first printed. */
+  kot_printed_at?: string | null;
   superseded?: boolean;
   edit_version?: number;
   price_overridden?: number | boolean;
