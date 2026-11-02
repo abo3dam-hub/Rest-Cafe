@@ -189,7 +189,7 @@ async function forwardToMainApiImpl(req: Request, res: Response, targetPath: str
     res.status(upstream.status);
     res.type(upstream.headers.get('content-type') || 'application/json');
     res.send(buffer);
-  } catch (error: any) {
+  } catch (error) {
     if (getHttpRequestSignal(req)?.aborted) {
       if (!res.headersSent) res.status(503).end();
       else if (!res.writableEnded) res.destroy();
@@ -342,7 +342,7 @@ export function startServerApp(): Promise<void> {
             authorization_revision: effectivePermissionRevision(user.id),
           },
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Server App] Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -511,7 +511,7 @@ export function startServerApp(): Promise<void> {
           data = { error: 'Unexpected response from the local POS API' };
         }
         return { status: upstream.status, data };
-      } catch (error: any) {
+      } catch (error) {
         if (getHttpRequestSignal(req)?.aborted)
           return { status: 503, data: { error: 'Request cancelled' } };
         console.error('[Server App] Self-order forward failed:', error);
