@@ -125,7 +125,7 @@ const emptyPrinterForm: PrinterForm = {
   connection_type: 'network',
   ip_address: '',
   port: '9100',
-  paper_width: 'cols-42',
+  paper_width: 'cols-48',
 };
 
 export interface PrintersSettingsTabProps {
@@ -186,7 +186,7 @@ export function PrintersSettingsTab({
     if (value === '58mm-36') return 'cols-36';
     if (value === '80mm-42') return 'cols-42';
     if (value === '80mm') return 'cols-48';
-    return /^cols-(32|36|40|42|44|48)$/.test(value || '') ? value! : 'cols-42';
+    return /^cols-(32|36|40|42|44|48)$/.test(value || '') ? value! : 'cols-48';
   };
 
   const printWidthLabel = (value?: string | null): string => {
