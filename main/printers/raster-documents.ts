@@ -10,6 +10,7 @@ import {
   renderCompactReceiptViaDocument,
 } from './document-compact';
 import { renderKotDocumentToLines } from './document-kot';
+import { renderMerchantReceiptViaDocument } from './document-merchant';
 import { buildEscPos, normalizePrintLanguage, type PrintWarning } from './formatting-helpers';
 import { capabilitiesForPrinter, resolvePrinterProfile, type PrinterCutMode } from './profiles';
 import { rasterCapabilityEnabled, type RasterSemanticLineGroup } from '../../shared/print/raster';
@@ -58,7 +59,35 @@ export function receiptDocumentLines(
   };
   const rasterBiz = { ...biz };
   const selection = parseBillTemplateSelection(template);
-  if (selection?.source === 'pack' || selection?.source === 'merchant') return null;
+  // Pack (plugin) templates have no document lines or financial-line
+  // groups, so rasterizing them would weaken the fail-closed rule: they
+  // stay raster-off and rely on the recorded warning (F-017). Merchant
+  // templates render through the classic pipeline, so their document
+  // lines carry the same financial-line groups and can be rasterized.
+  if (selection?.source === 'pack') return null;
+  if (selection?.source === 'merchant') {
+    const merchant = renderMerchantReceiptViaDocument(
+      order as Record<string, unknown>,
+      bill as Record<string, unknown>,
+      rasterBiz,
+      selection.id,
+      {
+        columns,
+        language,
+        ...(additionalLanguage !== undefined ? { additionalLanguage } : {}),
+        isReprint,
+        useUnicode,
+        arabicShaping,
+        cutMode,
+        capabilities,
+      },
+    );
+    return {
+      lines: merchant.lines,
+      warnings: merchant.warnings,
+      rasterGroups: merchant.rasterGroups,
+    };
+  }
   const normalizedTemplate = normalizeReceiptTemplate(
     selection?.source === 'core' ? selection.id : template,
   );
