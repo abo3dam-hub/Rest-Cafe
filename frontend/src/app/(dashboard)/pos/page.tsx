@@ -46,6 +46,7 @@ import { usePosCatalog } from '@/hooks/usePosCatalog';
 import { usePosConnectivity } from '@/hooks/usePosConnectivity';
 import { usePosFullscreen } from '@/hooks/usePosFullscreen';
 import { usePosOrderAlert } from '@/hooks/usePosOrderAlert';
+import { usePrintQueueDrain } from '@/hooks/usePrintQueueDrain';
 import { usePosProductActions } from '@/hooks/usePosProductActions';
 import { usePosTableActions } from '@/hooks/usePosTableActions';
 import KeyboardShortcutsModal from '@/components/pos/KeyboardShortcutsModal';
@@ -100,6 +101,8 @@ export default function POSPage() {
   } = usePosCatalog({ isRestaurant });
   const online = usePosConnectivity();
   const { orderAlert, showPrimeBanner, handlePrimeBanner } = usePosOrderAlert();
+  // Retries failed KOT and receipt prints from the frontend queue (F-009).
+  usePrintQueueDrain();
 
   // Modal state
   const [showTablePicker, setShowTablePicker] = useState(false);
