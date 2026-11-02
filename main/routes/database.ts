@@ -161,7 +161,7 @@ router.get('/export', requirePermission('database.manage'), (req: Request, res: 
       redacted_fields: result.redactedFields,
       data: result.exportData,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[DB Export] Error:', error);
     res.status(500).json({ error: 'Export failed' });
   }
@@ -653,7 +653,7 @@ router.post(
               clearUserAuthCache();
               clearInMemoryRevokedTokens();
               clearJWTSecretCache();
-            } catch (cacheError: any) {
+            } catch (cacheError) {
               // Log post-commit cache cleanup failure without failing the committed import.
               console.error('[DB Import] Post-commit cache cleanup failed:', cacheError);
             }
@@ -669,7 +669,7 @@ router.post(
               placeholderUsersCreated,
               cleanupPending: false,
             });
-          } catch (err: any) {
+          } catch (err) {
             try {
               db.exec('ROLLBACK');
             } catch {}
@@ -678,7 +678,7 @@ router.post(
         } finally {
           db.pragma(`foreign_keys = ${previousForeignKeys ? 'ON' : 'OFF'}`);
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[DB Import] Error:', error);
         res.status(500).json({ error: 'Import failed' });
       }
@@ -784,7 +784,7 @@ router.post(
         filename: path.basename(backupPath),
         schemaVersion,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Backup] Error:', error);
       res.status(500).json({ error: 'Backup failed' });
     }
@@ -856,7 +856,7 @@ router.post(
         tablesRestored: restoreResult.tablesRestored,
         cleanupPending: restoreResult.cleanupPending === true,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DB Restore] Error:', error);
       res.status(500).json({ error: 'Restore failed' });
     }
@@ -919,7 +919,7 @@ router.get(
         .catch((error) => {
           console.error('[DB Download] Stream error:', (error as Error).message);
         });
-    } catch (error: any) {
+    } catch (error) {
       if (tempDir) {
         try {
           fs.rmSync(tempDir, { recursive: true, force: true });
@@ -951,7 +951,7 @@ router.get('/tables', requirePermission('database.manage'), (req: Request, res: 
       });
 
     res.json({ tables: tableInfo });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[DB Tables] Error:', error);
     res.status(500).json({ error: 'Could not fetch database tables' });
   }
