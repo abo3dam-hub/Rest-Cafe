@@ -61,7 +61,17 @@ export default function StatusBar() {
   const tSupport = useTranslations('support');
 
   const { user, currentTenant } = useAuthStore();
-  const { status: printerConnStatus, deviceInfo, defaultPrinter, printMethod } = usePrinterStore();
+  const {
+    status: printerConnStatus,
+    deviceInfo,
+    defaultPrinter,
+    webusbPrinter,
+    printMethod,
+  } = usePrinterStore();
+  // The selected WebUSB printer is named even when no printer is marked
+  // default (F-027): with several WebUSB printers the selection is
+  // deterministic and the status bar shows which one it is.
+  const displayPrinter = defaultPrinter ?? webusbPrinter;
 
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [session, setSession] = useState<CashSession | null | undefined>(undefined);
@@ -160,7 +170,7 @@ export default function StatusBar() {
     let cancelled = false;
     let latestRequest = 0;
     if (
-      defaultPrinter?.connection_type !== 'webusb' ||
+      displayPrinter?.connection_type !== 'webusb' ||
       printMethod !== 'escpos' ||
       printerConnStatus !== 'connected'
     ) {
@@ -173,7 +183,7 @@ export default function StatusBar() {
       const request = ++latestRequest;
       setIsConfiguredWebUsbReady(false);
       printerService
-        .isConfiguredDeviceReady(defaultPrinter.name)
+        .isConfiguredDeviceReady(displayPrinter.name)
         .then((ready) => {
           if (!cancelled && request === latestRequest) setIsConfiguredWebUsbReady(ready);
         })
@@ -192,8 +202,8 @@ export default function StatusBar() {
       navigator.usb?.removeEventListener('disconnect', refreshReadiness);
     };
   }, [
-    defaultPrinter?.connection_type,
-    defaultPrinter?.name,
+    displayPrinter?.connection_type,
+    displayPrinter?.name,
     deviceInfo?.productId,
     deviceInfo?.productName,
     deviceInfo?.serialNumber,
@@ -247,31 +257,31 @@ export default function StatusBar() {
     : null;
 
   // Printer readiness & status labeling
-  const isWebUsb = defaultPrinter?.connection_type === 'webusb';
-  const isNetwork = defaultPrinter?.connection_type === 'network';
-  const isUsb = defaultPrinter?.connection_type === 'usb';
+  const isWebUsb = displayPrinter?.connection_type === 'webusb';
+  const isNetwork = displayPrinter?.connection_type === 'network';
+  const isUsb = displayPrinter?.connection_type === 'usb';
   const isServerPrinter = isNetwork || isUsb;
 
   const isWebUsbReady =
     isWebUsb &&
     printMethod === 'escpos' &&
     printerConnStatus === 'connected' &&
-    deviceInfo?.productName === defaultPrinter.name &&
+    deviceInfo?.productName === displayPrinter.name &&
     isConfiguredWebUsbReady;
   const isPrinterConnecting = isWebUsb && printerConnStatus === 'connecting';
   const isPrinterReady = isServerPrinter || isWebUsbReady;
-  const isPrinterConfigured = defaultPrinter !== null;
+  const isPrinterConfigured = displayPrinter !== null;
   const canTestPrint = tenantCan(currentTenant, 'printing.execute');
 
   const printerTitle = !isPrinterConfigured
     ? tSettings('printerOffline')
     : isServerPrinter
-      ? `${defaultPrinter.name} (${isNetwork ? tSettings('connectionNetwork') : tSettings('connectionUsb')})`
+      ? `${displayPrinter.name} (${isNetwork ? tSettings('connectionNetwork') : tSettings('connectionUsb')})`
       : isWebUsbReady
-        ? `${defaultPrinter.name} (${tSettings('connectionWebusb')})`
+        ? `${displayPrinter.name} (${tSettings('connectionWebusb')})`
         : isPrinterConnecting
           ? tPos('printerConnecting')
-          : `${defaultPrinter.name} (${tSettings('connectionWebusb')}) — ${tSettings('printerConfigured')}`;
+          : `${displayPrinter.name} (${tSettings('connectionWebusb')}) — ${tSettings('printerConfigured')}`;
 
   // Shift state
   const isShiftKnown = session !== undefined;
@@ -552,7 +562,7 @@ export default function StatusBar() {
               <>
                 <PrinterCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
                 <span className="hidden sm:inline font-medium text-emerald-700 dark:text-emerald-300">
-                  {defaultPrinter?.name || tPos('printerReady')}
+                  {displayPrinter?.name || tPos('printerReady')}
                 </span>
               </>
             ) : isPrinterConnecting ? (
