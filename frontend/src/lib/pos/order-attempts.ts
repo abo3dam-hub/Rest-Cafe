@@ -140,3 +140,43 @@ export const parsePrepaidPaymentRequest = (serialized: string): PrepaidPaymentRe
     return null;
   }
 };
+
+export interface PostpaidAttemptDescription {
+  /** Items in the sale the attempt was placed for, when its payload parses. */
+  itemCount: number | null;
+  tableId: string | number | null;
+  /** The confirmed order number, when the attempt already has one. */
+  orderNumber: string | null;
+}
+
+/** The attempt's fingerprint is the order payload it was placed with: the
+ * item count and table are recoverable from it without a server round trip. */
+export function describePostpaidAttempt(attempt: PostpaidAttempt): PostpaidAttemptDescription {
+  const orderNumber =
+    typeof attempt.order?.order_number === 'string' ? attempt.order.order_number : null;
+  try {
+    const payload = JSON.parse(attempt.fingerprint) as Record<string, unknown>;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      return { itemCount: null, tableId: null, orderNumber };
+    const tableId = payload.table_id;
+    return {
+      itemCount: Array.isArray(payload.items) ? payload.items.length : null,
+      tableId:
+        typeof tableId === 'string' || typeof tableId === 'number' ? tableId : null,
+      orderNumber,
+    };
+  } catch {
+    return { itemCount: null, tableId: null, orderNumber };
+  }
+}
+
+/** A stored postpaid attempt is stale when the cashier has moved on: its sale
+ * is not the cart currently in front of them, so the next place-order would
+ * overwrite the record and the earlier sale would be silently forgotten. An
+ * attempt for the current cart is the live retry, not a stale one. */
+export function isStalePostpaidAttempt(
+  attempt: PostpaidAttempt,
+  currentCartFingerprint: string,
+): boolean {
+  return attempt.fingerprint !== currentCartFingerprint;
+}
