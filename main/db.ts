@@ -115,6 +115,8 @@ export {
   localDateInTimezone,
   nextZNumber,
   now,
+  IDEMPOTENCY_RETENTION_DAYS,
+  pruneIdempotencyRecords,
   parseDbTimestamp,
   parseItemJson,
   parseRowJson,
