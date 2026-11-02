@@ -285,10 +285,7 @@ function ReserveModal({ table, onClose, onDone }: ReserveModalProps) {
         )}
 
         <div className="mb-4">
-          <label
-            htmlFor="reserve-arrival"
-            className="mb-2 block text-sm text-muted-foreground"
-          >
+          <label htmlFor="reserve-arrival" className="mb-2 block text-sm text-muted-foreground">
             {tTables('arrivalTime')}
           </label>
           <input
@@ -394,7 +391,12 @@ export default function TablesPage() {
     return role === 'cashier' || role === 'server' ? 'plan' : 'list';
   });
   const [layoutMode, setLayoutMode] = useState(false);
-  const [form, setForm] = useState({ name: '', capacity: '4', floor: 'الصالة الرئيسية', section: '' });
+  const [form, setForm] = useState({
+    name: '',
+    capacity: '4',
+    floor: 'الصالة الرئيسية',
+    section: '',
+  });
   const [newFloorMode, setNewFloorMode] = useState(false);
   const [newFloorInput, setNewFloorInput] = useState('');
   const [floorMenuFor, setFloorMenuFor] = useState<string | null>(null);
@@ -402,7 +404,14 @@ export default function TablesPage() {
   const [floorForm, setFloorForm] = useState({ name: '', tableName: '', capacity: '4' });
   const [floorFormSaving, setFloorFormSaving] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkForm, setBulkForm] = useState({ prefix: '', from: '', to: '', capacity: '4', floor: '', section: '' });
+  const [bulkForm, setBulkForm] = useState({
+    prefix: '',
+    from: '',
+    to: '',
+    capacity: '4',
+    floor: '',
+    section: '',
+  });
   const [bulkNewFloorMode, setBulkNewFloorMode] = useState(false);
   const [bulkNewFloorInput, setBulkNewFloorInput] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -586,6 +595,9 @@ export default function TablesPage() {
           `/bills/${bill.id}/print`,
           {
             print_type: isReprint ? 'reprint' : 'receipt',
+            // The bytes were dispatched: record the confirmation and any
+            // warnings the dispatch produced with the bill (F-017, F-026).
+            warnings,
           },
           { timeout: LONG_API_REQUEST_TIMEOUT_MS },
         );
@@ -665,9 +677,8 @@ export default function TablesPage() {
       fetchTables();
       fetchOrders();
     } catch (error: unknown) {
-      const serverMessage = (
-        error as { response?: { data?: { error?: string } } }
-      )?.response?.data?.error;
+      const serverMessage = (error as { response?: { data?: { error?: string } } })?.response?.data
+        ?.error;
       toast.error(serverMessage || tTables('updateStatusFailed'));
     } finally {
       setMerging(false);
@@ -746,7 +757,10 @@ export default function TablesPage() {
   const bulkFromNum = Number(bulkForm.from);
   const bulkToNum = Number(bulkForm.to);
   const bulkRangeValid =
-    Number.isInteger(bulkFromNum) && Number.isInteger(bulkToNum) && bulkFromNum >= 1 && bulkToNum >= bulkFromNum;
+    Number.isInteger(bulkFromNum) &&
+    Number.isInteger(bulkToNum) &&
+    bulkFromNum >= 1 &&
+    bulkToNum >= bulkFromNum;
   const bulkCount = bulkRangeValid ? bulkToNum - bulkFromNum + 1 : 0;
 
   const handleBulkCreate = async () => {
@@ -1311,7 +1325,8 @@ export default function TablesPage() {
                     const canViewTableOrder = canReadOrders && hasOrders;
                     const shownStatus = displayTableStatus(table.status);
                     const canMoveThisTable =
-                      canMoveTable && (shownStatus === 'occupied' || shownStatus === 'bill_requested');
+                      canMoveTable &&
+                      (shownStatus === 'occupied' || shownStatus === 'bill_requested');
                     const canMarkAvailable =
                       canManageTables &&
                       (table.status === 'occupied' ||
@@ -1392,29 +1407,29 @@ export default function TablesPage() {
                         <div className="px-4 py-3 flex-1 flex flex-col justify-center space-y-2.5">
                           {table.status === 'reserved' &&
                             (table.reservation_customer_name || table.reservation_at) && (
-                            <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/40 px-3 py-2">
-                              {table.reservation_customer_name && (
-                                <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium truncate">
-                                  {table.reservation_customer_name}
-                                </p>
-                              )}
-                              {table.reservation_customer_phone && (
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
-                                  <Ltr>{table.reservation_customer_phone}</Ltr>
-                                </p>
-                              )}
-                              {table.reservation_at && (
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
-                                  {tTables('arrivalTime')}:{' '}
-                                  <Ltr>
-                                    {formatReservationTime(
-                                      parseDbTimestamp(table.reservation_at),
-                                    )}
-                                  </Ltr>
-                                </p>
-                              )}
-                            </div>
-                          )}
+                              <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/40 px-3 py-2">
+                                {table.reservation_customer_name && (
+                                  <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium truncate">
+                                    {table.reservation_customer_name}
+                                  </p>
+                                )}
+                                {table.reservation_customer_phone && (
+                                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+                                    <Ltr>{table.reservation_customer_phone}</Ltr>
+                                  </p>
+                                )}
+                                {table.reservation_at && (
+                                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+                                    {tTables('arrivalTime')}:{' '}
+                                    <Ltr>
+                                      {formatReservationTime(
+                                        parseDbTimestamp(table.reservation_at),
+                                      )}
+                                    </Ltr>
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
                           {displaysOrderDetails ? (
                             hasOrders ? (
@@ -1775,7 +1790,10 @@ export default function TablesPage() {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="bulk-prefix" className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="bulk-prefix"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     {tTables('bulkPrefix')}
                   </label>
                   <input
@@ -1789,7 +1807,10 @@ export default function TablesPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="bulk-from" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="bulk-from"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       {tTables('bulkFrom')}
                     </label>
                     <input
@@ -1802,7 +1823,10 @@ export default function TablesPage() {
                     />
                   </div>
                   <div>
-                    <label htmlFor="bulk-to" className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="bulk-to"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       {tTables('bulkTo')}
                     </label>
                     <input
@@ -1816,7 +1840,10 @@ export default function TablesPage() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="bulk-capacity" className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="bulk-capacity"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     {tTables('capacity')}
                   </label>
                   <input
@@ -1829,7 +1856,10 @@ export default function TablesPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="bulk-floor" className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="bulk-floor"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     {tTables('floor')}
                   </label>
                   {bulkNewFloorMode ? (
@@ -1879,7 +1909,10 @@ export default function TablesPage() {
                   )}
                 </div>
                 <div>
-                  <label htmlFor="bulk-section" className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="bulk-section"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     {tTables('section')}
                   </label>
                   <input
