@@ -19,7 +19,7 @@ import { correlationId, type FloErrorCode } from '../errors';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { printLabel } from '../print/print-labels.generated';
 import type { PrintConceptId } from '../../shared/print/concepts';
-import { renderKotDocumentToLines, renderKotViaDocument } from './document-kot';
+import { renderKotViaDocument } from './document-kot';
 import {
   renderDeliverySlipViaDocument,
   type DeliverySlipItemRow,
@@ -31,7 +31,6 @@ export { describeWindowsPrintProcessFailure, getPrinterStatus } from './windows-
 import {
   NETWORK_PRINT_CHUNK_DELAY_MS,
   NETWORK_PRINT_CHUNK_SIZE,
-  printViaCups,
   printViaLocalIpp,
   printViaNetwork,
   printViaUSB,
