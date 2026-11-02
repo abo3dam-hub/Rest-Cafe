@@ -75,7 +75,7 @@ Procedures for people with release credentials.
 | Page | Subject |
 | --- | --- |
 | [releases.md](maintainers/releases.md) | Channels, promotion, artifact naming, and the manual pre-release checks. |
-| [upgrade-testing.md](maintainers/upgrade-testing.md) | How upgrade safety is proven for manual installer updates: backups and migration suites. |
+| [upgrade-testing.md](maintainers/upgrade-testing.md) | How upgrade safety is proven for manual installer updates: backups and migration suites; and the restore-onto-a-replacement-host runbook. |
 | [RESTAURANT_PRODUCTION_AUDIT.md](production-readiness/RESTAURANT_PRODUCTION_AUDIT.md) | Independent production-readiness audit: verified capabilities, confirmed defects, risks, and the go/no-go for a real-restaurant pilot. |
 | [RESTAURANT_TEST_MATRIX.md](production-readiness/RESTAURANT_TEST_MATRIX.md) | The production test matrix: scenarios with expected results, executed status, evidence, and the manual pilot checklist. |
 
