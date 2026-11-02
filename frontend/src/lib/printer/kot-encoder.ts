@@ -290,8 +290,8 @@ export function buildKotBytes(
   let hasItems = false;
 
   for (const item of items) {
-    // Skip items that are already served or ready.
-    if (!isKotItemPending(item.status)) {
+    // Skip items that are already served or ready, or already printed (F-004).
+    if (!isKotItemPending(item.status) || item.kot_printed_at) {
       continue;
     }
 
