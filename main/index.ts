@@ -27,6 +27,7 @@ import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } f
 import { operationDiagnostics } from './services/operation-diagnostics';
 import { isOfflineMode } from './services/offline-mode';
 import { localBackup } from './services/local-backup';
+import { printQueue } from './services/print-queue';
 import { startKdsServer, stopKdsServer, getKdsPort, isKdsServerRunning } from './kds-server';
 import { startServerApp, stopServerApp, getServerAppPort, isServerAppRunning } from './server-app';
 import { initPrinter } from './printers/thermal';
@@ -1164,6 +1165,8 @@ async function initialize(): Promise<void> {
     // this build. Local recorders (e.g. print-failure diagnostics) keep
     // working. Manual updates only.
     localBackup.start();
+    // Retries failed KOT and receipt prints from the durable queue (F-009).
+    printQueue.start();
 
     console.log('[Flo] Starting KDS server on port 3002...');
     await startKdsServer();
@@ -1349,6 +1352,7 @@ const cleanupCoordinator = createShutdownCoordinator(
       blocksDatabase: true,
     },
     { name: 'local backup', run: () => localBackup.stop(), blocksDatabase: true },
+    { name: 'print queue', run: () => printQueue.stop(), blocksDatabase: true },
     { name: 'Bonjour', run: () => stopMdns() },
     { name: 'HTTP handler cleanup', run: () => waitForHttpShutdownWork(), blocksDatabase: true },
     { name: 'database admission', run: () => beginDatabaseShutdown(), blocksDatabase: true },
