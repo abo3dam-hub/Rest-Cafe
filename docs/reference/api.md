@@ -705,6 +705,14 @@ Router: `main/routes/server-app-info.ts`. Full path: `/api/server-app-info`.
 | ------ | ---- | ---------------------- | ---------- | -------- |
 | `GET`  | `/`  | any authenticated role | none       | -        |
 
+### Interface links
+
+Router: `main/routes/interface-links.ts`. Full path: `/api/interface-links`.
+
+| Method | Path | Authorization          | Parameters | Response                                                                                                                                                                                            |
+| ------ | ---- | ---------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/`  | any authenticated role | none       | `{ ip, interfaces, self_order }`. Each interface is `{ id, url, qr_data_url, port, requested_port, port_bumped, enabled }` with the URL built from the live bound port; `qr_data_url` is null for a disabled interface. `self_order` is `{ enabled, server_app_enabled }` (self-ordering has one link per table, so it carries no URL). |
+
 ### More apps
 
 Router: `main/routes/more-apps.ts`. Full path: `/api/more-apps`.

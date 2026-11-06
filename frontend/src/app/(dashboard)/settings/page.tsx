@@ -10,6 +10,7 @@ import { usePosSortPreference } from '@/hooks/usePosSort';
 import { POS_CATEGORY_SORTS, POS_ITEM_SORTS } from '@/lib/pos-sort';
 import { CustomerDisplayCard } from '@/components/settings/CustomerDisplayCard';
 import SelfOrderSettingsCard from '@/components/settings/SelfOrderSettingsCard';
+import InterfaceLinksTab from '@/components/settings/InterfaceLinksTab';
 import type {
   KotLanguagePolicy,
   PrimaryLanguageSelection,
@@ -2919,6 +2920,12 @@ export default function SettingsPage() {
               active={activeTab}
               onClick={handleSettingsTabChange}
             />
+            <SettingsNavItem
+              label={t('tabInterfaceLinks')}
+              value="interface-links"
+              active={activeTab}
+              onClick={handleSettingsTabChange}
+            />
 
             {/* Customers group */}
             <div className="hidden md:block px-3 pt-4 pb-2 mt-3 mb-1 border-b border-border">
@@ -4207,6 +4214,12 @@ export default function SettingsPage() {
               )}
 
               <SelfOrderSettingsCard />
+            </SettingsTabShell>
+          </TabsContent>
+
+          <TabsContent value="interface-links">
+            <SettingsTabShell>
+              <InterfaceLinksTab onNavigate={handleSettingsTabChange} />
             </SettingsTabShell>
           </TabsContent>
 
