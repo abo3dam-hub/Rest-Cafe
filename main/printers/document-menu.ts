@@ -139,7 +139,7 @@ export function renderMenuViaDocument(
   }
 
   for (const line of wrapText(`${safePrinterText(printLabel(options.language, 'print.menu.totalItems'))}: ${document.itemCount}`, options.columns)) lines.push(`{CENTER}${line}{/CENTER}`);
-  lines.push('{CENTER}Powered by Ali.J{/CENTER}', '{FEED}', '{CUT}');
+  lines.push('{CENTER}Rest&Cafe System Powered by Ali.J{/CENTER}', '{FEED}', '{CUT}');
   const data = buildEscPos(lines, options.useUnicode === true, {
     cutMode: options.cutMode,
     arabicShaping: options.arabicShaping,

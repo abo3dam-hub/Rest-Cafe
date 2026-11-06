@@ -121,6 +121,10 @@ export interface OrderSnapshot {
   readonly externalOrderId: string;
   /** Address confirmed for this delivery; empty on every order that is not a delivery. */
   readonly deliveryAddress: string;
+  /** Party size recorded on the order, when any (bill-fields feature). */
+  readonly guestCount?: number | null;
+  /** First bill-request stamp — the printed closing time, when requested. */
+  readonly closedAt?: string;
   readonly items: readonly OrderItemSnapshot[];
 }
 
@@ -194,6 +198,19 @@ export interface BusinessSnapshot {
   readonly showLogo?: boolean;
   readonly receiptLogo?: string;
   readonly receiptLogoRaster?: string;
+  /** Establishment licence line (independent of the tax id), when carried. */
+  readonly licence?: string;
+  /** Establishment classification line (free text, e.g. "Two stars"). */
+  readonly classification?: string;
+  readonly showLicence?: boolean;
+  readonly showClassification?: boolean;
+  /** Staff names resolved by the caller (order owner / payment actor). */
+  readonly waiterName?: string;
+  readonly cashierName?: string;
+  readonly showWaiter?: boolean;
+  readonly showCashier?: boolean;
+  readonly showGuestCount?: boolean;
+  readonly showOpenCloseTimes?: boolean;
 }
 
 /**
@@ -255,6 +272,13 @@ export interface BusinessHeaderBlock {
   readonly instagramHandle: DirectionalText | null;
   /** Tax registration line, present per merchant flag + tax applicability. */
   readonly taxId: { readonly label: SemanticLabel; readonly value: DirectionalText } | null;
+  /** Licence line, present per merchant flag + recorded value. */
+  readonly licence?: { readonly label: SemanticLabel; readonly value: DirectionalText } | null;
+  /** Classification line, present per merchant flag + recorded value. */
+  readonly classification?: {
+    readonly label: SemanticLabel;
+    readonly value: DirectionalText;
+  } | null;
   /** Label used when the business phone renders as a labeled contact line. */
   readonly phoneLabel: SemanticLabel | null;
   readonly logo?: string | null;
@@ -278,6 +302,16 @@ export interface DocumentMetaBlock {
   readonly timestamp: DirectionalText;
   /** Table reference with its (uninterpolated) label concept. */
   readonly table: { readonly label: SemanticLabel; readonly name: DirectionalText } | null;
+  /** "Served by" waiter line, present per merchant flag + recorded name. */
+  readonly servedBy?: { readonly label: SemanticLabel; readonly name: DirectionalText } | null;
+  /** Cashier line, present per merchant flag + resolved name. */
+  readonly cashier?: { readonly label: SemanticLabel; readonly name: DirectionalText } | null;
+  /** Guest-count line, present per merchant flag + recorded count. */
+  readonly guests?: { readonly label: SemanticLabel; readonly count: number } | null;
+  /** Table open time (= order creation), present per merchant flag. */
+  readonly openedAt?: { readonly label: SemanticLabel; readonly timestamp: DirectionalText } | null;
+  /** Printed closing time (= first bill request), present per flag + stamp. */
+  readonly closedAt?: { readonly label: SemanticLabel; readonly timestamp: DirectionalText } | null;
 }
 
 /** Customer identity lines (name / number / delivery address), when present and shown. */
@@ -372,6 +406,8 @@ export interface TotalsBlock {
    * print merchant-named surcharges the semantic-label catalog cannot name.
    */
   readonly chargesBreakdown: string | null;
+  /** Total after fees, before the discount — present only with a discount. */
+  readonly postFeeTotal?: { readonly label: SemanticLabel; readonly amount: number } | null;
   readonly grandTotal: { readonly label: SemanticLabel; readonly amount: number };
   readonly pointsRedeemed: { readonly label: SemanticLabel; readonly points: number } | null;
   readonly pointsEarned: { readonly label: SemanticLabel; readonly points: number } | null;
@@ -609,6 +645,20 @@ export function buildBillDocument(printData: PrintData, printContext: PrintConte
           value: directionalText(business.taxRegistrationNumber, base),
         })
       : null,
+    licence:
+      business.showLicence !== false && (business.licence ?? '').length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.licence'),
+            value: directionalText(business.licence as string, base),
+          })
+        : null,
+    classification:
+      business.showClassification !== false && (business.classification ?? '').length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.classification'),
+            value: directionalText(business.classification as string, base),
+          })
+        : null,
     phoneLabel:
       business.showPhone && business.phone.length > 0
         ? resolveSemanticLabel(labels, 'receipt.phone')
@@ -634,6 +684,43 @@ export function buildBillDocument(printData: PrintData, printContext: PrintConte
             name: directionalText(order.tableName, base),
           })
         : null,
+    servedBy:
+      business.showWaiter !== false && (business.waiterName ?? '').length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.servedBy'),
+            name: directionalText(business.waiterName as string, base),
+          })
+        : null,
+    cashier:
+      business.showCashier === true && (business.cashierName ?? '').length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.cashier'),
+            name: directionalText(business.cashierName as string, base),
+          })
+        : null,
+    guests:
+      business.showGuestCount === true &&
+      typeof order.guestCount === 'number' &&
+      order.guestCount > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.guests'),
+            count: order.guestCount,
+          })
+        : null,
+    openedAt:
+      business.showOpenCloseTimes === true && order.createdAt.length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.openTime'),
+            timestamp: directionalText(order.createdAt, base),
+          })
+        : null,
+    closedAt:
+      business.showOpenCloseTimes === true && (order.closedAt ?? '').length > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.closeTime'),
+            timestamp: directionalText(order.closedAt as string, base),
+          })
+        : null,
   });
 
   // A delivery address is what makes this a customer-details block, so it drives the heading too.
@@ -657,7 +744,7 @@ export function buildBillDocument(printData: PrintData, printContext: PrintConte
     header: Object.freeze({
       item: resolveSemanticLabel(labels, 'receipt.item'),
       quantity: resolveSemanticLabel(labels, 'receipt.qty'),
-      rate: resolveSemanticLabel(labels, 'receipt.rate'),
+      rate: resolveSemanticLabel(labels, 'print.unitPrice'),
       amount: resolveSemanticLabel(labels, 'receipt.amount'),
     }),
     noteLabel: resolveSemanticLabel(labels, 'print.note'),
@@ -742,6 +829,13 @@ export function buildBillDocument(printData: PrintData, printContext: PrintConte
           })
         : null,
     chargesBreakdown: typeof bill.chargesBreakdown === 'string' ? bill.chargesBreakdown : null,
+    postFeeTotal:
+      bill.discountAmount > 0
+        ? Object.freeze({
+            label: resolveSemanticLabel(labels, 'print.postFeeTotal'),
+            amount: bill.total + bill.discountAmount,
+          })
+        : null,
     grandTotal: Object.freeze({
       label: resolveSemanticLabel(labels, 'print.grandTotal'),
       amount: bill.total,

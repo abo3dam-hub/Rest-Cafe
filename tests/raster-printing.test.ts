@@ -176,8 +176,11 @@ async function run(): Promise<void> {
   });
   const compactBusinessGroups = compactGroups.filter((group) => group.groupId === 'business-header');
   const compactMessageGroups = compactGroups.filter((group) => group.groupId === 'message');
-  assert.equal(compactBusinessGroups.length, 2);
-  assert.equal(compactBusinessGroups[0].lineIndex < compactBusinessGroups[1].lineIndex, true);
+  // v3 bill layout: the header facts (address/phone/…) print as paired
+  // lines directly under the store name, so name + address rasterize as
+  // ONE business-header group whose source lines keep their order.
+  assert.equal(compactBusinessGroups.length, 1);
+  assert.deepEqual(compactBusinessGroups[0].sourceLines, ['فروشگاه فارسی', 'آدرس فارسی']);
   assert.equal(compactMessageGroups.length, 2);
   assert.equal(compactMessageGroups[0].lineIndex < compactMessageGroups[1].lineIndex, true);
   const classicHeaderGroups: any[] = [];
@@ -201,7 +204,9 @@ async function run(): Promise<void> {
     },
   }, classicHeaderLines, caps, 'classic-header', classicHeaderGroups);
   const addressRequest = classicHeaderRequests.find((request) => request.text.includes('آدرس فارسی'));
-  assert.equal(addressRequest?.align, 'center');
+  // v3 bill layout: the address is the left slot of a paired header row,
+  // not a centered footer fact, so its raster request aligns left.
+  assert.equal(addressRequest?.align, 'left');
   assert.equal(classicHeaderRequests.some((request) => request.text.startsWith('** ') && request.text.endsWith(' **')), true);
   const longFinancialLabel = 'برچسب مالی بسیار طولانی برای مبلغ نهایی';
   const longFinancialDocument = {

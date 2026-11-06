@@ -62,7 +62,12 @@ import {
   type DocumentTaxAllocationItemOutput,
 } from '../services/tax';
 import { applyPayableRounding } from '../services/tax-engine';
-import { calculateOrderTotals, recomputeOrderTotals } from '../services/orders';
+import {
+  calculateOrderTotals,
+  detectSyriaProfileFromSnapshots,
+  recomputeOrderTotals,
+  resolveSyriaDiscountAmount,
+} from '../services/orders';
 import {
   chargeIdsAfterToggle,
   getChargeDefinitions,
@@ -4813,6 +4818,32 @@ router.post(
         const freshChargesBreakdown = freshResolvedCharges.configured
           ? serializeAppliedCharges(freshResolvedCharges.charges)
           : (currentBill.charges_breakdown ?? currentOrder.charges_breakdown ?? null);
+
+        if (detectSyriaProfileFromSnapshots(freshTotals.allTaxSnapshots)) {
+          // Syria levy orders: the discount is taken from the post-fee
+          // total, so resolve that total with a no-discount recompute first.
+          const pre = recomputeOrderTotals({
+            tenantInfo,
+            chargeContext: {
+              ...currentOrder,
+              packaging_charge: freshPackagingCharge,
+              delivery_charge: currentBill.delivery_charge || 0,
+              service_charge: freshServiceCharge,
+            },
+            customer: freshCustomer,
+            totals: freshTotals,
+            discountAmount: 0,
+            taxScaling: 'always',
+            appliedCharges: freshAppliedCharges,
+          });
+          freshDiscountAmount = resolveSyriaDiscountAmount({
+            discountType: type,
+            discountValue: value,
+            storedAmount: type === 'amount' ? value : null,
+            postFeeTotal: pre.total,
+            decimals,
+          });
+        }
 
         const { taxRollup: freshTaxRollup, total: freshExactTotal } = recomputeOrderTotals({
           tenantInfo,

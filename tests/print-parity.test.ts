@@ -28,10 +28,6 @@ import * as path from 'node:path';
 import { formatReceipt, formatKOT, escPosToText, buildEscPos } from '../main/printers/thermal';
 import { loadFrontendPrintModules, measureEscPos } from './helpers/receipt-column-measure';
 import { renderClassicReceiptViaDocument } from '../main/printers/document-classic';
-import {
-  formatClassicReceiptLegacy,
-  formatCompactReceiptLegacy,
-} from './helpers/legacy-thermal-oracle';
 import { printLabel } from '../main/print/print-labels.generated';
 import { displayCellWidth } from '../shared/print/width';
 import {
@@ -230,6 +226,7 @@ function expectContent(
     discount?: number;
     total: number;
     payments?: string[];
+    absentPayments?: string[];
     reprint?: boolean;
     reprintStyle?: 'ascii' | 'html';
     businessName: string;
@@ -240,9 +237,19 @@ function expectContent(
   warn: (ok: boolean, msg: string) => void,
 ): void {
   const normalized = normalizeSemanticContent(text).replace(/[,\s]/g, '');
+  // Letters-only stream: on narrow paper the v3 rate column wraps item
+  // names mid-word and interleaves the fragments with rate/amount digits,
+  // so a name can be fully printed without appearing as one substring.
+  const lettersOnly = (value: string): string =>
+    normalizeSemanticContent(value)
+      // Currency tokens glued to amounts (normalized text is lowercase).
+      .replace(/rs(?=\d)|₹/g, '')
+      .replace(/[^\p{L}]/gu, '');
+  const lettersStream = lettersOnly(text);
   for (const item of expectations.items) {
     warn(
-      normalized.includes(normalizeSemanticContent(item).replace(/[,\s]/g, '')),
+      normalized.includes(normalizeSemanticContent(item).replace(/[,\s]/g, '')) ||
+        lettersStream.includes(lettersOnly(item)),
       `${label}: item "${item.slice(0, 24)}${item.length > 24 ? '…' : ''}" present`,
     );
   }
@@ -269,11 +276,14 @@ function expectContent(
     );
   }
   warn(
-    rowAmountPresent(rows, /total/i, expectations.total, /sub\s*total/i),
+    rowAmountPresent(rows, /total/i, expectations.total, /sub\s*total|after\s+fees/i),
     `${label}: total ${expectations.total} on TOTAL row`,
   );
   for (const p of expectations.payments ?? []) {
     warn(text.includes(p), `${label}: payment "${p}"`);
+  }
+  for (const p of expectations.absentPayments ?? []) {
+    warn(!text.includes(p), `${label}: payment "${p}" absent from the customer bill (v3)`);
   }
   if (expectations.reprint != null && expectations.reprint) {
     const banner =
@@ -292,15 +302,21 @@ function expectContent(
       /\.(?:\s+\d+)?\s*$/.test(itemNamePortion) || itemNamePortion.includes('\u2026');
     const hasWrappedContinuation =
       stemRowIndex >= 0 &&
-      rows.slice(stemRowIndex + 1, stemRowIndex + 12).some((row) => row.includes('Drizzle'));
-    const isTruncatedOrWrapped = stemRowIndex >= 0 && (hasExplicitMarker || hasWrappedContinuation);
+      rows.slice(stemRowIndex + 1, stemRowIndex + 40).some((row) => row.includes('Drizzle'));
+    // At 58mm the stem itself can split across lines ('Extra' / 'Long'),
+    // so also accept the whole name appearing in the letters stream —
+    // proof it printed in full, wrapped.
+    const isTruncatedOrWrapped =
+      (stemRowIndex >= 0 && (hasExplicitMarker || hasWrappedContinuation)) ||
+      lettersStream.includes(lettersOnly(LONG_ITEM));
     warn(isTruncatedOrWrapped, `${label}: long item truncated with marker or wrapped`);
   }
   for (const addon of expectations.addons ?? []) {
     const normalizedText = normalizeSemanticContent(text);
     const quantitySuffix = addon.quantity && addon.quantity > 1 ? `x${addon.quantity}` : '';
     warn(
-      normalizedText.includes(normalizeSemanticContent(addon.name)) &&
+      (normalizedText.includes(normalizeSemanticContent(addon.name)) ||
+        lettersStream.includes(lettersOnly(addon.name))) &&
         (!quantitySuffix || normalizedText.includes(quantitySuffix)),
       `${label}: add-on ${addon.name}${quantitySuffix ? ` quantity ${addon.quantity}` : ''}`,
     );
@@ -351,7 +367,7 @@ function run(): void {
     instructions: ['Less sugar'],
     discount: 120,
     total: 1117,
-    payments: ['Cash', 'Card'],
+    absentPayments: ['Cash', 'Card'],
     businessName: 'Flo Parity Cafe',
     truncationMarker: true,
   };
@@ -384,7 +400,7 @@ function run(): void {
       const text = escPosToText(
         formatReceipt(order, bill, business, template, cols, false, false, undefined, []),
       );
-      const withSubtotal = template === 'classic' ? { subtotal: 1220 } : {};
+      const withSubtotal = { subtotal: 1220 };
       expectContent(
         `${template}/${cols}`,
         text,
@@ -427,7 +443,7 @@ function run(): void {
               warnings as any,
             );
       const text = new TextDecoder().decode(bytes);
-      const feSubtotal = variant === 'classic' ? { subtotal: 1220 } : {};
+      const feSubtotal = { subtotal: 1220 };
       // WebUSB uses the configured 32-column logical width for 58mm and keeps
       // truncated item rows printable with an ASCII marker.
       expectContent(
@@ -788,9 +804,10 @@ function run(): void {
   }
 
   // ------------------------------------------------------------------
-  // 2d. Cash tendered & change parity (#770) — every supported normal
-  // receipt path prints the same tendered/change rows; exact and legacy
-  // payments without the optional fields keep their existing output.
+  // 2d. Cash tendered & change parity (#770) — under the v3 bill layout
+  // the built-in customer bill carries NO payment rows at all (applied,
+  // tendered or change) on any native surface; a merchant-authored
+  // template that orders a payments block still renders the #770 rows.
   // ------------------------------------------------------------------
   section('Cash tendered and change rows');
   {
@@ -864,6 +881,25 @@ function run(): void {
         }),
       ],
     ];
+    const expectNoPaymentRows = (text: string, renderer: string): void => {
+      const rows = contentRows(text);
+      warn(
+        !rows.some((row) => /\bcash\b/i.test(row)),
+        `${renderer}: no applied cash row on the customer bill (v3)`,
+      );
+      warn(
+        !rows.some((row) => /\bcard\b/i.test(row)),
+        `${renderer}: no card row on the customer bill (v3)`,
+      );
+      warn(
+        !rows.some((row) => row.includes(tenderedLabel)),
+        `${renderer}: no cash-received row on the customer bill (v3)`,
+      );
+      warn(
+        !rows.some((row) => row.includes(changeLabel)),
+        `${renderer}: no change row on the customer bill (v3)`,
+      );
+    };
     const expectCashRows = (text: string, renderer: string): void => {
       const rows = contentRows(text);
       const appliedRow = rows.find((row) => /\bcash\b/i.test(row) && !row.includes(tenderedLabel));
@@ -903,7 +939,7 @@ function run(): void {
       payment_details: [{ method: 'cash', amount: 150, tendered_amount: 200, change_amount: 50 }],
     };
     for (const [renderer, text] of renderBill(overpaidBill)) {
-      expectCashRows(text, renderer);
+      expectNoPaymentRows(text, renderer);
     }
 
     const fePayments = fe.printDocument.buildBillPrintData(overpaidBill).bill.payments;
@@ -925,36 +961,7 @@ function run(): void {
       ],
     };
     for (const [renderer, text] of renderBill(splitBill)) {
-      const rows = contentRows(text);
-      const tenderedRows = rows.filter((row) => row.includes(tenderedLabel));
-      const changeRows = rows.filter((row) => row.includes(changeLabel));
-      const cashRows = rows.filter((row) => /\bcash\b/i.test(row) && !row.includes(tenderedLabel));
-      const cardRow = rows.find((row) => /\bcard\b/i.test(row));
-      warn(
-        tenderedRows.length === 1 && digitsOf(tenderedRows[0]).includes('80'),
-        `${renderer}: split payment keeps one cash-received row`,
-      );
-      warn(
-        changeRows.length === 1 && digitsOf(changeRows[0]).includes('20'),
-        `${renderer}: split payment keeps one change row`,
-      );
-      warn(
-        cashRows.length === 2 &&
-          digitsOf(cashRows[0]).includes('60') &&
-          digitsOf(cashRows[1]).includes('20'),
-        `${renderer}: split cash payments keep applied amounts and order`,
-      );
-      warn(
-        cardRow != null && digitsOf(cardRow).includes('70'),
-        `${renderer}: split non-cash payment keeps its applied amount`,
-      );
-      warn(
-        rows.indexOf(cashRows[0]) < rows.indexOf(tenderedRows[0]) &&
-          rows.indexOf(tenderedRows[0]) < rows.indexOf(changeRows[0]) &&
-          rows.indexOf(changeRows[0]) < rows.indexOf(cardRow!) &&
-          rows.indexOf(cardRow!) < rows.indexOf(cashRows[1]),
-        `${renderer}: split cash, tender, change, card, and exact-cash rows keep payment order`,
-      );
+      expectNoPaymentRows(text, renderer);
     }
 
     const merchantFixture = validateMerchantTemplate(
@@ -1161,10 +1168,14 @@ function run(): void {
         ),
       );
       const headingAt = classic.indexOf(HEADING);
+      const customerAt = classic.indexOf('Asha Kumar');
       const storeAt = classic.indexOf(business.address);
+      // v3 layout: the store address sits in the header zone (before the
+      // customer block), so the two addresses are distinguished by place
+      // plus the customer-details heading over the customer block.
       warn(
-        headingAt > 0 && storeAt > headingAt,
-        'backend/classic: the customer block is headed and precedes the store address',
+        storeAt > 0 && storeAt < headingAt && customerAt > headingAt,
+        'backend/classic: store address in the header, customer block headed below it',
       );
     }
 
@@ -1359,15 +1370,12 @@ function run(): void {
       ['print.numberShort', 'Customer No'],
       ['receipt.item', 'Item'],
       ['receipt.qty', 'Qty'],
-      ['receipt.rate', 'Rate'],
+      ['print.unitPrice', 'Unit Price'],
       ['receipt.amount', 'Amount'],
       ['pos.subtotal', 'Subtotal'],
       ['pos.discount', 'Discount'],
       ['pos.packaging', 'Packaging'],
       ['receipt.grandTotal', 'Grand Total'],
-      ['receipt.payments', 'Payments'],
-      ['pos.methodCash', 'Cash'],
-      ['pos.methodCard', 'Card'],
       ['receipt.thankYou', 'Thank you for your visit!'],
     ] as const) {
       warn(html.includes(expected), `browser semantic label ${concept} renders as ${expected}`);
@@ -1382,10 +1390,12 @@ function run(): void {
   }
 
   // ------------------------------------------------------------------
-  // 4. PrintDocument pipeline vs LEGACY ORACLE (#443): every migrated
-  //    backend surface (classic, compact, KOT) must reproduce its frozen
-  //    pre-migration output BYTE FOR BYTE at every tested width, including
-  //    Persian-item skip rules and reprint banners.
+  // 4. PrintDocument pipeline content (#443; v3 layout 2026-11-06): the
+  //    document-driven backend surfaces (classic, compact, KOT) are
+  //    checked semantically at every tested width, including Persian-item
+  //    skip rules and reprint banners. Byte-identity with the frozen
+  //    pre-v3 legacy oracle ended with the approved v3 bill layout
+  //    (paired header, rate column, no payment block on the bill).
   // ------------------------------------------------------------------
   const kotOrder = {
     order_number: order.order_number,
@@ -1394,26 +1404,11 @@ function run(): void {
   };
   const typedKotOrder = { ...kotOrder, type: 'dine_in' };
 
-  section('PrintDocument vs legacy classic');
+  section('PrintDocument classic');
   for (const cols of [32, 42, 48]) {
     for (const isReprint of [false, true] as const) {
       const label = `document/${cols}${isReprint ? '/reprint' : ''}`;
       section(label);
-      const legacyWarnings: Warnings = [];
-      const legacyText = escPosToText(
-        formatClassicReceiptLegacy(
-          order,
-          bill,
-          business,
-          cols,
-          false,
-          isReprint,
-          'full',
-          legacyWarnings,
-          false,
-          'en',
-        ),
-      );
       const docResult = renderClassicReceiptViaDocument(order, bill, business, {
         columns: cols,
         language: 'en',
@@ -1423,7 +1418,6 @@ function run(): void {
         cutMode: 'full' as const,
       });
       const docText = escPosToText(docResult.data);
-      warn(legacyText === docText, `${label}: identical output to legacy classic`);
       const withSubtotal = { subtotal: 1220 };
       expectContent(
         label,
@@ -1443,26 +1437,13 @@ function run(): void {
     }
   }
 
-  section('PrintDocument vs legacy compact');
+  section('PrintDocument compact');
   for (const cols of [32, 42, 48]) {
     for (const isReprint of [false, true] as const) {
       const label = `compact-document/${cols}${isReprint ? '/reprint' : ''}`;
       section(label);
-      const legacyWarnings: Warnings = [];
-      const legacyBuf = formatCompactReceiptLegacy(
-        order,
-        bill,
-        business,
-        cols,
-        false,
-        isReprint,
-        'full',
-        legacyWarnings,
-        false,
-        'en',
-      );
       // Production entry point: formatReceipt('compact') is document-driven
-      // since #443, so this compares the migrated pipeline against the oracle.
+      // since #443.
       const migratedBuf = formatReceipt(
         order,
         bill,
@@ -1476,7 +1457,6 @@ function run(): void {
         false,
         'en',
       );
-      warn(legacyBuf.equals(migratedBuf), `${label}: byte-identical output to legacy compact`);
       expectContent(
         label,
         escPosToText(migratedBuf),

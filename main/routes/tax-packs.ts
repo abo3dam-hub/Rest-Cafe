@@ -1553,8 +1553,12 @@ function buildSyriaProfilePack(
       },
     ],
     taxRounding: {
-      scope: 'line',
-      method: 'half_up',
+      // Document scope + ceiling: the levy is charged on the WHOLE bill and
+      // any fraction rounds up to a whole unit (owner-confirmed Syrian
+      // practice, 2026-11-06), so per-line amounts are allocated from the
+      // rounded document total instead of being rounded line by line.
+      scope: 'document',
+      method: 'ceiling',
       decimalPlaces: 2,
       remainderAllocation: 'largest_remainder',
     },
@@ -1586,6 +1590,32 @@ router.post(
         rate = SYRIA_CONSUMPTION_CLASS_RATES[classification];
       } else {
         rate = SYRIA_SALES_DEFAULT_RATE;
+      }
+
+      // Local-administration fee: a percent OF the consumption fee itself
+      // (owner-confirmed Syrian practice, 2026-11-06). Editable, defaults
+      // to 5; an omitted value keeps the stored one. Sales profile has no
+      // consumption fee, so the rate does not apply there.
+      let localAdminRate: number | null = null;
+      if (profile === 'consumption') {
+        if (
+          req.body?.local_admin_rate !== undefined &&
+          req.body?.local_admin_rate !== null &&
+          req.body?.local_admin_rate !== ''
+        ) {
+          localAdminRate = Number(req.body.local_admin_rate);
+          if (!Number.isFinite(localAdminRate) || localAdminRate < 0 || localAdminRate > 100) {
+            return res
+              .status(400)
+              .json({ error: 'Local admin rate must be a number between 0 and 100' });
+          }
+        } else {
+          const storedRaw = getSettingValue('syria_local_admin_rate');
+          const storedNum =
+            storedRaw === null || storedRaw === '' ? NaN : Number(storedRaw);
+          localAdminRate =
+            Number.isFinite(storedNum) && storedNum >= 0 && storedNum <= 100 ? storedNum : 5;
+        }
       }
 
       const db = getDatabase();
@@ -1717,6 +1747,7 @@ router.post(
           profile,
           classification: profile === 'consumption' ? classification : null,
           rate,
+          local_admin_rate: localAdminRate,
           remapped,
         });
       });
@@ -1726,12 +1757,16 @@ router.post(
         tax_profile: definition.settingValue,
         syria_tax_classification: profile === 'consumption' ? classification : '',
         syria_tax_rate: String(rate),
+        ...(profile === 'consumption'
+          ? { syria_local_admin_rate: String(localAdminRate) }
+          : {}),
       });
       return res.json({
         pack_id: pack.id,
         version_id: versionId,
         version: pack.version,
         rate,
+        local_admin_rate: localAdminRate,
         remapped,
         validation,
       });

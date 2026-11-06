@@ -303,6 +303,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   const [syriaProfile, setSyriaProfile] = useState<'consumption' | 'sales'>('consumption');
   const [syriaClassification, setSyriaClassification] = useState('unrated');
   const [syriaRate, setSyriaRate] = useState('0');
+  const [syriaLocalAdminRate, setSyriaLocalAdminRate] = useState('5');
   const [syriaSaving, setSyriaSaving] = useState(false);
   const applyManualDefinition = useCallback(async (country: string) => {
     const response = await api.get(`/tax-packs/manual-${country.toLowerCase()}`);
@@ -356,10 +357,11 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
 
   const loadSyriaSettings = useCallback(async () => {
     try {
-      const [classRes, rateRes, profileRes] = await Promise.all([
+      const [classRes, rateRes, profileRes, adminRes] = await Promise.all([
         api.get('/settings/syria_tax_classification').catch(() => null),
         api.get('/settings/syria_tax_rate').catch(() => null),
         api.get('/settings/tax_profile').catch(() => null),
+        api.get('/settings/syria_local_admin_rate').catch(() => null),
       ]);
       const storedClass = classRes?.data?.setting?.value;
       if (typeof storedClass === 'string' && storedClass in SYRIA_CLASS_RATES) {
@@ -367,6 +369,10 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       }
       const storedRate = rateRes?.data?.setting?.value;
       if (typeof storedRate === 'string' && storedRate !== '') setSyriaRate(storedRate);
+      const storedAdmin = adminRes?.data?.setting?.value;
+      if (typeof storedAdmin === 'string' && storedAdmin !== '') {
+        setSyriaLocalAdminRate(storedAdmin);
+      }
       const storedProfile = profileRes?.data?.setting?.value;
       if (storedProfile === 'syria_sales') setSyriaProfile('sales');
       if (storedProfile === 'syria_consumption') setSyriaProfile('consumption');
@@ -648,11 +654,20 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       toast.error(t('syriaApplyFailed'));
       return;
     }
+    const adminNum = Number(syriaLocalAdminRate);
+    if (
+      syriaProfile === 'consumption' &&
+      (!Number.isFinite(adminNum) || adminNum < 0 || adminNum > 100)
+    ) {
+      toast.error(t('syriaApplyFailed'));
+      return;
+    }
     setSyriaSaving(true);
     try {
       await api.post('/tax-packs/syria-profile', {
         profile: syriaProfile,
         ...(syriaProfile === 'consumption' ? { classification: syriaClassification } : {}),
+        ...(syriaProfile === 'consumption' ? { local_admin_rate: adminNum } : {}),
         rate: rateNum,
       });
       setTaxesEnabled(true);
@@ -983,8 +998,28 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
               />
             </label>
+            {syriaProfile === 'consumption' && (
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-foreground">
+                  {t('syriaLocalAdminRate')}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={syriaLocalAdminRate}
+                  disabled={!isOwner}
+                  onChange={(event) => setSyriaLocalAdminRate(event.target.value)}
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+                />
+              </label>
+            )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{t('syriaRateHint')}</p>
+          {syriaProfile === 'consumption' && (
+            <p className="mt-1 text-sm text-muted-foreground">{t('syriaLocalAdminRateHint')}</p>
+          )}
 
           <div className="mt-4">
             <Button

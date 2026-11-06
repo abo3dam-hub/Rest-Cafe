@@ -67,7 +67,10 @@ function main() {
   assert(!columnNames().includes('usb_device_path'), 'upgrade drops ignored USB device path column');
   assert((db.prepare("SELECT value FROM settings WHERE key = 'bill_show_name'").get() as any)?.value === 'false', 'upgrade preserves an existing bill visibility choice');
   assert((db.prepare("SELECT value FROM settings WHERE key = 'bill_show_tax_breakdown'").get() as any)?.value === 'true', 'upgrade seeds the tax breakdown visibility setting');
-  assert((db.prepare("SELECT value FROM settings WHERE key = 'bill_show_customer_phone'").get() as any)?.value === 'true', 'upgrade seeds the customer number visibility setting');
+  // Migration v125 removes the legacy seeded 'true' rows for the customer
+  // name/phone bill toggles: unset now carries the decided default (hidden
+  // on dine-in bills, shown on other order types); owners can re-enable.
+  assert((db.prepare("SELECT value FROM settings WHERE key = 'bill_show_customer_phone'").get() as any) === undefined, 'upgrade clears the legacy seeded customer number visibility row (v125 defaults)');
   const printer = db.prepare('SELECT id, name, connection_type, paper_width, is_default FROM printers WHERE id = ?').get('legacy-usb') as any;
   assert(printer?.name === 'Legacy USB' && printer.connection_type === 'usb' && printer.paper_width === 'cols-42' && printer.is_default === 1, 'legacy printer row survives the column removal');
 

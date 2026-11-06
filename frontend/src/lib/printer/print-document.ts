@@ -53,6 +53,18 @@ export interface BillBusinessOptions {
   deliveryShowCustomerPhoneAlways?: boolean;
   showTableNumber?: boolean;
   isReprint?: boolean;
+  /** Establishment licence + classification lines (bill-fields feature). */
+  licence?: string;
+  classification?: string;
+  showLicence?: boolean;
+  showClassification?: boolean;
+  /** Staff names for the served-by / cashier lines, when the caller has them. */
+  waiterName?: string;
+  cashierName?: string;
+  showWaiter?: boolean;
+  showCashier?: boolean;
+  showGuestCount?: boolean;
+  showOpenCloseTimes?: boolean;
 }
 
 function maskPhoneOnReceipt(phone: string): string {
@@ -166,6 +178,10 @@ export function buildBillPrintData(bill: Bill, opts: BillBusinessOptions = {}): 
     order: {
       orderNumber: String(order?.order_number ?? ''),
       createdAt: String(order?.created_at ?? ''),
+      guestCount: typeof order?.guest_count === 'number' ? order.guest_count : null,
+      closedAt: String(
+        (order as { bill_requested_at?: unknown } | undefined)?.bill_requested_at ?? '',
+      ),
       tableName: String(order?.table?.name ?? ''),
       onlinePlatform: String(order?.online_platform ?? ''),
       externalOrderId: String(order?.external_order_id ?? ''),
@@ -230,6 +246,16 @@ export function buildBillPrintData(bill: Bill, opts: BillBusinessOptions = {}): 
       showTaxId: showTaxId ? 'force' : 'never',
       showTaxBreakdown: opts.showTaxBreakdown === true,
       showTableNumber: opts.showTableNumber !== false,
+      licence: String(opts.licence ?? ''),
+      classification: String(opts.classification ?? ''),
+      waiterName: String(opts.waiterName ?? ''),
+      cashierName: String(opts.cashierName ?? ''),
+      showLicence: opts.showLicence !== false,
+      showClassification: opts.showClassification !== false,
+      showWaiter: opts.showWaiter !== false,
+      showCashier: opts.showCashier === true,
+      showGuestCount: opts.showGuestCount === true,
+      showOpenCloseTimes: opts.showOpenCloseTimes === true,
       showCustomerName: opts.showCustomerName !== false,
       showCustomerPhone: shouldShowCustomerNumber({
         showOnReceipts: opts.showCustomerPhone !== false,

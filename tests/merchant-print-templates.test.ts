@@ -52,9 +52,8 @@ import {
   validateMerchantTemplate,
   validateMerchantTemplateText,
 } from '../shared/print';
-import { renderClassicReceiptViaDocument, renderBillDocumentToClassicLines } from '../main/printers/document-classic';
-import { formatClassicReceiptLegacy } from './helpers/legacy-thermal-oracle';
-import { escPosToText, formatReceipt } from '../main/printers/thermal';
+import { buildBillPrintContext, buildBillPrintData, renderClassicReceiptViaDocument, renderBillDocumentToClassicLines } from '../main/printers/document-classic';
+import { buildEscPos, escPosToText, formatReceipt } from '../main/printers/thermal';
 import {
   parseBillTemplateSelection,
   serializeBillTemplateSelection,
@@ -578,11 +577,30 @@ async function runLifecycle(): Promise<void> {
     for (const cols of [32, 42, 48] as const) {
       const merchantBytes = formatReceipt(order, bill, business,
         serializeBillTemplateSelection({ source: 'merchant', id: renderId }), cols, false, false, 'full', [], false, 'en');
-      const nativeBytes = formatClassicReceiptLegacy(order, bill, business, cols, false, false, 'full', [], false, 'en');
+      // The comparison baseline is the un-templated PrintDocument rendered
+      // through the same classic line renderer (NOT the native entry, which
+      // strips the payment block under the v3 bill layout, and NOT the
+      // frozen pre-v3 legacy oracle): a template that mirrors classic must
+      // not distort the document it is applied to.
+      const context = buildBillPrintContext({ columns: cols, language: 'en', business });
+      const plainDocument = buildBillDocument(buildBillPrintData(order, bill, business, false), context);
+      const plainLines = renderBillDocumentToClassicLines(plainDocument, {
+        columns: cols,
+        language: context.languages[0],
+        locale: context.locale,
+        ...(context.timezone !== undefined ? { timezone: context.timezone } : {}),
+        currency: context.currency,
+        currencySymbol: context.currencySymbol,
+        trimDecimals: context.trimDecimals,
+        useUnicode: false,
+        arabicShaping: false,
+        cutMode: 'full',
+      });
+      const nativeBytes = buildEscPos(plainLines, false, { cutMode: 'full', arabicShaping: false, columns: cols, language: 'en' }, []);
       assert(Buffer.compare(merchantBytes, nativeBytes) === 0,
-        `merchant render preserves native classic output at ${cols} columns`);
+        `merchant render preserves un-templated document classic output at ${cols} columns`);
     }
-    ok('native merchant output remains byte-identical at 32/42/48 columns');
+    ok('merchant output remains byte-identical to the un-templated document at 32/42/48 columns');
 
     const styled = await request(app).post('/api/print-templates')
       .set('Authorization', OWNER).send({ name: 'Styled', payload: PAYLOAD_LABELED });

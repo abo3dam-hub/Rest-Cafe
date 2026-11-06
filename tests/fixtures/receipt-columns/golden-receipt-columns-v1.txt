@@ -10,262 +10,277 @@
 === backend classic 32 columns ===
 rule=32 maxFontA=32 max=32
 001 30  |Flo Parity Cafe|
-002 32A |--------------------------------|
-003 25A |Invoice #: INV-PARITY-001|
-004 22A |22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 32A |--------------------------------|
-007 32A |Item              Qty     Amount|
-008 32A |--------------------------------|
-009 32A |Espresso Doppio   2     Rs500.00|
-010 32A |  + Oat milk x2         Rs160.00|
-011 18A |  Note: Less sugar|
-012 32A |Extra Long        1     Rs420.00|
-013 11A |Caramelized|
-014 12A |Vanilla Bean|
-015 17A |Creme Frappuccino|
-016 10A |With Extra|
-017 17A |Whipped Cream And|
-018 15A |Caramel Drizzle|
-019 32A |+ No-price extra shot|
-020 32A |--------------------------------|
-021 32A |Subtotal              Rs1,220.00|
-022 32A |Discount              - Rs120.00|
-023 32A |Delivery                  Rs8.00|
-024 32A |Packaging                 Rs9.00|
-025 32A |TOTAL                 Rs1,117.00|
-026 32A |Cash                    Rs600.00|
-027 32A |Card                    Rs517.00|
-028 32A |--------------------------------|
-029 19A |12 Marina Boulevard|
-030 14A |Ph: 9876543210|
-031 18A |GSTIN: GSTIN123456|
-032 00A ||
-033 00A ||
-034 20  |Powered by Rest&Cafe|
+002 19A |12 Marina Boulevard|
+003 32A |                  Ph: 9876543210|
+004 32A |              GSTIN: GSTIN123456|
+005 32A |--------------------------------|
+006 25A |Invoice #: INV-PARITY-001|
+007 32A |                Date: 22/08/2026|
+008 32A |Time: 12:12:00 am       Table: 4|
+009 32A |--------------------------------|
+010 32A |Item    Unit PriceQty     Amount|
+011 32A |--------------------------------|
+012 32A |Espress  Rs250.00 2     Rs500.00|
+013 01A |o|
+014 06A |Doppio|
+015 32A |+ Oat                   Rs160.00|
+016 11A |    milk x2|
+017 18A |  Note: Less sugar|
+018 32A |Extra    Rs420.00 1     Rs420.00|
+019 04A |Long|
+020 07A |Caramel|
+021 04A |ized|
+022 07A |Vanilla|
+023 04A |Bean|
+024 05A |Creme|
+025 07A |Frappuc|
+026 04A |cino|
+027 04A |With|
+028 05A |Extra|
+029 07A |Whipped|
+030 05A |Cream|
+031 03A |And|
+032 07A |Caramel|
+033 07A |Drizzle|
+034 32A |+ No-price extra shot|
+035 32A |--------------------------------|
+036 32A |Subtotal              Rs1,220.00|
+037 32A |Delivery                  Rs8.00|
+038 32A |Packaging                 Rs9.00|
+039 32A |Total After Fees      Rs1,237.00|
+040 32A |Discount              - Rs120.00|
+041 32A |TOTAL                 Rs1,117.00|
+042 00A ||
+043 00A ||
+044 27  |Rest&Cafe System Powered by|
+045 05  |Ali.J|
 === backend classic 42 columns ===
 rule=42 maxFontA=42 max=42
 001 30  |Flo Parity Cafe|
-002 42A |------------------------------------------|
-003 25A |Invoice #: INV-PARITY-001|
-004 22A |22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 42A |------------------------------------------|
-007 42A |Item                        Qty     Amount|
-008 42A |------------------------------------------|
-009 42A |Espresso Doppio             2     Rs500.00|
-010 42A |  + Oat milk x2                   Rs160.00|
-011 18A |  Note: Less sugar|
-012 42A |Extra Long Caramelized      1     Rs420.00|
-013 18A |Vanilla Bean Creme|
-014 22A |Frappuccino With Extra|
-015 25A |Whipped Cream And Caramel|
-016 07A |Drizzle|
-017 42A |+ No-price extra shot|
-018 42A |------------------------------------------|
-019 42A |Subtotal                        Rs1,220.00|
-020 42A |Discount                        - Rs120.00|
-021 42A |Delivery                            Rs8.00|
-022 42A |Packaging                           Rs9.00|
-023 42A |TOTAL                           Rs1,117.00|
-024 42A |Cash                              Rs600.00|
-025 42A |Card                              Rs517.00|
-026 42A |------------------------------------------|
-027 19A |12 Marina Boulevard|
-028 14A |Ph: 9876543210|
-029 18A |GSTIN: GSTIN123456|
-030 00A ||
-031 00A ||
-032 20  |Powered by Rest&Cafe|
+002 42A |12 Marina Boulevard         Ph: 9876543210|
+003 42A |                        GSTIN: GSTIN123456|
+004 42A |------------------------------------------|
+005 42A |Invoice #: INV-PARITY-001 Date: 22/08/2026|
+006 42A |Time: 12:12:00 am                 Table: 4|
+007 42A |------------------------------------------|
+008 42A |Item              Unit PriceQty     Amount|
+009 42A |------------------------------------------|
+010 42A |Espresso Doppio    Rs250.00 2     Rs500.00|
+011 42A |  + Oat milk x2                   Rs160.00|
+012 18A |  Note: Less sugar|
+013 42A |Extra Long         Rs420.00 1     Rs420.00|
+014 11A |Caramelized|
+015 12A |Vanilla Bean|
+016 17A |Creme Frappuccino|
+017 10A |With Extra|
+018 17A |Whipped Cream And|
+019 15A |Caramel Drizzle|
+020 42A |+ No-price extra shot|
+021 42A |------------------------------------------|
+022 42A |Subtotal                        Rs1,220.00|
+023 42A |Delivery                            Rs8.00|
+024 42A |Packaging                           Rs9.00|
+025 42A |Total After Fees                Rs1,237.00|
+026 42A |Discount                        - Rs120.00|
+027 42A |TOTAL                           Rs1,117.00|
+028 00A ||
+029 00A ||
+030 33  |Rest&Cafe System Powered by Ali.J|
 === backend classic 48 columns ===
 rule=48 maxFontA=48 max=48
 001 30  |Flo Parity Cafe|
-002 48A |------------------------------------------------|
-003 25A |Invoice #: INV-PARITY-001|
-004 22A |22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 48A |------------------------------------------------|
-007 48A |Item                              Qty     Amount|
-008 48A |------------------------------------------------|
-009 48A |Espresso Doppio                   2     Rs500.00|
-010 48A |  + Oat milk x2                         Rs160.00|
-011 18A |  Note: Less sugar|
-012 48A |Extra Long Caramelized Vanilla    1     Rs420.00|
-013 33A |Bean Creme Frappuccino With Extra|
-014 33A |Whipped Cream And Caramel Drizzle|
-015 48A |+ No-price extra shot|
-016 48A |------------------------------------------------|
-017 48A |Subtotal                              Rs1,220.00|
-018 48A |Discount                              - Rs120.00|
-019 48A |Delivery                                  Rs8.00|
-020 48A |Packaging                                 Rs9.00|
-021 48A |TOTAL                                 Rs1,117.00|
-022 48A |Cash                                    Rs600.00|
-023 48A |Card                                    Rs517.00|
-024 48A |------------------------------------------------|
-025 19A |12 Marina Boulevard|
-026 14A |Ph: 9876543210|
-027 18A |GSTIN: GSTIN123456|
-028 00A ||
-029 00A ||
-030 20  |Powered by Rest&Cafe|
+002 48A |12 Marina Boulevard               Ph: 9876543210|
+003 48A |                              GSTIN: GSTIN123456|
+004 48A |------------------------------------------------|
+005 48A |Invoice #: INV-PARITY-001       Date: 22/08/2026|
+006 48A |Time: 12:12:00 am                       Table: 4|
+007 48A |------------------------------------------------|
+008 48A |Item                    Unit PriceQty     Amount|
+009 48A |------------------------------------------------|
+010 48A |Espresso Doppio          Rs250.00 2     Rs500.00|
+011 48A |  + Oat milk x2                         Rs160.00|
+012 18A |  Note: Less sugar|
+013 48A |Extra Long Caramelized   Rs420.00 1     Rs420.00|
+014 18A |Vanilla Bean Creme|
+015 22A |Frappuccino With Extra|
+016 17A |Whipped Cream And|
+017 15A |Caramel Drizzle|
+018 48A |+ No-price extra shot|
+019 48A |------------------------------------------------|
+020 48A |Subtotal                              Rs1,220.00|
+021 48A |Delivery                                  Rs8.00|
+022 48A |Packaging                                 Rs9.00|
+023 48A |Total After Fees                      Rs1,237.00|
+024 48A |Discount                              - Rs120.00|
+025 48A |TOTAL                                 Rs1,117.00|
+026 00A ||
+027 00A ||
+028 33  |Rest&Cafe System Powered by Ali.J|
 === backend compact 32 columns ===
 rule=32 maxFontA=32 max=32
 001 15A |Flo Parity Cafe|
-002 32A |================================|
-003 22A |Bill #: INV-PARITY-001|
-004 28A |Date: 22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 32A |--------------------------------|
-007 32A |Item              Qty     Amount|
-008 32A |--------------------------------|
-009 32A |Espresso Doppio   2     Rs500.00|
-010 32A |  + Oat milk x2         Rs160.00|
-011 18A |  Note: Less sugar|
-012 32A |Extra Long        1     Rs420.00|
-013 11A |Caramelized|
-014 12A |Vanilla Bean|
-015 17A |Creme Frappuccino|
-016 10A |With Extra|
-017 17A |Whipped Cream And|
-018 15A |Caramel Drizzle|
-019 32A |+ No-price extra shot|
-020 32A |--------------------------------|
-021 32A |Subtotal              Rs1,220.00|
-022 32A |Discount              - Rs120.00|
-023 32A |Delivery                  Rs8.00|
-024 32A |Packaging                 Rs9.00|
-025 32A |TOTAL                 Rs1,117.00|
-026 32A |--------------------------------|
-027 32A |Cash                    Rs600.00|
-028 32A |Card                    Rs517.00|
-029 32A |================================|
-030 19A |12 Marina Boulevard|
-031 14A |Ph: 9876543210|
-032 18A |GSTIN: GSTIN123456|
-033 10A |Thank you!|
-034 00A ||
-035 00A ||
-036 20  |Powered by Rest&Cafe|
+002 19A |12 Marina Boulevard|
+003 32A |                  Ph: 9876543210|
+004 32A |              GSTIN: GSTIN123456|
+005 32A |================================|
+006 22A |Bill #: INV-PARITY-001|
+007 32A |                Date: 22/08/2026|
+008 32A |Time: 12:12:00 am       Table: 4|
+009 32A |--------------------------------|
+010 32A |Item    Unit PriceQty     Amount|
+011 32A |--------------------------------|
+012 32A |Espress  Rs250.00 2     Rs500.00|
+013 01A |o|
+014 06A |Doppio|
+015 32A |+ Oat                   Rs160.00|
+016 11A |    milk x2|
+017 18A |  Note: Less sugar|
+018 32A |Extra    Rs420.00 1     Rs420.00|
+019 04A |Long|
+020 07A |Caramel|
+021 04A |ized|
+022 07A |Vanilla|
+023 04A |Bean|
+024 05A |Creme|
+025 07A |Frappuc|
+026 04A |cino|
+027 04A |With|
+028 05A |Extra|
+029 07A |Whipped|
+030 05A |Cream|
+031 03A |And|
+032 07A |Caramel|
+033 07A |Drizzle|
+034 32A |+ No-price extra shot|
+035 32A |--------------------------------|
+036 32A |Subtotal              Rs1,220.00|
+037 32A |Delivery                  Rs8.00|
+038 32A |Packaging                 Rs9.00|
+039 32A |Total After Fees      Rs1,237.00|
+040 32A |Discount              - Rs120.00|
+041 32A |TOTAL                 Rs1,117.00|
+042 32A |================================|
+043 10A |Thank you!|
+044 00A ||
+045 00A ||
+046 27  |Rest&Cafe System Powered by|
+047 05  |Ali.J|
 === backend compact 42 columns ===
 rule=42 maxFontA=42 max=42
 001 15A |Flo Parity Cafe|
-002 42A |==========================================|
-003 22A |Bill #: INV-PARITY-001|
-004 28A |Date: 22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 42A |------------------------------------------|
-007 42A |Item                        Qty     Amount|
-008 42A |------------------------------------------|
-009 42A |Espresso Doppio             2     Rs500.00|
-010 42A |  + Oat milk x2                   Rs160.00|
-011 18A |  Note: Less sugar|
-012 42A |Extra Long Caramelized      1     Rs420.00|
-013 18A |Vanilla Bean Creme|
-014 22A |Frappuccino With Extra|
-015 25A |Whipped Cream And Caramel|
-016 07A |Drizzle|
-017 42A |+ No-price extra shot|
-018 42A |------------------------------------------|
-019 42A |Subtotal                        Rs1,220.00|
-020 42A |Discount                        - Rs120.00|
-021 42A |Delivery                            Rs8.00|
-022 42A |Packaging                           Rs9.00|
-023 42A |TOTAL                           Rs1,117.00|
-024 42A |------------------------------------------|
-025 42A |Cash                              Rs600.00|
-026 42A |Card                              Rs517.00|
-027 42A |==========================================|
-028 19A |12 Marina Boulevard|
-029 14A |Ph: 9876543210|
-030 18A |GSTIN: GSTIN123456|
-031 10A |Thank you!|
-032 00A ||
-033 00A ||
-034 20  |Powered by Rest&Cafe|
-=== backend compact 48 columns ===
-rule=48 maxFontA=48 max=48
-001 15A |Flo Parity Cafe|
-002 48A |================================================|
-003 22A |Bill #: INV-PARITY-001|
-004 28A |Date: 22/08/2026 12:12:00 am|
-005 08A |Table: 4|
-006 48A |------------------------------------------------|
-007 48A |Item                              Qty     Amount|
-008 48A |------------------------------------------------|
-009 48A |Espresso Doppio                   2     Rs500.00|
-010 48A |  + Oat milk x2                         Rs160.00|
-011 18A |  Note: Less sugar|
-012 48A |Extra Long Caramelized Vanilla    1     Rs420.00|
-013 33A |Bean Creme Frappuccino With Extra|
-014 33A |Whipped Cream And Caramel Drizzle|
-015 48A |+ No-price extra shot|
-016 48A |------------------------------------------------|
-017 48A |Subtotal                              Rs1,220.00|
-018 48A |Discount                              - Rs120.00|
-019 48A |Delivery                                  Rs8.00|
-020 48A |Packaging                                 Rs9.00|
-021 48A |TOTAL                                 Rs1,117.00|
-022 48A |------------------------------------------------|
-023 48A |Cash                                    Rs600.00|
-024 48A |Card                                    Rs517.00|
-025 48A |================================================|
-026 19A |12 Marina Boulevard|
-027 14A |Ph: 9876543210|
-028 18A |GSTIN: GSTIN123456|
+002 42A |12 Marina Boulevard         Ph: 9876543210|
+003 42A |                        GSTIN: GSTIN123456|
+004 42A |==========================================|
+005 42A |Bill #: INV-PARITY-001    Date: 22/08/2026|
+006 42A |Time: 12:12:00 am                 Table: 4|
+007 42A |------------------------------------------|
+008 42A |Item              Unit PriceQty     Amount|
+009 42A |------------------------------------------|
+010 42A |Espresso Doppio    Rs250.00 2     Rs500.00|
+011 42A |  + Oat milk x2                   Rs160.00|
+012 18A |  Note: Less sugar|
+013 42A |Extra Long         Rs420.00 1     Rs420.00|
+014 11A |Caramelized|
+015 12A |Vanilla Bean|
+016 17A |Creme Frappuccino|
+017 10A |With Extra|
+018 17A |Whipped Cream And|
+019 15A |Caramel Drizzle|
+020 42A |+ No-price extra shot|
+021 42A |------------------------------------------|
+022 42A |Subtotal                        Rs1,220.00|
+023 42A |Delivery                            Rs8.00|
+024 42A |Packaging                           Rs9.00|
+025 42A |Total After Fees                Rs1,237.00|
+026 42A |Discount                        - Rs120.00|
+027 42A |TOTAL                           Rs1,117.00|
+028 42A |==========================================|
 029 10A |Thank you!|
 030 00A ||
 031 00A ||
-032 20  |Powered by Rest&Cafe|
+032 33  |Rest&Cafe System Powered by Ali.J|
+=== backend compact 48 columns ===
+rule=48 maxFontA=48 max=48
+001 15A |Flo Parity Cafe|
+002 48A |12 Marina Boulevard               Ph: 9876543210|
+003 48A |                              GSTIN: GSTIN123456|
+004 48A |================================================|
+005 48A |Bill #: INV-PARITY-001          Date: 22/08/2026|
+006 48A |Time: 12:12:00 am                       Table: 4|
+007 48A |------------------------------------------------|
+008 48A |Item                    Unit PriceQty     Amount|
+009 48A |------------------------------------------------|
+010 48A |Espresso Doppio          Rs250.00 2     Rs500.00|
+011 48A |  + Oat milk x2                         Rs160.00|
+012 18A |  Note: Less sugar|
+013 48A |Extra Long Caramelized   Rs420.00 1     Rs420.00|
+014 18A |Vanilla Bean Creme|
+015 22A |Frappuccino With Extra|
+016 17A |Whipped Cream And|
+017 15A |Caramel Drizzle|
+018 48A |+ No-price extra shot|
+019 48A |------------------------------------------------|
+020 48A |Subtotal                              Rs1,220.00|
+021 48A |Delivery                                  Rs8.00|
+022 48A |Packaging                                 Rs9.00|
+023 48A |Total After Fees                      Rs1,237.00|
+024 48A |Discount                              - Rs120.00|
+025 48A |TOTAL                                 Rs1,117.00|
+026 48A |================================================|
+027 10A |Thank you!|
+028 00A ||
+029 00A ||
+030 33  |Rest&Cafe System Powered by Ali.J|
 === frontend classic 58mm ===
-rule=32 maxFontA=32 max=33
+rule=32 maxFontA=32 max=37
 001 31  | Flo Parity Cafe|
-002 20A |            Table: 4|
-003 21A |           Asha Kumar|
-004 23A |        xxxxxxxxxxx3210|
-005 33  |        Invoice #: INV-PARITY-001|
-006 32  |          22/08/2026 12:12:00 am|
+002 21A |           Asha Kumar|
+003 23A |        xxxxxxxxxxx3210|
+004 33  |        Invoice #: INV-PARITY-001|
+005 37  |                     Date: 22/08/2026|
+006 37  |     Time: 12:12:00 am       Table: 4|
 007 32A |────────────────────────────────|
-008 32A |Item         Qty    Rate     Amt|
-009 32A |────────────────────────────────|
-010 32A |Espresso Doppio 2|
-011 14A |Rate: Rs250.00|
-012 16A |Amount: Rs500.00|
-013 32A |  + Oat milk x2         Rs160.00|
-014 15A |  >> Less sugar|
-015 32A |Extra Long Caramelized Vanill. 1|
-016 14A |Rate: Rs420.00|
-017 16A |Amount: Rs420.00|
-018 23A |  + No-price extra shot|
-019 32A |────────────────────────────────|
-020 32A |Subtotal              Rs1,220.00|
-021 32A |Discount               -Rs120.00|
+008 26A |Item         Unit PriceQty|
+009 03A |Amt|
+010 32A |────────────────────────────────|
+011 32A |Espresso Doppio 2|
+012 14A |Rate: Rs250.00|
+013 16A |Amount: Rs500.00|
+014 32A |  + Oat milk x2         Rs160.00|
+015 15A |  >> Less sugar|
+016 32A |Extra Long Caramelized Vanill. 1|
+017 14A |Rate: Rs420.00|
+018 16A |Amount: Rs420.00|
+019 23A |  + No-price extra shot|
+020 32A |────────────────────────────────|
+021 32A |Subtotal              Rs1,220.00|
 022 32A |Delivery                  Rs8.00|
 023 32A |Packaging                 Rs9.00|
-024 32A |════════════════════════════════|
-025 32A |TOTAL                 Rs1,117.00|
-026 32A |────────────────────────────────|
-027 32A |Cash                    Rs600.00|
-028 32A |Card                    Rs517.00|
+024 32A |Total After Fees      Rs1,237.00|
+025 32A |Discount               -Rs120.00|
+026 32A |════════════════════════════════|
+027 32A |TOTAL                 Rs1,117.00|
+028 32A |────────────────────────────────|
 029 00A ||
 030 00A ||
 031 28A |   Thank you for your visit!|
-032 29  |             Powered by Ali.J|
-033 00A ||
+032 34  |       Rest&Cafe System Powered by|
+033 23  |                  Ali.J|
 034 00A ||
 035 00A ||
 036 00A ||
+037 00A ||
 === frontend classic 80mm ===
 rule=48 maxFontA=48 max=56
 001 39  |         Flo Parity Cafe|
-002 28A |                    Table: 4|
-003 29A |                   Asha Kumar|
-004 31A |                xxxxxxxxxxx3210|
-005 56  |        Invoice #: INV-PARITY-001 22/08/2026 12:12:00 am|
+002 29A |                   Asha Kumar|
+003 31A |                xxxxxxxxxxx3210|
+004 56  |        Invoice #: INV-PARITY-001       Date: 22/08/2026|
+005 56  |        Time: 12:12:00 am                       Table: 4|
 006 48A |────────────────────────────────────────────────|
-007 48A |Item                 Qty       Rate          Amt|
+007 48A |Item                 Unit Price Qty          Amt|
 008 48A |────────────────────────────────────────────────|
-009 48A |Espresso Doppio        2   Rs250.00     Rs500.00|
+009 48A |Espresso Doppio        Rs250.00   2     Rs500.00|
 010 48A |  + Oat milk x2                         Rs160.00|
 011 15A |  >> Less sugar|
 012 48A |Extra Long Caramelized Vanilla Bean Creme Fra. 1|
@@ -274,29 +289,28 @@ rule=48 maxFontA=48 max=56
 015 23A |  + No-price extra shot|
 016 48A |────────────────────────────────────────────────|
 017 48A |Subtotal                              Rs1,220.00|
-018 48A |Discount                               -Rs120.00|
-019 48A |Delivery                                  Rs8.00|
-020 48A |Packaging                                 Rs9.00|
-021 48A |════════════════════════════════════════════════|
-022 48A |TOTAL                                 Rs1,117.00|
-023 48A |────────────────────────────────────────────────|
-024 48A |Cash                                    Rs600.00|
-025 48A |Card                                    Rs517.00|
+018 48A |Delivery                                  Rs8.00|
+019 48A |Packaging                                 Rs9.00|
+020 48A |Total After Fees                      Rs1,237.00|
+021 48A |Discount                               -Rs120.00|
+022 48A |════════════════════════════════════════════════|
+023 48A |TOTAL                                 Rs1,117.00|
+024 48A |────────────────────────────────────────────────|
+025 00A ||
 026 00A ||
-027 00A ||
-028 36A |           Thank you for your visit!|
-029 40  |                        Powered by Ali.J|
+027 36A |           Thank you for your visit!|
+028 48  |               Rest&Cafe System Powered by Ali.J|
+029 00A ||
 030 00A ||
 031 00A ||
 032 00A ||
-033 00A ||
 === frontend compact 58mm ===
 rule=32 maxFontA=32 max=42
 001 23A |        Flo Parity Cafe|
 002 32A |────────────────────────────────|
 003 25A |Invoice #: INV-PARITY-001|
-004 22A |22/08/2026 12:12:00 am|
-005 08A |Table: 4|
+004 32A |                Date: 22/08/2026|
+005 32A |Time: 12:12:00 am       Table: 4|
 006 20A |Customer: Asha Kumar|
 007 28A |Customer No: xxxxxxxxxxx3210|
 008 32A |────────────────────────────────|
@@ -307,26 +321,27 @@ rule=32 maxFontA=32 max=42
 013 32A |Extra Long Caramelized. Rs420.00|
 014 23A |  + No-price extra shot|
 015 32A |────────────────────────────────|
-016 32A |Discount               -Rs120.00|
+016 32A |Subtotal              Rs1,220.00|
 017 32A |Delivery                  Rs8.00|
 018 32A |Packaging                 Rs9.00|
-019 32A |════════════════════════════════|
-020 32A |TOTAL                 Rs1,117.00|
-021 32A |Cash                    Rs600.00|
-022 32A |Card                    Rs517.00|
+019 32A |Total After Fees      Rs1,237.00|
+020 32A |Discount               -Rs120.00|
+021 32A |════════════════════════════════|
+022 32A |TOTAL                 Rs1,117.00|
 023 00A ||
 024 21A |           Thank you!|
-025 29  |             Powered by Ali.J|
-026 00A ||
+025 34  |       Rest&Cafe System Powered by|
+026 23  |                  Ali.J|
 027 00A ||
 028 00A ||
 029 00A ||
+030 00A ||
 === frontend compact 80mm ===
 rule=48 maxFontA=48 max=64
 001 31A |                Flo Parity Cafe|
 002 48A |────────────────────────────────────────────────|
-003 48A |Invoice #: INV-PARITY-001 22/08/2026 12:12:00 am|
-004 08A |Table: 4|
+003 48A |Invoice #: INV-PARITY-001       Date: 22/08/2026|
+004 48A |Time: 12:12:00 am                       Table: 4|
 005 20A |Customer: Asha Kumar|
 006 28A |Customer No: xxxxxxxxxxx3210|
 007 48A |────────────────────────────────────────────────|
@@ -337,16 +352,16 @@ rule=48 maxFontA=48 max=64
 012 48A |Extra Long Caramelized Vanilla Bean Cr. Rs420.00|
 013 23A |  + No-price extra shot|
 014 48A |────────────────────────────────────────────────|
-015 48A |Discount                               -Rs120.00|
+015 48A |Subtotal                              Rs1,220.00|
 016 48A |Delivery                                  Rs8.00|
 017 48A |Packaging                                 Rs9.00|
-018 48A |════════════════════════════════════════════════|
-019 48A |TOTAL                                 Rs1,117.00|
-020 48A |Cash                                    Rs600.00|
-021 48A |Card                                    Rs517.00|
+018 48A |Total After Fees                      Rs1,237.00|
+019 48A |Discount                               -Rs120.00|
+020 48A |════════════════════════════════════════════════|
+021 48A |TOTAL                                 Rs1,117.00|
 022 00A ||
 023 29A |                   Thank you!|
-024 40  |                        Powered by Ali.J|
+024 48  |               Rest&Cafe System Powered by Ali.J|
 025 00A ||
 026 00A ||
 027 00A ||

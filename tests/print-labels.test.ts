@@ -18,7 +18,7 @@
  * Run: npm run test:print-labels
  */
 
-import { formatReceipt, formatKOT, buildTestPage, escPosToText } from '../main/printers/thermal';
+import { buildEscPos, formatReceipt, formatKOT, buildTestPage, escPosToText } from '../main/printers/thermal';
 import { printLabel, PRINT_LABEL_LANGUAGES } from '../main/print/print-labels.generated';
 import { LANGUAGES } from '../frontend/src/lib/i18n/languages';
 import {
@@ -33,8 +33,34 @@ import {
   truncateToDisplayCells,
   wrapToDisplayCells,
 } from '../shared/print/width';
-import { renderCompactReceiptViaDocument } from '../main/printers/document-compact';
-import { renderClassicReceiptViaDocument } from '../main/printers/document-classic';
+import { renderBillDocumentToCompactLines, renderCompactReceiptViaDocument } from '../main/printers/document-compact';
+import { buildBillPrintContext, buildBillPrintData, renderClassicReceiptViaDocument } from '../main/printers/document-classic';
+import { buildBillDocument } from '../shared/print';
+
+/**
+ * Payment-method labels no longer print on the built-in customer bill
+ * (v3 layout); they render through the PrintDocument pipeline when a
+ * merchant-authored template carries a payments block. Render that
+ * pipeline directly to assert the label localization end to end.
+ */
+function renderDocumentCompactText(order: any, bill: any, business: any, language: string): string {
+  const printData = buildBillPrintData(order, bill, business, false);
+  const context = buildBillPrintContext({ columns: 48, language, business });
+  const document = buildBillDocument(printData, context);
+  const lines = renderBillDocumentToCompactLines(document, {
+    columns: 48,
+    language: context.languages[0],
+    locale: context.locale,
+    ...(context.timezone !== undefined ? { timezone: context.timezone } : {}),
+    currency: context.currency,
+    currencySymbol: context.currencySymbol,
+    trimDecimals: context.trimDecimals,
+    useUnicode: true,
+    arabicShaping: true,
+    cutMode: 'full',
+  });
+  return escPosToText(buildEscPos(lines, true, { cutMode: 'full', arabicShaping: true, columns: 48, language }, []));
+}
 
 let passed = 0;
 let failed = 0;
@@ -296,7 +322,10 @@ function run(): void {
       'fa classic renders Persian subtotal (borrowed pos.subtotal)',
       faText.includes('جمع جزء'),
     );
-    assert('fa classic localizes cash payment method', faText.includes('نقدی'));
+    assert(
+      'fa localizes cash payment method (document pipeline)',
+      renderDocumentCompactText(buildOrder(), buildBill(), buildBusiness(), 'fa').includes('نقدی'),
+    );
     assert('fa classic translates table prefix', faText.includes('میز:'));
     const urText = escPosToText(
       formatReceipt(
@@ -316,7 +345,10 @@ function run(): void {
     assert('ur classic renders Urdu invoice title label', urText.includes('انوائس نمبر:'));
     assert('ur classic renders Urdu grand total', urText.includes('کل رقم'));
     assert('ur classic renders Urdu subtotal', urText.includes('ذیلی رقم'));
-    assert('ur classic localizes cash payment method', urText.includes('نقد'));
+    assert(
+      'ur localizes cash payment method (document pipeline)',
+      renderDocumentCompactText(buildOrder(), buildBill(), buildBusiness(), 'ur').includes('نقد'),
+    );
     const deText = escPosToText(
       formatReceipt(
         buildOrder(),
@@ -521,26 +553,10 @@ function run(): void {
   console.log('\n✅ Test 6: payment method resolution');
   {
     const bill = { ...buildBill(), payment_details: [{ method: 'card', amount: 250 }] };
-    const faText = escPosToText(
-      formatReceipt(
-        buildOrder(),
-        bill,
-        buildBusiness(),
-        'compact',
-        48,
-        false,
-        false,
-        undefined,
-        [],
-        true,
-        'fa',
-      ),
-    );
+    const faText = renderDocumentCompactText(buildOrder(), bill, buildBusiness(), 'fa');
     assert('card localizes in fa', faText.includes('کارت'));
     const voucherBill = { ...buildBill(), payment_details: [{ method: 'voucher', amount: 250 }] };
-    const text = escPosToText(
-      formatReceipt(buildOrder(), voucherBill, buildBusiness(), 'compact', 48),
-    );
+    const text = renderDocumentCompactText(buildOrder(), voucherBill, buildBusiness(), 'en');
     assert('unknown method keeps capitalize fallback', text.includes('Voucher'));
   }
 

@@ -48,7 +48,6 @@ import {
   type SemanticLabel,
   type TaxBreakdownBlock,
   type TotalsBlock,
-  paymentDisplayRows,
 } from '@print/document';
 import { layoutStyledUnit } from '@print/layout';
 import type { ResolvedPrintLanguages } from '@print/types';
@@ -103,6 +102,19 @@ export interface ReceiptOptions {
   isReprint?: boolean;
   /** Hide trailing .00 on printed amounts while keeping non-zero decimals. */
   trimDecimals?: boolean;
+  /** Establishment licence line value (bill-fields feature). */
+  licence?: string;
+  /** Establishment classification line value. */
+  classification?: string;
+  showLicence?: boolean;
+  showClassification?: boolean;
+  /** Staff names for the served-by / cashier lines, when known. */
+  waiterName?: string;
+  cashierName?: string;
+  showWaiter?: boolean;
+  showCashier?: boolean;
+  showGuestCount?: boolean;
+  showOpenCloseTimes?: boolean;
   /** Ordered receipt languages (primary first) resolved from policy. */
   languages?: ResolvedPrintLanguages;
   /** Selected thermal text capabilities; defaults to generic ESC/POS safety. */
@@ -207,13 +219,26 @@ function printOnlineOrderBanner(
 }
 
 function printPoweredByFooter(enc: ReceiptPrinterEncoder, columns: number): void {
-  enc
-    .align('center')
-    .size('small')
-    .text(fitThermalLine(RECEIPT_BRANDING_NAME, columns))
-    .newline()
-    .size('normal')
-    .align('left');
+  // The branding is 33 cells; on 58mm paper it wraps to two centered lines
+  // instead of truncating the name (mirrors the backend footer).
+  const words = RECEIPT_BRANDING_NAME.split(' ');
+  const wrapped: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? current + ' ' + word : word;
+    if (candidate.length <= columns) {
+      current = candidate;
+    } else {
+      if (current) wrapped.push(current);
+      current = word;
+    }
+  }
+  if (current) wrapped.push(current);
+  enc.align('center').size('small');
+  for (const line of wrapped) {
+    enc.text(fitThermalLine(line, columns)).newline();
+  }
+  enc.size('normal').align('left');
 }
 
 // Paper-size fallback only. Callers that know the configured printer pass
@@ -254,9 +279,6 @@ function labelOf(label: SemanticLabel): string {
 }
 
 /** Literal payment methods keep the legacy capitalize fallback. */
-function paymentLabel(label: SemanticLabel): string {
-  return label.conceptId !== undefined ? label.primary : capitalize(label.primary);
-}
 
 function capitalize(text: string): string {
   return text.length > 0 ? text.charAt(0).toUpperCase() + text.slice(1) : text;
@@ -319,13 +341,19 @@ function resolveEncoderCurrency(
   return padCurrencyPrefix(hasSymbol && useUnicode ? normalizedCurrency : fallbackCurrency);
 }
 
-/** Thermal-safe timestamp: DD/MM/YYYY date plus a Latin-digit time. */
-function formatThermalTimestamp(iso: string, locale: string, timezone?: string | null): string {
+/** Thermal-safe date only (DD/MM/YYYY, Gregorian, Latin digits). */
+function formatThermalDate(iso: string, timezone?: string | null): string {
   const parsed = parseDbTimestamp(iso);
   if (Number.isNaN(parsed.getTime())) return iso;
-  const safeLocale = getSafeLatnLocale(locale);
+  return formatBusinessDate(parsed, timezone ?? undefined);
+}
+
+/** Thermal-safe time only (Latin digits, business timezone). */
+function formatThermalTime(iso: string, locale: string, timezone?: string | null): string {
+  const parsed = parseDbTimestamp(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
   const options = timezone ? { timeZone: timezone } : undefined;
-  return `${formatBusinessDate(parsed, timezone ?? undefined)} ${parsed.toLocaleTimeString(safeLocale, options)}`;
+  return parsed.toLocaleTimeString(getSafeLatnLocale(locale), options);
 }
 
 function getSafeLatnLocale(locale: string | undefined): string {
@@ -362,6 +390,16 @@ function buildReceiptEnvironment(
     showLogo: opts.showLogo,
     receiptLogo: opts.receiptLogo,
     receiptLogoRaster: opts.receiptLogoRaster,
+    licence: opts.licence,
+    classification: opts.classification,
+    waiterName: opts.waiterName,
+    cashierName: opts.cashierName,
+    showLicence: opts.showLicence,
+    showClassification: opts.showClassification,
+    showWaiter: opts.showWaiter,
+    showCashier: opts.showCashier,
+    showGuestCount: opts.showGuestCount,
+    showOpenCloseTimes: opts.showOpenCloseTimes,
     showCustomerName: opts.showCustomerName,
     showCustomerPhone: opts.showCustomerPhone,
     deliveryShowCustomerPhoneAlways: opts.deliveryShowCustomerPhoneAlways,
@@ -384,12 +422,12 @@ function buildReceiptEnvironment(
   };
 }
 
-// 4-column layout helpers: [name, qty, rate, amount]
+// 4-column layout helpers: [name, rate, qty, amount] (v3 bill layout order)
 type Col4Widths = [number, number, number, number];
 
 function col4Widths(cols: number): Col4Widths {
-  if (cols >= 48) return [20, 4, 11, 13];
-  return [14, 3, 7, 8];
+  if (cols >= 48) return [20, 11, 4, 13];
+  return [14, 7, 3, 8];
 }
 
 function resolveCol4Widths(
@@ -400,7 +438,7 @@ function resolveCol4Widths(
   trimDecimals: boolean,
   fractionDigits: number,
 ): Col4Widths {
-  const [, qtyWidth, minimumRateWidth, minimumAmountWidth] = col4Widths(cols);
+  const [, minimumRateWidth, qtyWidth, minimumAmountWidth] = col4Widths(cols);
   let rateWidth = minimumRateWidth;
   let amountWidth = minimumAmountWidth;
 
@@ -426,7 +464,7 @@ function resolveCol4Widths(
   }
 
   const nameWidth = cols - qtyWidth - rateWidth - amountWidth;
-  return [nameWidth, qtyWidth, rateWidth, amountWidth];
+  return [nameWidth, rateWidth, qtyWidth, amountWidth];
 }
 
 function col4Header(
@@ -435,10 +473,10 @@ function col4Header(
 ): string {
   const [w0, w1, w2, w3] = widths;
   const item = padToDisplayCells(labels.item, w0);
-  const qty = padToDisplayCells(labels.qty, w1, 'right');
-  const rate = padToDisplayCells(labels.rate, w2, 'right');
+  const rate = padToDisplayCells(labels.rate, w1, 'right');
+  const qty = padToDisplayCells(labels.qty, w2, 'right');
   const amt = padToDisplayCells(labels.amount, w3, 'right');
-  return item + qty + rate + amt;
+  return item + rate + qty + amt;
 }
 
 function col4Rows(
@@ -454,7 +492,7 @@ function col4Rows(
   language?: string,
   capabilities?: ThermalPrinterCapabilities,
 ): string[] {
-  const [nameWidth, qtyWidth, rateWidth, amountWidth] = widths;
+  const [nameWidth, rateWidth, qtyWidth, amountWidth] = widths;
   const normalizedName = normalizeThermalText(name, capabilities);
   const rateStr = formatAmount(rate, currency, locale, trimDecimals, fractionDigits);
   const amtStr = formatAmount(amount, currency, locale, trimDecimals, fractionDigits);
@@ -488,8 +526,8 @@ function col4Rows(
   const qtyColumn = padToDisplayCells(qtyStr, qtyWidth, 'right');
   return [
     nameColumn +
-      qtyColumn +
       padToDisplayCells(rateStr, rateWidth, 'right') +
+      qtyColumn +
       padToDisplayCells(amtStr, amountWidth, 'right'),
   ];
 }
@@ -534,7 +572,7 @@ export function buildClassicReceiptBytes(
   const fractionDigits = getCurrencyFractionDigits(currencyCode);
   const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
   const env = buildReceiptEnvironment(bill, tenant, opts, cols);
-  const { header, meta, customer, items, breakdown, totals, payments, messages, languages } = env;
+  const { header, meta, customer, items, breakdown, totals, messages, languages } = env;
   const primaryLang = languages[0];
   const safePrinterText = safePrinterTextForLanguage(primaryLang, useUnicode, opts.capabilities);
   const padRow = (left: string, right: string, _columns?: number): string => {
@@ -555,7 +593,7 @@ export function buildClassicReceiptBytes(
   const col4Labels = {
     item: labelOf(items?.header.item ?? { primary: '' }),
     qty: labelOf(items?.header.quantity ?? { primary: '' }),
-    rate: printLabelResolver('receipt.rate', primaryLang),
+    rate: labelOf(items?.header.rate ?? { primary: '' }),
     amount: printLabelResolver('printTest.amt', primaryLang),
   };
 
@@ -600,19 +638,42 @@ export function buildClassicReceiptBytes(
     enc.width(1).height(1).bold(false).newline();
   }
 
-  // Document meta: table, customer, invoice number + timestamp.
-  if (meta?.table) {
-    enc.bold(true);
-    safePrinterText(
-      enc,
-      meta.table.label.primary.replace('{name}', meta.table.name.text),
-      warnings,
-      false,
-      arabicShaping,
-      cols,
-    );
-    enc.bold(false).newline();
-  }
+  // Header-zone facts (v3 bill layout): fixed-slot pairs under the name —
+  // (address | phone), (licence | tax id), (classification | instagram).
+  const printFactPair = (left: string | null, right: string | null): void => {
+    if (left && right) {
+      // Too wide for one line (narrow paper): stack rather than truncate a
+      // permanent field like the bill number.
+      if (displayCellWidth(left) + 1 + displayCellWidth(right) > cols) {
+        safePrinterText(enc, left, warnings, false, arabicShaping, undefined, cols).newline();
+        safePrinterText(enc, padRow('', right, cols), warnings, false, arabicShaping).newline();
+        return;
+      }
+      safePrinterText(enc, padRow(left, right, cols), warnings, false, arabicShaping).newline();
+    } else if (left) {
+      safePrinterText(enc, left, warnings, false, arabicShaping, undefined, cols).newline();
+    } else if (right) {
+      safePrinterText(enc, padRow('', right, cols), warnings, false, arabicShaping).newline();
+    }
+  };
+  printFactPair(
+    header?.address?.text ?? null,
+    header?.phone && header?.phoneLabel
+      ? `${labelOf(header.phoneLabel)}: ${header.phone.text}`
+      : null,
+  );
+  printFactPair(
+    header?.licence ? `${labelOf(header.licence.label)}: ${header.licence.value.text}` : null,
+    header?.taxId ? `${labelOf(header.taxId.label)}: ${header.taxId.value.text}` : null,
+  );
+  printFactPair(
+    header?.classification
+      ? `${labelOf(header.classification.label)}: ${header.classification.value.text}`
+      : null,
+    header?.instagramHandle?.text ?? null,
+  );
+
+  // Customer block.
   if (customer?.heading) {
     enc.bold(true);
     safePrinterText(enc, labelOf(customer.heading), warnings, false, arabicShaping, cols);
@@ -633,20 +694,44 @@ export function buildClassicReceiptBytes(
     }
   }
 
+  // Document meta: fixed-slot pairs (v3 bill layout) — (bill no | date),
+  // (time | table), (guests | open time), (close time | cashier), then the
+  // served-by line. Date/time show the closing stamp when one exists.
   if (meta) {
     enc.size('small');
-    safePrinterText(
-      enc,
-      padRow(
-        `${labelOf(meta.invoiceNumberLabel)} ${meta.invoiceNumber.text}`,
-        formatThermalTimestamp(meta.timestamp.text, locale, tenant.timezone),
-        cols,
-      ),
-      warnings,
-      false,
-      arabicShaping,
+    const stampRaw = meta.closedAt?.timestamp.text ?? meta.timestamp.text;
+    printFactPair(
+      `${labelOf(meta.invoiceNumberLabel)} ${meta.invoiceNumber.text}`,
+      `${labelOf(meta.dateLabel)}: ${formatThermalDate(stampRaw, tenant.timezone)}`,
     );
-    enc.newline().size('normal').align('left').rule({ style: 'single' });
+    printFactPair(
+      `${printLabelResolver('print.time', primaryLang)}: ${formatThermalTime(stampRaw, locale, tenant.timezone)}`,
+      meta.table ? meta.table.label.primary.replace('{name}', meta.table.name.text) : null,
+    );
+    printFactPair(
+      meta.guests ? `${labelOf(meta.guests.label)}: ${meta.guests.count}` : null,
+      meta.openedAt
+        ? `${labelOf(meta.openedAt.label)}: ${formatThermalTime(meta.openedAt.timestamp.text, locale, tenant.timezone)}`
+        : null,
+    );
+    printFactPair(
+      meta.closedAt
+        ? `${labelOf(meta.closedAt.label)}: ${formatThermalTime(meta.closedAt.timestamp.text, locale, tenant.timezone)}`
+        : null,
+      meta.cashier ? `${labelOf(meta.cashier.label)}: ${meta.cashier.name.text}` : null,
+    );
+    if (meta.servedBy) {
+      safePrinterText(
+        enc,
+        `${labelOf(meta.servedBy.label)}: ${meta.servedBy.name.text}`,
+        warnings,
+        false,
+        arabicShaping,
+        undefined,
+        cols,
+      ).newline();
+    }
+    enc.size('normal').align('left').rule({ style: 'single' });
   } else {
     enc.rule({ style: 'single' });
   }
@@ -760,21 +845,25 @@ export function buildClassicReceiptBytes(
       undefined,
       true,
     ).newline();
-    if (totals.discount) {
-      safePrinterText(
-        enc,
-        padRow(
-          labelOf(totals.discount.label),
-          `-${formatAmount(totals.discount.amount, currency, locale, opts.trimDecimals === true, fractionDigits)}`,
-          cols,
-        ),
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        true,
-      ).newline();
+    // Fee breakdown lines (the Syria fees print here, inside the totals).
+    if (breakdown && breakdown.lines.length > 0) {
+      for (const line of breakdown.lines) {
+        const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
+        safePrinterText(
+          enc,
+          padRow(
+            ` ${line.label.primary}${rateSuffix}`,
+            formatAmount(line.amount, currency, locale, opts.trimDecimals === true, fractionDigits),
+            cols,
+          ),
+          warnings,
+          false,
+          arabicShaping,
+          undefined,
+          undefined,
+          true,
+        ).newline();
+      }
     }
     if (totals.tax) {
       safePrinterText(
@@ -885,6 +974,40 @@ export function buildClassicReceiptBytes(
       ).newline();
     }
 
+    // The discount is deducted after the fees (owner decision, 2026-11-06),
+    // with the post-fee total shown before it.
+    if (totals.postFeeTotal) {
+      safePrinterText(
+        enc,
+        padRow(
+          labelOf(totals.postFeeTotal.label),
+          formatAmount(totals.postFeeTotal.amount, currency, locale, opts.trimDecimals === true, fractionDigits),
+          cols,
+        ),
+        warnings,
+        false,
+        arabicShaping,
+        undefined,
+        undefined,
+        true,
+      ).newline();
+    }
+    if (totals.discount) {
+      safePrinterText(
+        enc,
+        padRow(
+          labelOf(totals.discount.label),
+          `-${formatAmount(totals.discount.amount, currency, locale, opts.trimDecimals === true, fractionDigits)}`,
+          cols,
+        ),
+        warnings,
+        false,
+        arabicShaping,
+        undefined,
+        undefined,
+        true,
+      ).newline();
+    }
     enc.rule({ style: 'double' });
     enc.bold(true);
     safePrinterText(
@@ -911,25 +1034,7 @@ export function buildClassicReceiptBytes(
     enc.rule({ style: 'single' });
   }
 
-  // Payment methods
-  for (const line of payments?.lines ?? []) {
-    for (const row of paymentDisplayRows(line)) {
-      safePrinterText(
-        enc,
-        padRow(
-          paymentLabel(row.label),
-          formatAmount(row.amount, currency, locale, opts.trimDecimals === true, fractionDigits),
-          cols,
-        ),
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        true,
-      ).newline();
-    }
-  }
+  // Payments never appear on the customer bill (v3 bill layout).
   if (totals?.pointsEarned || totals?.pointsBalance) {
     enc.rule({ style: 'single' });
     if (totals.pointsEarned) {
@@ -954,66 +1059,8 @@ export function buildClassicReceiptBytes(
 
   enc.newline();
 
-  // Tax breakdown (optional)
-  if (breakdown && breakdown.lines.length > 0) {
-    for (const line of breakdown.lines) {
-      const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
-      safePrinterText(
-        enc,
-        padRow(
-          ` ${line.label.primary}${rateSuffix}`,
-          formatAmount(line.amount, currency, locale, opts.trimDecimals === true, fractionDigits),
-          cols,
-        ),
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        true,
-      ).newline();
-    }
-  }
-
-  // Footer
+  // Footer (business facts live in the header zone now).
   if (showFooter) {
-    if (header?.taxId && meta) {
-      safePrinterText(
-        enc,
-        padRow(
-          `${labelOf(header.taxId.label)}: ${header.taxId.value.text}`,
-          `${labelOf(meta.invoiceNumberLabel)} ${meta.invoiceNumber.text}`,
-          cols,
-        ),
-        warnings,
-        false,
-        arabicShaping,
-      ).newline();
-    }
-    if (header?.address) {
-      enc.align('center');
-      safePrinterText(
-        enc,
-        truncate(header.address.text, cols),
-        warnings,
-        false,
-        arabicShaping,
-        cols,
-      ).newline();
-      enc.align('left');
-    }
-    if (header?.phone) {
-      enc.align('center');
-      safePrinterText(
-        enc,
-        `${printLabelResolver('print.call', primaryLang)}: ${header.phone.text}`,
-        warnings,
-        false,
-        arabicShaping,
-        cols,
-      ).newline();
-      enc.align('left');
-    }
     enc.newline();
     enc.align('center');
     safePrinterText(
@@ -1061,7 +1108,7 @@ export function buildCompactReceiptBytes(
   // Business/show flags flow into the document via `opts`; the renderer only
   // sees resolved blocks.
   const env = buildReceiptEnvironment(bill, tenant, opts, cols);
-  const { header, meta, customer, items, breakdown, totals, payments, messages, languages } = env;
+  const { header, meta, customer, items, breakdown, totals, messages, languages } = env;
   const primaryLang = languages[0];
   const safePrinterText = safePrinterTextForLanguage(primaryLang, useUnicode, opts.capabilities);
   const padRow = (left: string, right: string, _columns?: number): string => {
@@ -1105,26 +1152,70 @@ export function buildCompactReceiptBytes(
     safePrinterText(enc, truncate(header.name.text, cols), warnings, true, arabicShaping, cols);
     enc.bold(false).newline();
   }
+
+  // Header-zone facts (v3 bill layout): fixed-slot pairs under the name.
+  const printFactPair = (left: string | null, right: string | null): void => {
+    if (left && right) {
+      // Too wide for one line (narrow paper): stack rather than truncate a
+      // permanent field like the bill number.
+      if (displayCellWidth(left) + 1 + displayCellWidth(right) > cols) {
+        safePrinterText(enc, left, warnings, false, arabicShaping, undefined, cols).newline();
+        safePrinterText(enc, padRow('', right, cols), warnings, false, arabicShaping).newline();
+        return;
+      }
+      safePrinterText(enc, padRow(left, right, cols), warnings, false, arabicShaping).newline();
+    } else if (left) {
+      safePrinterText(enc, left, warnings, false, arabicShaping, undefined, cols).newline();
+    } else if (right) {
+      safePrinterText(enc, padRow('', right, cols), warnings, false, arabicShaping).newline();
+    }
+  };
+  printFactPair(
+    header?.address?.text ?? null,
+    header?.phone && header?.phoneLabel
+      ? `${labelOf(header.phoneLabel)}: ${header.phone.text}`
+      : null,
+  );
+  printFactPair(
+    header?.licence ? `${labelOf(header.licence.label)}: ${header.licence.value.text}` : null,
+    header?.taxId ? `${labelOf(header.taxId.label)}: ${header.taxId.value.text}` : null,
+  );
+  printFactPair(
+    header?.classification
+      ? `${labelOf(header.classification.label)}: ${header.classification.value.text}`
+      : null,
+    header?.instagramHandle?.text ?? null,
+  );
   enc.align('left').rule({ style: 'single' });
 
-  // Invoice number and timestamp on one line (document-meta block)
+  // Document meta: fixed-slot pairs (v3 bill layout) — (bill no | date),
+  // (time | table), (guests | open time), (close time | cashier), served-by.
   if (meta) {
-    safePrinterText(
-      enc,
-      padRow(
-        `${labelOf(meta.invoiceNumberLabel)} ${meta.invoiceNumber.text}`,
-        formatThermalTimestamp(meta.timestamp.text, locale, tenant.timezone),
-        cols,
-      ),
-      warnings,
-      false,
-      arabicShaping,
-    ).newline();
-
-    if (meta.table) {
+    const stampRaw = meta.closedAt?.timestamp.text ?? meta.timestamp.text;
+    printFactPair(
+      `${labelOf(meta.invoiceNumberLabel)} ${meta.invoiceNumber.text}`,
+      `${labelOf(meta.dateLabel)}: ${formatThermalDate(stampRaw, tenant.timezone)}`,
+    );
+    printFactPair(
+      `${printLabelResolver('print.time', primaryLang)}: ${formatThermalTime(stampRaw, locale, tenant.timezone)}`,
+      meta.table ? meta.table.label.primary.replace('{name}', meta.table.name.text) : null,
+    );
+    printFactPair(
+      meta.guests ? `${labelOf(meta.guests.label)}: ${meta.guests.count}` : null,
+      meta.openedAt
+        ? `${labelOf(meta.openedAt.label)}: ${formatThermalTime(meta.openedAt.timestamp.text, locale, tenant.timezone)}`
+        : null,
+    );
+    printFactPair(
+      meta.closedAt
+        ? `${labelOf(meta.closedAt.label)}: ${formatThermalTime(meta.closedAt.timestamp.text, locale, tenant.timezone)}`
+        : null,
+      meta.cashier ? `${labelOf(meta.cashier.label)}: ${meta.cashier.name.text}` : null,
+    );
+    if (meta.servedBy) {
       safePrinterText(
         enc,
-        meta.table.label.primary.replace('{name}', meta.table.name.text),
+        `${labelOf(meta.servedBy.label)}: ${meta.servedBy.name.text}`,
         warnings,
         false,
         arabicShaping,
@@ -1254,12 +1345,12 @@ export function buildCompactReceiptBytes(
 
   enc.rule({ style: 'single' });
 
-  if (totals?.discount) {
+  if (totals) {
     safePrinterText(
       enc,
       padRow(
-        labelOf(totals.discount.label),
-        `-${formatAmount(totals.discount.amount, currency, locale, trim, fractionDigits)}`,
+        labelOf(totals.subtotal.label),
+        formatAmount(totals.subtotal.amount, currency, locale, trim, fractionDigits),
         cols,
       ),
       warnings,
@@ -1372,6 +1463,41 @@ export function buildCompactReceiptBytes(
     }
   }
 
+  // The discount is deducted after the fees (owner decision, 2026-11-06),
+  // with the post-fee total shown before it.
+  if (totals?.postFeeTotal) {
+    safePrinterText(
+      enc,
+      padRow(
+        labelOf(totals.postFeeTotal.label),
+        formatAmount(totals.postFeeTotal.amount, currency, locale, trim, fractionDigits),
+        cols,
+      ),
+      warnings,
+      false,
+      arabicShaping,
+      undefined,
+      undefined,
+      true,
+    ).newline();
+  }
+  if (totals?.discount) {
+    safePrinterText(
+      enc,
+      padRow(
+        labelOf(totals.discount.label),
+        `-${formatAmount(totals.discount.amount, currency, locale, trim, fractionDigits)}`,
+        cols,
+      ),
+      warnings,
+      false,
+      arabicShaping,
+      undefined,
+      undefined,
+      true,
+    ).newline();
+  }
+
   enc.rule({ style: 'double' });
   if (totals) {
     enc.bold(true);
@@ -1392,54 +1518,9 @@ export function buildCompactReceiptBytes(
     enc.bold(false).newline();
   }
 
-  for (const line of payments?.lines ?? []) {
-    for (const row of paymentDisplayRows(line)) {
-      safePrinterText(
-        enc,
-        padRow(
-          paymentLabel(row.label),
-          formatAmount(row.amount, currency, locale, trim, fractionDigits),
-          cols,
-        ),
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        true,
-      ).newline();
-    }
-  }
-
+  // Payments never appear on the customer bill (v3 bill layout), and the
+  // business facts live in the header zone now.
   enc.newline().align('center');
-  if (header?.taxId) {
-    safePrinterText(
-      enc,
-      `${labelOf(header.taxId.label)}: ${header.taxId.value.text}`,
-      warnings,
-      false,
-      arabicShaping,
-      cols,
-    ).newline();
-  }
-  if (header?.address)
-    safePrinterText(
-      enc,
-      truncate(header.address.text, cols),
-      warnings,
-      false,
-      arabicShaping,
-      cols,
-    ).newline();
-  if (header?.phone)
-    safePrinterText(
-      enc,
-      `${printLabelResolver('receipt.phone', primaryLang)}: ${header.phone.text}`,
-      warnings,
-      false,
-      arabicShaping,
-      cols,
-    ).newline();
   safePrinterText(
     enc,
     printLabelResolver('print.thankYouShort', primaryLang),

@@ -6,7 +6,11 @@ import {
   calculateConfiguredChargeTaxes,
   combineItemAndChargeTaxes,
   computeDiscountTaxRatio,
+  computeSyriaLocalAdmin,
+  detectSyriaProfileFromSnapshots,
   rollupOrderTaxes,
+  SYRIA_LOCAL_ADMIN_LABEL,
+  getSyriaLocalAdminRate,
   type ChargeTaxContext,
   type ChargeTaxSummary,
   type Customer,
@@ -15,6 +19,12 @@ import {
   type TenantInfo,
 } from './tax';
 import { isTerminalItemStatus } from '../../shared/order-item-status';
+
+export {
+  detectSyriaProfileFromSnapshots,
+  resolveSyriaDiscountAmount,
+  type SyriaProfileKind,
+} from './tax';
 import {
   ChargeValidationError,
   toStandardChargeColumns,
@@ -169,12 +179,14 @@ export function recomputeOrderTotals(input: RecomputeOrderTotalsInput): Recomput
   };
   const subtotal = totals.subtotal;
   const subtotalDec = new Decimal(subtotal);
+  const syriaProfile = detectSyriaProfileFromSnapshots(totals.allTaxSnapshots);
   // The discount can never exceed the subtotal it is deducted from, so a
   // caller-supplied figure cannot drive the discounted share outside 0..1.
-  const effectiveDiscountDec = Decimal.max(
-    0,
-    Decimal.min(new Decimal(discountAmount || 0), subtotalDec),
-  );
+  // Syria levy orders are the exception: their discount is deducted from the
+  // post-fee total (which is larger), and is capped against that total below.
+  const effectiveDiscountDec = syriaProfile
+    ? Decimal.max(0, new Decimal(discountAmount || 0))
+    : Decimal.max(0, Decimal.min(new Decimal(discountAmount || 0), subtotalDec));
   const discountedSubtotalDec = Decimal.max(0, subtotalDec.minus(effectiveDiscountDec));
   const discountedSubtotal = discountedSubtotalDec.toNumber();
 
@@ -246,7 +258,11 @@ export function recomputeOrderTotals(input: RecomputeOrderTotalsInput): Recomput
     applyDiscountScaling && subtotalDec.gt(0)
       ? computeDiscountTaxRatio(discountedSubtotalDec, subtotalDec)
       : new Decimal(1);
-  const taxRatio = taxRatioDec.toNumber();
+  // Syria levy orders: the fee is charged on the whole pre-discount bill and
+  // the discount is deducted afterwards (owner decision, 2026-11-06), so a
+  // discount never rescales the tax.
+  const effectiveTaxRatioDec = syriaProfile ? new Decimal(1) : taxRatioDec;
+  const taxRatio = effectiveTaxRatioDec.toNumber();
 
   let taxAmount: number;
   let exclusiveTaxAmount: number;
@@ -274,7 +290,7 @@ export function recomputeOrderTotals(input: RecomputeOrderTotalsInput): Recomput
       currency: tenantInfo.currency || '',
       decimals,
       minorFactor,
-      itemTaxRatio: taxRatioDec,
+      itemTaxRatio: effectiveTaxRatioDec,
       taxesEnabled: tenantInfo.taxes_enabled,
     });
     taxAmount = rolled.itemTaxAmount;
@@ -283,13 +299,13 @@ export function recomputeOrderTotals(input: RecomputeOrderTotalsInput): Recomput
   } else {
     taxAmount = applyDiscountScaling
       ? new Decimal(totals.totalTax)
-          .mul(taxRatioDec)
+          .mul(effectiveTaxRatioDec)
           .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
           .toNumber()
       : totals.totalTax;
     exclusiveTaxAmount = applyDiscountScaling
       ? new Decimal(totals.exclusiveTax)
-          .mul(taxRatioDec)
+          .mul(effectiveTaxRatioDec)
           .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
           .toNumber()
       : totals.exclusiveTax;
@@ -298,18 +314,64 @@ export function recomputeOrderTotals(input: RecomputeOrderTotalsInput): Recomput
       itemExclusiveTaxAmount: exclusiveTaxAmount,
       itemBreakdowns: totals.allTaxBreakdowns,
       itemSnapshots: totals.allTaxSnapshots,
-      itemTaxRatio: taxRatioDec,
+      itemTaxRatio: effectiveTaxRatioDec,
       chargeTaxes,
       minorFactor,
     });
   }
 
-  const preRoundTotal = discountedSubtotalDec
-    .plus(taxRollup.exclusiveTaxAmount)
-    .plus(effectiveChargeContext.delivery_charge || 0)
+  // Local-administration fee (Syria consumption profile only): a percent OF
+  // the consumption fee itself, fractions rounded up — a document-level tax
+  // component, so it lands in the order breakdown without touching items.
+  if (syriaProfile === 'consumption') {
+    const adminAmount = computeSyriaLocalAdmin({
+      syriaProfile,
+      snapshotJson: taxRollup.snapshotJson,
+      breakdowns: taxRollup.breakdowns,
+      decimals,
+    });
+    if (adminAmount.gt(0)) {
+      taxAmount = new Decimal(taxAmount).plus(adminAmount).toNumber();
+      exclusiveTaxAmount = new Decimal(exclusiveTaxAmount).plus(adminAmount).toNumber();
+      taxRollup = {
+        ...taxRollup,
+        taxAmount: new Decimal(taxRollup.taxAmount).plus(adminAmount).toNumber(),
+        exclusiveTaxAmount: new Decimal(taxRollup.exclusiveTaxAmount)
+          .plus(adminAmount)
+          .toNumber(),
+        breakdowns: [
+          ...taxRollup.breakdowns,
+          [
+            {
+              title: SYRIA_LOCAL_ADMIN_LABEL,
+              rate: getSyriaLocalAdminRate(),
+              amount: adminAmount.toNumber(),
+            },
+          ],
+        ],
+      };
+    }
+  }
+
+  const chargesDec = new Decimal(effectiveChargeContext.delivery_charge || 0)
     .plus(effectiveChargeContext.packaging_charge || 0)
     .plus(effectiveChargeContext.service_charge || 0)
     .plus(otherCharges);
+  let preRoundTotal: Decimal;
+  if (syriaProfile) {
+    // Fees first, discount last: the discount is deducted from the
+    // post-fee total and can zero the bill but never drive it negative.
+    const postFeeTotal = subtotalDec.plus(exclusiveTaxAmount).plus(chargesDec);
+    const cappedDiscount = Decimal.min(
+      effectiveDiscountDec,
+      Decimal.max(0, postFeeTotal),
+    );
+    preRoundTotal = postFeeTotal.minus(cappedDiscount);
+  } else {
+    preRoundTotal = discountedSubtotalDec
+      .plus(taxRollup.exclusiveTaxAmount)
+      .plus(chargesDec);
+  }
   const total = preRoundTotal.toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP).toNumber();
   if (!Number.isSafeInteger(Math.round(total * minorFactor))) {
     throw new ChargeValidationError('Order total exceeds the supported currency precision');

@@ -64,7 +64,7 @@ export function buildMenuWebPrintHtml(input: MenuWebPrintInput): string {
     <div class="date">${escapeHtml(input.printedAt)}</div>
   </header>
   <main>${sections}</main>
-  <footer>${escapeHtml(input.totalItemsLabel)}: ${input.itemCount}<br>Powered by Ali.J</footer>
+  <footer>${escapeHtml(input.totalItemsLabel)}: ${input.itemCount}<br>Rest&Cafe System Powered by Ali.J</footer>
 </body>
 </html>`;
 }

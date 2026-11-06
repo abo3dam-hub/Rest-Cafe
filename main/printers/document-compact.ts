@@ -1,6 +1,7 @@
 /** PrintDocument v1 compact thermal receipt renderer; maps print blocks to ESC/POS token lines. */
 
 import { parseDbTimestamp } from '../db';
+import { printLabel } from '../print/print-labels.generated';
 import { formatBusinessDate, getCurrencyFractionDigits } from '../countries';
 import type { PrinterCutMode } from './profiles';
 import { isThermalTextRepresentable, type ThermalPrinterCapabilities } from '../../shared/print/thermal-capabilities';
@@ -14,6 +15,7 @@ import {
   financialRows,
   formatCurrency,
   itemAmountWidth,
+  itemRateWidth,
   itemRows,
   itemNameWidth,
   normalizeThermalText,
@@ -29,6 +31,7 @@ import { buildBillPrintContext, buildBillPrintData } from './document-classic';
 import {
   buildBillDocument,
   getBlock,
+  paymentDisplayRows,
   type BusinessHeaderBlock,
   type CustomerBlock,
   type DocumentMetaBlock,
@@ -40,7 +43,6 @@ import {
   type TaxBreakdownBlock,
   type TotalsBlock,
   layoutStyledUnit,
-  paymentDisplayRows,
   type ThermalLayoutContext,
 } from '../../shared/print';
 
@@ -94,18 +96,72 @@ function compactBannerLines(label: SemanticLabel, context: ThermalLayoutContext)
 }
 
 /** Column header row, composed from the document's own header labels. */
-function compactItemHeader(block: ItemTableBlock, nameLen: number, amtLen: number, language: string, capabilities?: ThermalPrinterCapabilities): string {
+function compactItemHeader(block: ItemTableBlock, nameLen: number, rateLen: number, amtLen: number, language: string, capabilities?: ThermalPrinterCapabilities): string {
   const qtyW = 4;
   const itemLabel = normalizeThermalText(labelOf(block.header.item), capabilities);
+  const rateLabel = normalizeThermalText(labelOf(block.header.rate), capabilities);
   const qtyLabel = normalizeThermalText(labelOf(block.header.quantity), capabilities);
   const amountLabel = normalizeThermalText(labelOf(block.header.amount), capabilities);
   const fit = (value: string, length: number): string => capabilities?.raster.enabled === true && !isThermalTextRepresentable(value, capabilities)
     ? value
     : truncateToDisplayCells(value, length);
   const item = padToDisplayCells(fit(itemLabel, nameLen), nameLen);
+  const rate = padToDisplayCells(fit(rateLabel, rateLen), rateLen);
   const qty = padToDisplayCells(fit(qtyLabel, qtyW), qtyW);
   const amount = fit(amountLabel, Math.max(1, amtLen - 1));
-  return item + qty + ' '.repeat(Math.max(0, amtLen - displayCellWidth(amount))) + amount;
+  return item + rate + qty + ' '.repeat(Math.max(0, amtLen - displayCellWidth(amount))) + amount;
+}
+
+/**
+ * Header-zone lines carrying two facts in fixed slots (v3 bill layout):
+ * the first fact starts the line, the second ends it; an empty slot stays
+ * empty so a hidden field never shifts its neighbours. A pair too wide for
+ * the paper stacks onto two lines rather than truncating a permanent
+ * field like the bill number.
+ */
+function pairedFactLines(
+  left: string | null,
+  right: string | null,
+  cols: number,
+  capabilities?: ThermalPrinterCapabilities,
+): { lines: string[]; sources: string[] } | null {
+  const fit = (value: string, length: number): string =>
+    capabilities?.raster.enabled === true && !isThermalTextRepresentable(value, capabilities)
+      ? value
+      : truncateToDisplayCells(value, Math.max(1, length));
+  if (left && right) {
+    const rightText = fit(right, cols);
+    const leftText = fit(left, cols);
+    const source = left + '  ' + right;
+    if (displayCellWidth(leftText) + 1 + displayCellWidth(rightText) <= cols) {
+      return {
+        lines: [
+          leftText +
+            ' '.repeat(
+              Math.max(1, cols - displayCellWidth(leftText) - displayCellWidth(rightText)),
+            ) +
+            rightText,
+        ],
+        sources: [source],
+      };
+    }
+    return {
+      lines: [
+        leftText,
+        ' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText,
+      ],
+      sources: [left, right],
+    };
+  }
+  if (left) return { lines: [fit(left, cols)], sources: [left] };
+  if (right) {
+    const rightText = fit(right, cols);
+    return {
+      lines: [' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText],
+      sources: [right],
+    };
+  }
+  return null;
 }
 
 /** Map a PrintDocument onto compact token-line layout. */
@@ -186,25 +242,95 @@ export function renderBillDocumentToCompactLines(
   }
   markGroup('message', messageStart, messageSourceLines, messageSourceControlLines);
 
-  // Business header (store name only — compact keeps contact facts in the footer).
+  // Business header: store name, then the header-zone facts in fixed-slot
+  // pairs (v3 bill layout) — (address | phone), (licence | tax id),
+  // (classification | instagram).
   const headerStart = lines.length;
-  if (header?.name) lines.push('{STORE_NAME}{CENTER}{BOLD}' + truncateShapedLine(header.name.text, cols, options.arabicShaping, options.language, options.capabilities) + '{/BOLD}{/CENTER}');
-  markGroup('business-header', headerStart, header?.name ? [header.name.text] : [], header?.name ? [lines[headerStart] ?? ''] : []);
+  const headerSourceLines: string[] = [];
+  const headerSourceControlLines: string[] = [];
+  if (header?.name) {
+    lines.push('{STORE_NAME}{CENTER}{BOLD}' + truncateShapedLine(header.name.text, cols, options.arabicShaping, options.language, options.capabilities) + '{/BOLD}{/CENTER}');
+    headerSourceLines.push(header.name.text);
+    headerSourceControlLines.push(lines.at(-1) ?? '');
+  }
+  if (header) {
+    const factPairs: Array<[string | null, string | null]> = [
+      [
+        header.address ? header.address.text : null,
+        header.phone && header.phoneLabel
+          ? normalize(labelOf(header.phoneLabel) + ': ' + header.phone.text)
+          : null,
+      ],
+      [
+        header.licence
+          ? normalize(labelOf(header.licence.label) + ': ' + header.licence.value.text)
+          : null,
+        header.taxId
+          ? normalize(labelOf(header.taxId.label) + ': ' + header.taxId.value.text)
+          : null,
+      ],
+      [
+        header.classification
+          ? normalize(labelOf(header.classification.label) + ': ' + header.classification.value.text)
+          : null,
+        header.instagramHandle ? header.instagramHandle.text : null,
+      ],
+    ];
+    for (const [left, right] of factPairs) {
+      const produced = pairedFactLines(left, right, cols, options.capabilities);
+      if (produced !== null) {
+        lines.push(...produced.lines);
+        headerSourceLines.push(...produced.sources);
+        headerSourceControlLines.push(...produced.lines);
+      }
+    }
+  }
+  markGroup('business-header', headerStart, headerSourceLines, headerSourceControlLines);
   lines.push(bar);
 
-  // Document meta.
+  // Document meta: fixed-slot pairs (v3 bill layout) — (bill no | date),
+  // (time | table), (guests | open time), (close time | cashier), then the
+  // served-by line. Date/time show the closing stamp when one exists.
   const metaStart = lines.length;
   const metaSourceLines: string[] = [];
   if (meta) {
-    lines.push(normalize(labelOf(meta.billNumberLabel) + ': ' + meta.invoiceNumber.text));
-    metaSourceLines.push(labelOf(meta.billNumberLabel) + ': ' + meta.invoiceNumber.text);
-    const date = parseDbTimestamp(meta.timestamp.text);
-    const dateText = formatBusinessDate(date, tzOptions?.timeZone) + ' ' + date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
-    lines.push(normalize(labelOf(meta.dateLabel) + ': ' + dateText));
-    metaSourceLines.push(labelOf(meta.dateLabel) + ': ' + dateText);
-    if (meta.table) {
-      lines.push(truncateShapedLine(meta.table.label.primary.replace('{name}', meta.table.name.text), cols, options.arabicShaping, options.language, options.capabilities));
-      metaSourceLines.push(meta.table.label.primary.replace('{name}', meta.table.name.text));
+    const stampText = meta.closedAt?.timestamp.text ?? meta.timestamp.text;
+    const stamp = parseDbTimestamp(stampText);
+    const stampDate = formatBusinessDate(stamp, tzOptions?.timeZone);
+    const stampTime = stamp.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
+    const timeOf = (raw: string): string =>
+      parseDbTimestamp(raw).toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
+    const metaPairs: Array<[string | null, string | null]> = [
+      [
+        normalize(labelOf(meta.billNumberLabel) + ': ' + meta.invoiceNumber.text),
+        normalize(labelOf(meta.dateLabel) + ': ' + stampDate),
+      ],
+      [
+        normalize(printLabel(options.language, 'print.time') + ': ' + stampTime),
+        meta.table
+          ? truncateShapedLine(meta.table.label.primary.replace('{name}', meta.table.name.text), cols, options.arabicShaping, options.language, options.capabilities)
+          : null,
+      ],
+      [
+        meta.guests ? normalize(labelOf(meta.guests.label) + ': ' + String(meta.guests.count)) : null,
+        meta.openedAt ? normalize(labelOf(meta.openedAt.label) + ': ' + timeOf(meta.openedAt.timestamp.text)) : null,
+      ],
+      [
+        meta.closedAt ? normalize(labelOf(meta.closedAt.label) + ': ' + timeOf(meta.closedAt.timestamp.text)) : null,
+        meta.cashier ? normalize(labelOf(meta.cashier.label) + ': ' + meta.cashier.name.text) : null,
+      ],
+    ];
+    for (const [left, right] of metaPairs) {
+      const produced = pairedFactLines(left, right, cols, options.capabilities);
+      if (produced !== null) {
+        lines.push(...produced.lines);
+        metaSourceLines.push(...produced.sources);
+      }
+    }
+    if (meta.servedBy) {
+      const servedLine = normalize(labelOf(meta.servedBy.label) + ': ' + meta.servedBy.name.text);
+      lines.push(servedLine);
+      metaSourceLines.push(servedLine);
     }
   }
   markGroup('document-meta', metaStart, metaSourceLines);
@@ -248,8 +374,16 @@ export function renderBillDocumentToCompactLines(
       cols,
       fractionDigits,
     );
-    const nameLen = itemNameWidth(cols, amtLen);
-    lines.push(compactItemHeader(items, nameLen, amtLen, options.language, options.capabilities));
+    const rateLen = itemRateWidth(
+      { items: items.rows.map((row) => ({ total: row.amount, unit_price: row.unitPrice, addons: row.addons.map((addon) => ({ price: addon.price })) })) },
+      prefix,
+      options.locale,
+      trimDecimals,
+      cols,
+      fractionDigits,
+    );
+    const nameLen = itemNameWidth(cols, amtLen, rateLen);
+    lines.push(compactItemHeader(items, nameLen, rateLen, amtLen, options.language, options.capabilities));
     lines.push(dash);
 
     for (const [rowIndex, row] of items.rows.entries()) {
@@ -265,16 +399,19 @@ export function renderBillDocumentToCompactLines(
         options.language,
         fractionDigits,
         options.capabilities,
+        { unitPrice: row.unitPrice ?? 0, rateLen },
       );
       lines.push(...rowLines);
       recordFinancialLines(rowStart, rowLines);
       const amount = formatCurrency(row.amount, prefix, options.locale, trimDecimals, fractionDigits);
       const sourceLines = [`${row.name.text} ${row.quantity} ${amount}`];
       const sourceControlLines = [rowLines[0] ?? ''];
+      const rateText = formatCurrency(row.unitPrice ?? 0, prefix, options.locale, trimDecimals, fractionDigits);
       const sourceLayouts: Array<RasterTextLayout | undefined> = [{
         kind: 'financial-item',
         columns: [
           { text: row.name.text, align: 'left', widthRatio: nameLen / cols },
+          { text: rateText.trimStart(), align: 'left', widthRatio: rateLen / cols },
           { text: String(row.quantity), align: 'left', widthRatio: 4 / cols },
           { text: amount.trimStart(), align: 'right', widthRatio: amtLen / cols },
         ],
@@ -339,10 +476,6 @@ export function renderBillDocumentToCompactLines(
   if (totals) {
     const subtotalValue = formatCurrency(totals.subtotal.amount, prefix, options.locale, trimDecimals, fractionDigits);
     pushTotalRow(financialRows(labelOf(totals.subtotal.label), subtotalValue, cols, options.language, options.capabilities), false, labelOf(totals.subtotal.label), subtotalValue);
-    if (totals.discount) {
-      const discountValue = '-' + formatCurrency(totals.discount.amount, prefix, options.locale, trimDecimals, fractionDigits);
-      pushTotalRow(financialRows(labelOf(totals.discount.label), discountValue, cols, options.language, options.capabilities), false, labelOf(totals.discount.label), discountValue);
-    }
     if (breakdown && breakdown.lines.length > 0) {
       for (const line of breakdown.lines) {
         const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
@@ -374,12 +507,24 @@ export function renderBillDocumentToCompactLines(
       const value = formatCurrency(charge.amount, prefix, options.locale, trimDecimals, fractionDigits);
       pushTotalRow(financialRows(charge.name, value, cols, options.language, options.capabilities), false, charge.name, value);
     }
+    // The discount is deducted after the fees (owner decision, 2026-11-06),
+    // with the post-fee total shown before it.
+    if (totals.postFeeTotal) {
+      const postFeeValue = formatCurrency(totals.postFeeTotal.amount, prefix, options.locale, trimDecimals, fractionDigits);
+      pushTotalRow(financialRows(labelOf(totals.postFeeTotal.label), postFeeValue, cols, options.language, options.capabilities), false, labelOf(totals.postFeeTotal.label), postFeeValue);
+    }
+    if (totals.discount) {
+      const discountValue = '-' + formatCurrency(totals.discount.amount, prefix, options.locale, trimDecimals, fractionDigits);
+      pushTotalRow(financialRows(labelOf(totals.discount.label), discountValue, cols, options.language, options.capabilities), false, labelOf(totals.discount.label), discountValue);
+    }
     const grandTotalValue = formatCurrency(totals.grandTotal.amount, prefix, options.locale, trimDecimals, fractionDigits);
     pushTotalRow(financialRows(labelOf(totals.grandTotal.label), grandTotalValue, cols, options.language, options.capabilities), true, labelOf(totals.grandTotal.label), grandTotalValue);
   }
   markGroup('totals', totalsStart, totalsSourceLines, totalsSourceControlLines, true, totalsSourceLayouts);
 
-  // Payments.
+  // Payments. The native compact entry strips this block (v3 bill layout:
+  // no payment lines on the customer bill); it renders when a document
+  // still carries it, e.g. a merchant-authored template.
   const paymentsStart = lines.length;
   const paymentSourceLines: string[] = [];
   const paymentSourceControlLines: string[] = [];
@@ -413,31 +558,8 @@ export function renderBillDocumentToCompactLines(
   }
   markGroup('payments', paymentsStart, paymentSourceLines, paymentSourceControlLines, true, paymentSourceLayouts);
 
-  // Footer contact details.
+  // Footer: bar, then the message footer (facts live in the header now).
   lines.push(bar);
-  const businessFooterStart = lines.length;
-  const businessFooterSourceLines: string[] = [];
-  const businessFooterSourceControlLines: string[] = [];
-  if (header?.address) {
-    const start = lines.length;
-    pushWrapped(lines, header.address.text, cols, options.language, options.capabilities);
-    businessFooterSourceLines.push(header.address.text);
-    businessFooterSourceControlLines.push(lines[start] ?? '');
-  }
-  if (header?.phone && header.phoneLabel) {
-    const start = lines.length;
-    pushWrapped(lines, labelOf(header.phoneLabel) + ': ' + header.phone.text, cols, options.language, options.capabilities);
-    businessFooterSourceLines.push(labelOf(header.phoneLabel) + ': ' + header.phone.text);
-    businessFooterSourceControlLines.push(lines[start] ?? '');
-  }
-  if (header?.taxId) {
-    const start = lines.length;
-    pushWrapped(lines, labelOf(header.taxId.label) + ': ' + header.taxId.value.text, cols, options.language, options.capabilities);
-    businessFooterSourceLines.push(labelOf(header.taxId.label) + ': ' + header.taxId.value.text);
-    businessFooterSourceControlLines.push(lines[start] ?? '');
-  }
-  markGroup('business-header', businessFooterStart, businessFooterSourceLines, businessFooterSourceControlLines);
-
   const messageFooterStart = lines.length;
   const messageFooterSourceLines: string[] = [];
   const messageFooterSourceControlLines: string[] = [];
@@ -497,10 +619,16 @@ export function renderCompactReceiptViaDocument(
     business: semanticBusiness,
   });
   const document = buildBillDocument(printData, printContext);
+  // v3 bill layout: the built-in customer bill never shows the payment
+  // block. The document model keeps it for merchant-authored templates.
+  const nativeDocument: PrintDocument = {
+    ...document,
+    blocks: document.blocks.filter((block) => block.kind !== 'payments'),
+  };
   const warnings: PrintWarning[] = [];
   const rasterGroups: RasterSemanticLineGroup[] = [];
   const financialLineRanges: Array<{ lineIndex: number; lineCount: number }> = [];
-  const lines = renderBillDocumentToCompactLines(document, {
+  const lines = renderBillDocumentToCompactLines(nativeDocument, {
     columns: opts.columns,
     language: printContext.languages[0],
     locale: printContext.locale,

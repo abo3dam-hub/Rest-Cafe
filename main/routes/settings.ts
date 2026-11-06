@@ -210,6 +210,8 @@ function businessShape(s: Record<string, string>) {
     country: s.country || '',
     language: s.language || 'ar',
     tax_registration_number: s.tax_registration_number || '',
+    business_licence: s.business_licence || '',
+    business_classification: s.business_classification || '',
     state_code: s.state_code || '',
     business_address: s.business_address || '',
     business_phone: s.business_phone || '',
@@ -220,7 +222,13 @@ function businessShape(s: Record<string, string>) {
     bill_show_name: s.bill_show_name !== 'false',
     bill_show_address: s.bill_show_address !== 'false',
     bill_show_phone: s.bill_show_phone !== 'false',
-    bill_show_tax_id: s.bill_show_tax_id === 'true',
+    bill_show_tax_id: s.bill_show_tax_id !== 'false',
+    bill_show_licence: s.bill_show_licence !== 'false',
+    bill_show_classification: s.bill_show_classification !== 'false',
+    bill_show_waiter: s.bill_show_waiter !== 'false',
+    bill_show_cashier: s.bill_show_cashier === 'true',
+    bill_show_guest_count: s.bill_show_guest_count === 'true',
+    bill_show_open_close_times: s.bill_show_open_close_times === 'true',
     bill_show_tax_breakdown: s.bill_show_tax_breakdown !== 'false',
     bill_show_customer_name: s.bill_show_customer_name !== 'false',
     bill_show_customer_phone: s.bill_show_customer_phone !== 'false',
@@ -300,6 +308,8 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       country,
       language,
       tax_registration_number,
+      business_licence,
+      business_classification,
       state_code,
       business_address,
       business_phone,
@@ -311,6 +321,12 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       bill_show_address,
       bill_show_phone,
       bill_show_tax_id,
+      bill_show_licence,
+      bill_show_classification,
+      bill_show_waiter,
+      bill_show_cashier,
+      bill_show_guest_count,
+      bill_show_open_close_times,
       bill_show_tax_breakdown,
       bill_show_customer_name,
       bill_show_customer_phone,
@@ -453,6 +469,14 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       language,
       currency_symbol: normalizedCurrencySymbol,
       tax_registration_number,
+      business_licence:
+        business_licence !== undefined
+          ? String(business_licence || '').trim().slice(0, 100)
+          : undefined,
+      business_classification:
+        business_classification !== undefined
+          ? String(business_classification || '').trim().slice(0, 100)
+          : undefined,
       state_code,
       business_address,
       business_phone: normalizedPhone !== undefined ? normalizedPhone : undefined,
@@ -464,6 +488,12 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       bill_show_address,
       bill_show_phone,
       bill_show_tax_id,
+      bill_show_licence,
+      bill_show_classification,
+      bill_show_waiter,
+      bill_show_cashier,
+      bill_show_guest_count,
+      bill_show_open_close_times,
       bill_show_tax_breakdown,
       bill_show_customer_name,
       bill_show_customer_phone,
@@ -1088,6 +1118,14 @@ const ALLOWED_WILDCARD_KEYS = new Set([
   'bill_show_address',
   'bill_show_phone',
   'bill_show_tax_id',
+  'business_licence',
+  'business_classification',
+  'bill_show_licence',
+  'bill_show_classification',
+  'bill_show_waiter',
+  'bill_show_cashier',
+  'bill_show_guest_count',
+  'bill_show_open_close_times',
   'bill_show_tax_breakdown',
   'bill_show_customer_name',
   'bill_show_customer_phone',
@@ -1214,7 +1252,15 @@ const PRINTING_BOOLEAN_KEYS = [
   'bill_delivery_show_customer_phone_always',
 ] as const;
 
-const OPTIONAL_PRINTING_BOOLEAN_KEYS = ['bill_show_logo'] as const;
+const OPTIONAL_PRINTING_BOOLEAN_KEYS = [
+  'bill_show_logo',
+  'bill_show_licence',
+  'bill_show_classification',
+  'bill_show_waiter',
+  'bill_show_cashier',
+  'bill_show_guest_count',
+  'bill_show_open_close_times',
+] as const;
 
 const PRINTING_BATCH_KEYS = new Set<string>([
   ...PRINTING_BOOLEAN_KEYS,

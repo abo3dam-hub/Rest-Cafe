@@ -10,6 +10,12 @@
  * is a second selectable profile at 5%. Settings mirror production:
  * country '' (no country profiles), currency SYP.
  *
+ * Owner-confirmed Syrian practice (2026-11-06): the fee is computed on the
+ * WHOLE bill with fractions rounded up; the local-administration fee is a
+ * percent OF the consumption fee (default 5%, editable), also rounded up;
+ * and a discount is deducted only after the fees, with a percentage
+ * discount taken from the post-fee total.
+ *
  * Usage: node tests/run-electron-node-test.cjs tests/syria-tax-profile.test.ts
  */
 const Module = require('module');
@@ -115,6 +121,12 @@ async function main() {
       body: { profile: 'consumption', classification: 'rated_2_3', rate: 150 },
     });
     assertEqualOrThrow(badRate.status, 400, 'rate above 100 is rejected');
+    const badAdminRate = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3', local_admin_rate: 150 },
+    });
+    assertEqualOrThrow(badAdminRate.status, 400, 'local admin rate above 100 is rejected');
 
     console.log('\n3. Owner activates the consumption fee — classified 2–3 stars (5%)');
     const activate = await api(baseUrl, '/api/tax-packs/syria-profile', {
@@ -125,6 +137,8 @@ async function main() {
     assertEqualOrThrow(activate.status, 200, 'activation succeeds');
     assertEqualOrThrow(activate.data.pack_id, 'syria-consumption', 'consumption pack installed');
     assertEqualOrThrow(activate.data.rate, 5, 'legal default rate for 2–3 stars is 5%');
+    assertEqualOrThrow(activate.data.local_admin_rate, 5, 'local admin defaults to 5% of the fee');
+    assertEqualOrThrow(getSetting(db, 'syria_local_admin_rate'), '5', 'local admin rate recorded');
     assertEqualOrThrow(getSetting(db, 'taxes_enabled'), 'true', 'taxes are enabled');
     assertEqualOrThrow(getSetting(db, 'tax_profile'), 'syria_consumption', 'profile recorded');
     assertEqualOrThrow(getSetting(db, 'syria_tax_classification'), 'rated_2_3', 'class recorded');
@@ -162,8 +176,12 @@ async function main() {
     ]);
     assertEqualOrThrow(order.status, 201, 'order created under the fee');
     assertEqualOrThrow(order.data.order.subtotal, 17000, 'subtotal is 17,000');
-    assertEqualOrThrow(order.data.order.tax_amount, 850, 'fee is 5% of the whole bill (850)');
-    assertEqualOrThrow(order.data.order.total, 17850, 'fee is added on top of the bill');
+    assertEqualOrThrow(
+      order.data.order.tax_amount,
+      893,
+      'tax is the fee (850) plus local admin at 5% of the fee, rounded up (43)',
+    );
+    assertEqualOrThrow(order.data.order.total, 17893, 'fees are added on top of the bill');
     const rawBreakdown = order.data.order.tax_breakdown;
     const breakdown = (typeof rawBreakdown === 'string'
       ? JSON.parse(rawBreakdown || '[]')
@@ -171,7 +189,11 @@ async function main() {
     const feeLines = breakdown.filter((line) => line.title === 'رسم الإنفاق الاستهلاكي');
     assertEqualOrThrow(feeLines.length, 1, 'one aggregated fee line on the breakdown');
     assertEqualOrThrow(feeLines[0].rate, 5, 'fee line carries the 5% rate');
-    assertEqualOrThrow(feeLines[0].amount, 850, 'fee line amount matches the order tax');
+    assertEqualOrThrow(feeLines[0].amount, 850, 'fee line amount is 5% of the whole bill');
+    const adminLines = breakdown.filter((line) => line.title === 'رسم الإدارة المحلية');
+    assertEqualOrThrow(adminLines.length, 1, 'one local admin line on the breakdown');
+    assertEqualOrThrow(adminLines[0].rate, 5, 'admin line carries the 5% rate');
+    assertEqualOrThrow(adminLines[0].amount, 43, 'admin is 5% of the fee, rounded up (42.5 → 43)');
 
     console.log('\n6. The generated bill carries the same fee');
     const bill = await api(baseUrl, '/api/bills/generate', {
@@ -180,10 +202,10 @@ async function main() {
       body: { order_id: order.data.order.id },
     });
     assertEqualOrThrow(bill.status, 201, 'bill generated');
-    assertEqualOrThrow(bill.data.bill.tax_amount, 850, 'bill tax equals the fee');
-    assertEqualOrThrow(bill.data.bill.total, 17850, 'bill total includes the fee');
+    assertEqualOrThrow(bill.data.bill.tax_amount, 893, 'bill tax equals fee + local admin');
+    assertEqualOrThrow(bill.data.bill.total, 17893, 'bill total includes both fees');
 
-    console.log('\n7. A discount scales the fee to the discounted bill');
+    console.log('\n7. A discount is deducted after the fees and never shrinks them');
     const discounted = await api(baseUrl, `/api/orders/${order.data.order.id}/discount`, {
       method: 'PATCH',
       headers: owner.authHeader,
@@ -192,11 +214,88 @@ async function main() {
     assertEqualOrThrow(discounted.status, 200, 'discount applied');
     assertEqualOrThrow(
       discounted.data.order.tax_amount,
-      765,
-      'fee follows the discounted bill (5% of 15,300)',
+      893,
+      'fees stay on the whole pre-discount bill',
+    );
+    assertEqualOrThrow(
+      discounted.data.order.discount_amount,
+      1789,
+      'percentage discount is taken from the post-fee total (10% of 17,893)',
+    );
+    assertEqualOrThrow(
+      discounted.data.order.total,
+      16104,
+      'total is the post-fee total minus the discount',
     );
 
-    console.log('\n8. Reclassification: popular/unrated is exempt (0%)');
+    console.log('\n8. Whole-bill ceiling across many small lines (approved mockup numbers)');
+    seedProduct(db, 'syria-p4', 'syria-menu', 'Coffee', 950, { tax_category_id: null });
+    seedProduct(db, 'syria-p5', 'syria-menu', 'Grill', 1200, { tax_category_id: null });
+    seedProduct(db, 'syria-p6', 'syria-menu', 'Salad', 250, { tax_category_id: null });
+    seedProduct(db, 'syria-p7', 'syria-menu', 'Water', 100, { tax_category_id: null });
+    seedProduct(db, 'syria-p8', 'syria-menu', 'Bread', 50, { tax_category_id: null });
+    seedProduct(db, 'syria-p9', 'syria-menu', 'Tissues', 25, { tax_category_id: null });
+    const manyLines = await createOrder([
+      { product_id: 'syria-p4', quantity: 1 },
+      { product_id: 'syria-p5', quantity: 1 },
+      { product_id: 'syria-p6', quantity: 1 },
+      { product_id: 'syria-p7', quantity: 2 },
+      { product_id: 'syria-p8', quantity: 1 },
+      { product_id: 'syria-p9', quantity: 1 },
+    ]);
+    assertEqualOrThrow(manyLines.status, 201, 'multi-line order created');
+    assertEqualOrThrow(manyLines.data.order.subtotal, 2675, 'subtotal is 2,675');
+    const manyBreakdown = (typeof manyLines.data.order.tax_breakdown === 'string'
+      ? JSON.parse(manyLines.data.order.tax_breakdown || '[]')
+      : manyLines.data.order.tax_breakdown || []) as any[];
+    const manyFee = manyBreakdown.find((line) => line.title === 'رسم الإنفاق الاستهلاكي');
+    // Per-line rounding would give 135; the levy is on the whole bill:
+    // 2,675 × 5% = 133.75, rounded UP to 134.
+    assertEqualOrThrow(manyFee?.amount, 134, 'fee is rounded up on the whole bill, not per line');
+    const manyAdmin = manyBreakdown.find((line) => line.title === 'رسم الإدارة المحلية');
+    assertEqualOrThrow(manyAdmin?.amount, 7, 'admin is 5% of 134, rounded up (6.7 → 7)');
+    assertEqualOrThrow(manyLines.data.order.tax_amount, 141, 'tax is fee + admin');
+    assertEqualOrThrow(manyLines.data.order.total, 2816, 'total matches the approved mockup');
+
+    console.log('\n9. Percentage discount on the post-fee total (owner example)');
+    const exampleOrder = await createOrder([{ product_id: 'syria-p1', quantity: 1 }]);
+    assertEqualOrThrow(exampleOrder.data.order.tax_amount, 525, 'fee 500 + admin 25');
+    assertEqualOrThrow(exampleOrder.data.order.total, 10525, 'post-fee total is 10,525');
+    const exampleDiscount = await api(
+      baseUrl,
+      `/api/orders/${exampleOrder.data.order.id}/discount`,
+      {
+        method: 'PATCH',
+        headers: owner.authHeader,
+        body: { discount_type: 'percentage', discount_value: 10 },
+      },
+    );
+    assertEqualOrThrow(exampleDiscount.status, 200, 'discount applied');
+    assertEqualOrThrow(
+      exampleDiscount.data.order.discount_amount,
+      1053,
+      '10% is taken from 10,525, not from 10,000',
+    );
+    assertEqualOrThrow(exampleDiscount.data.order.tax_amount, 525, 'fees unchanged by discount');
+    assertEqualOrThrow(exampleDiscount.data.order.total, 9472, 'total is 10,525 − 1,053');
+
+    console.log('\n10. An amount discount is also deducted after the fees');
+    setSetting(db, 'discount_mode', 'both');
+    const amountOrder = await createOrder([{ product_id: 'syria-p1', quantity: 1 }]);
+    const amountDiscount = await api(
+      baseUrl,
+      `/api/orders/${amountOrder.data.order.id}/discount`,
+      {
+        method: 'PATCH',
+        headers: owner.authHeader,
+        body: { discount_type: 'amount', discount_value: 2000 },
+      },
+    );
+    assertEqualOrThrow(amountDiscount.status, 200, 'amount discount applied');
+    assertEqualOrThrow(amountDiscount.data.order.tax_amount, 525, 'fees unchanged');
+    assertEqualOrThrow(amountDiscount.data.order.total, 8525, 'total is 10,525 − 2,000');
+
+    console.log('\n11. Reclassification: popular/unrated is exempt (0%)');
     const exempt = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: owner.authHeader,
@@ -208,7 +307,7 @@ async function main() {
     assertEqualOrThrow(exemptOrder.data.order.tax_amount, 0, 'no fee for an unrated establishment');
     assertEqualOrThrow(exemptOrder.data.order.total, 10000, 'total is unchanged when exempt');
 
-    console.log('\n9. Editable rate: owner overrides the legal default');
+    console.log('\n12. Editable rate: owner overrides the legal default');
     const custom = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: owner.authHeader,
@@ -219,10 +318,58 @@ async function main() {
       { product_id: 'syria-p1', quantity: 1 },
       { product_id: 'syria-p2', quantity: 1 },
     ]);
-    assertEqualOrThrow(customOrder.data.order.tax_amount, 1050, 'fee uses the edited 7% rate');
+    assertEqualOrThrow(
+      customOrder.data.order.tax_amount,
+      1103,
+      'fee uses the edited 7% rate (1,050) plus admin rounded up (52.5 → 53)',
+    );
     assertEqualOrThrow(getSetting(db, 'syria_tax_rate'), '7', 'edited rate recorded');
 
-    console.log('\n10. Sales tax is a selectable profile at its announced 5%');
+    console.log('\n13. Local admin rate is editable, and 0 turns it off');
+    const adminCustom = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3', rate: 7, local_admin_rate: 10 },
+    });
+    assertEqualOrThrow(adminCustom.status, 200, 'admin rate override accepted');
+    assertEqualOrThrow(adminCustom.data.local_admin_rate, 10, 'response carries the admin rate');
+    assertEqualOrThrow(getSetting(db, 'syria_local_admin_rate'), '10', 'admin rate recorded');
+    const adminOrder = await createOrder([
+      { product_id: 'syria-p1', quantity: 1 },
+      { product_id: 'syria-p2', quantity: 1 },
+    ]);
+    assertEqualOrThrow(
+      adminOrder.data.order.tax_amount,
+      1155,
+      'admin at 10% of the 1,050 fee adds 105',
+    );
+    const adminOff = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3', rate: 7, local_admin_rate: 0 },
+    });
+    assertEqualOrThrow(adminOff.status, 200, 'admin rate 0 accepted');
+    const adminOffOrder = await createOrder([
+      { product_id: 'syria-p1', quantity: 1 },
+      { product_id: 'syria-p2', quantity: 1 },
+    ]);
+    assertEqualOrThrow(adminOffOrder.data.order.tax_amount, 1050, 'no admin line at rate 0');
+    const adminOffBreakdown = (typeof adminOffOrder.data.order.tax_breakdown === 'string'
+      ? JSON.parse(adminOffOrder.data.order.tax_breakdown || '[]')
+      : adminOffOrder.data.order.tax_breakdown || []) as any[];
+    assertEqualOrThrow(
+      adminOffBreakdown.some((line) => line.title === 'رسم الإدارة المحلية'),
+      false,
+      'breakdown has no admin line at rate 0',
+    );
+    // Restore the default for the remaining sections.
+    await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3', rate: 7, local_admin_rate: 5 },
+    });
+
+    console.log('\n14. Sales tax is a selectable profile at its announced 5%');
     const sales = await api(baseUrl, '/api/tax-packs/syria-profile', {
       method: 'POST',
       headers: owner.authHeader,
@@ -246,7 +393,7 @@ async function main() {
       'breakdown carries the sales tax line',
     );
 
-    console.log('\n11. Turning taxes off is a safe off-ramp');
+    console.log('\n15. Turning taxes off is a safe off-ramp');
     const off = await api(baseUrl, '/api/settings/taxes_enabled', {
       method: 'PUT',
       headers: owner.authHeader,

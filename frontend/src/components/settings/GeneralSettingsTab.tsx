@@ -64,6 +64,8 @@ export interface BusinessForm {
   tablesRequired: boolean;
   taxRegistered: boolean;
   taxRegistrationNumber: string;
+  businessLicence: string;
+  businessClassification: string;
   businessPhone: string;
   businessAddress: string;
   instagramHandle: string;
@@ -393,6 +395,45 @@ export function GeneralSettingsTab({
           ) : (
             <div className="hidden md:block" />
           )}
+          <div>
+            <label className="block text-sm text-muted-foreground mb-1">{t('licenceLabel')}</label>
+            {isAdmin ? (
+              <input
+                type="text"
+                value={form.businessLicence}
+                onChange={(e) => {
+                  markHydrationTouched('businessLicence');
+                  setForm((p) => ({ ...p, businessLicence: e.target.value }));
+                }}
+                placeholder={t('licencePlaceholder')}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg outline-none focus:ring-2 focus:ring-brand"
+                dir="ltr"
+              />
+            ) : (
+              <p className="font-medium text-foreground">
+                <Ltr>{form.businessLicence || '-'}</Ltr>
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm text-muted-foreground mb-1">
+              {t('classificationLabel')}
+            </label>
+            {isAdmin ? (
+              <input
+                type="text"
+                value={form.businessClassification}
+                onChange={(e) => {
+                  markHydrationTouched('businessClassification');
+                  setForm((p) => ({ ...p, businessClassification: e.target.value }));
+                }}
+                placeholder={t('classificationPlaceholder')}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg outline-none focus:ring-2 focus:ring-brand"
+              />
+            ) : (
+              <p className="font-medium text-foreground">{form.businessClassification || '-'}</p>
+            )}
+          </div>
           <div>
             <label className="block text-sm text-muted-foreground mb-1">{t('phone')}</label>
             {isAdmin ? (

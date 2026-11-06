@@ -36,6 +36,7 @@ import {
   formatCurrency,
   formatVariantItemHeading,
   itemAmountWidth,
+  itemRateWidth,
   itemRows,
   itemNameWidth,
   normalizeThermalText,
@@ -131,6 +132,8 @@ export function buildBillPrintData(
     order: {
       orderNumber: String(order?.order_number ?? ''),
       createdAt: String(order?.created_at ?? ''),
+      guestCount: typeof order?.guest_count === 'number' ? order.guest_count : null,
+      closedAt: String(order?.bill_requested_at ?? ''),
       tableName: String(order?.table?.name ?? ''),
       onlinePlatform: String(order?.online_platform ?? ''),
       externalOrderId: String(order?.external_order_id ?? ''),
@@ -205,6 +208,16 @@ export function buildBillPrintData(
       showCustomerName: business?.show_customer_name !== false,
       showCustomerPhone: business?.show_customer_phone !== false,
       showLogo: business?.show_logo === true,
+      licence: String(business?.licence ?? ''),
+      classification: String(business?.classification ?? ''),
+      waiterName: String(business?.waiter_name ?? ''),
+      cashierName: String(business?.cashier_name ?? ''),
+      showLicence: business?.show_licence !== false,
+      showClassification: business?.show_classification !== false,
+      showWaiter: business?.show_waiter !== false,
+      showCashier: business?.show_cashier === true,
+      showGuestCount: business?.show_guest_count === true,
+      showOpenCloseTimes: business?.show_open_close_times === true,
       receiptLogo: typeof business?.receipt_logo === 'string' ? business.receipt_logo : '',
       receiptLogoRaster:
         typeof business?.receipt_logo_raster === 'string' ? business.receipt_logo_raster : '',
@@ -308,12 +321,14 @@ function classicBannerLines(label: SemanticLabel, context: ThermalLayoutContext)
 function classicItemHeader(
   block: ItemTableBlock,
   nameLen: number,
+  rateLen: number,
   amtLen: number,
   language: string,
   capabilities?: ThermalPrinterCapabilities,
 ): string {
   const qtyW = 4;
   const itemLabel = normalizeThermalText(labelOf(block.header.item), capabilities);
+  const rateLabel = normalizeThermalText(labelOf(block.header.rate), capabilities);
   const qtyLabel = normalizeThermalText(labelOf(block.header.quantity), capabilities);
   const amountLabel = normalizeThermalText(labelOf(block.header.amount), capabilities);
   const fit = (value: string, length: number): string =>
@@ -321,9 +336,62 @@ function classicItemHeader(
       ? value
       : truncateToDisplayCells(value, length);
   const item = padToDisplayCells(fit(itemLabel, nameLen), nameLen);
+  const rate = padToDisplayCells(fit(rateLabel, rateLen), rateLen);
   const qty = padToDisplayCells(fit(qtyLabel, qtyW), qtyW);
   const amount = fit(amountLabel, Math.max(1, amtLen - 1));
-  return item + qty + ' '.repeat(Math.max(0, amtLen - displayCellWidth(amount))) + amount;
+  return item + rate + qty + ' '.repeat(Math.max(0, amtLen - displayCellWidth(amount))) + amount;
+}
+
+/**
+ * Header-zone lines carrying two facts in fixed slots (v3 bill layout):
+ * the first fact starts the line, the second ends it; an empty slot stays
+ * empty so a hidden field never shifts its neighbours. A pair too wide for
+ * the paper stacks onto two lines rather than truncating a permanent
+ * field like the bill number.
+ */
+function pairedFactLines(
+  left: string | null,
+  right: string | null,
+  cols: number,
+  capabilities?: ThermalPrinterCapabilities,
+): { lines: string[]; sources: string[] } | null {
+  const fit = (value: string, length: number): string =>
+    capabilities?.raster.enabled === true && !isThermalTextRepresentable(value, capabilities)
+      ? value
+      : truncateToDisplayCells(value, Math.max(1, length));
+  if (left && right) {
+    const rightText = fit(right, cols);
+    const leftText = fit(left, cols);
+    const source = left + '  ' + right;
+    if (displayCellWidth(leftText) + 1 + displayCellWidth(rightText) <= cols) {
+      return {
+        lines: [
+          leftText +
+            ' '.repeat(
+              Math.max(1, cols - displayCellWidth(leftText) - displayCellWidth(rightText)),
+            ) +
+            rightText,
+        ],
+        sources: [source],
+      };
+    }
+    return {
+      lines: [
+        leftText,
+        ' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText,
+      ],
+      sources: [left, right],
+    };
+  }
+  if (left) return { lines: [fit(left, cols)], sources: [left] };
+  if (right) {
+    const rightText = fit(right, cols);
+    return {
+      lines: [' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText],
+      sources: [right],
+    };
+  }
+  return null;
 }
 
 /** Map a PrintDocument onto classic token-line layout. */
@@ -452,6 +520,40 @@ export function renderBillDocumentToClassicLines(
     );
   };
 
+  const renderPostFeeTotal = (block: TotalsBlock, target: BlockSegments): void => {
+    if (!block.postFeeTotal) return;
+    const label = labelOf(block.postFeeTotal.label);
+    const value = formatCurrency(
+      block.postFeeTotal.amount,
+      prefix,
+      options.locale,
+      trimDecimals,
+      fractionDigits,
+    );
+    appendFinancial(
+      target,
+      financialRows(label, value, cols, options.language, options.capabilities),
+      false,
+      label,
+      value,
+    );
+  };
+
+  const renderDiscount = (block: TotalsBlock, target: BlockSegments): void => {
+    if (!block.discount) return;
+    const label = labelOf(block.discount.label);
+    const value =
+      '-' +
+      formatCurrency(block.discount.amount, prefix, options.locale, trimDecimals, fractionDigits);
+    appendFinancial(
+      target,
+      financialRows(label, value, cols, options.language, options.capabilities),
+      false,
+      label,
+      value,
+    );
+  };
+
   const renderCharges = (block: TotalsBlock, target: BlockSegments): void => {
     // An engine breakdown is the itemised source of truth; the standard rows it
     // covers are skipped so the fee is never printed twice.
@@ -556,42 +658,41 @@ export function renderBillDocumentToClassicLines(
           segment.sourceLines.main.push(block.name.text);
           segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
         }
-        // Contact/tax facts are header-owned content; they travel with
-        // the header block's position in reordered compositions.
-        const footerLines: string[] = [];
-        const footerSourceLines: string[] = [];
-        if (block.address) {
-          footerLines.push(block.address.text);
-          footerSourceLines.push(block.address.text);
-        }
-        if (block.phone && block.phoneLabel) {
-          footerLines.push(normalize(labelOf(block.phoneLabel) + ': ' + block.phone.text));
-          footerSourceLines.push(labelOf(block.phoneLabel) + ': ' + block.phone.text);
-        }
-        if (block.taxId) {
-          footerLines.push(normalize(labelOf(block.taxId.label) + ': ' + block.taxId.value.text));
-          footerSourceLines.push(labelOf(block.taxId.label) + ': ' + block.taxId.value.text);
-        }
-        if (block.instagramHandle) {
-          footerLines.push(block.instagramHandle.text);
-          footerSourceLines.push(block.instagramHandle.text);
-        }
-        if (footerLines.length > 0) {
-          segment.post.push(dash);
-          const footerControlLines: string[] = [dash];
-          for (const footerLine of footerLines) {
-            const start = segment.post.length;
-            pushCenteredWrapped(
-              segment.post,
-              footerLine,
-              cols,
-              options.language,
-              options.capabilities,
-            );
-            footerControlLines.push(segment.post[start] ?? '');
+        // Header-zone facts (v3 bill layout): two facts per line in fixed
+        // slots, directly under the store name — (address | phone),
+        // (licence | tax id), (classification | instagram). A fact with no
+        // value leaves its slot empty.
+        const factPairs: Array<[string | null, string | null]> = [
+          [
+            block.address ? block.address.text : null,
+            block.phone && block.phoneLabel
+              ? normalize(labelOf(block.phoneLabel) + ': ' + block.phone.text)
+              : null,
+          ],
+          [
+            block.licence
+              ? normalize(labelOf(block.licence.label) + ': ' + block.licence.value.text)
+              : null,
+            block.taxId
+              ? normalize(labelOf(block.taxId.label) + ': ' + block.taxId.value.text)
+              : null,
+          ],
+          [
+            block.classification
+              ? normalize(
+                  labelOf(block.classification.label) + ': ' + block.classification.value.text,
+                )
+              : null,
+            block.instagramHandle ? block.instagramHandle.text : null,
+          ],
+        ];
+        for (const [left, right] of factPairs) {
+          const produced = pairedFactLines(left, right, cols, options.capabilities);
+          if (produced !== null) {
+            segment.main.push(...produced.lines);
+            segment.sourceLines.main.push(...produced.sources);
+            segment.sourceControlLines.main.push(...produced.lines);
           }
-          segment.sourceLines.post.push(dash, ...footerSourceLines);
-          segment.sourceControlLines.post.push(...footerControlLines);
         }
         break;
       }
@@ -670,45 +771,66 @@ export function renderBillDocumentToClassicLines(
           segment.sourceLines.main.push(labelOf(block.title));
           segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
         }
-        segment.main.push(
-          '{CENTER}' +
-            normalize(labelOf(block.invoiceNumberLabel) + ' ' + block.invoiceNumber.text) +
-            '{/CENTER}',
-        );
-        segment.sourceLines.main.push(
-          labelOf(block.invoiceNumberLabel) + ' ' + block.invoiceNumber.text,
-        );
-        segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
-        const date = parseDbTimestamp(block.timestamp.text);
-        segment.main.push(
-          '{CENTER}' +
-            formatBusinessDate(date, tzOptions?.timeZone) +
-            ' ' +
-            date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions) +
-            '{/CENTER}',
-        );
-        segment.sourceLines.main.push(
-          formatBusinessDate(date, tzOptions?.timeZone) +
-            ' ' +
-            date.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions),
-        );
-        segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
-        if (block.table) {
-          segment.main.push(
-            '{CENTER}' +
-              truncateShapedLine(
-                block.table.label.primary.replace('{name}', block.table.name.text),
-                cols,
-                options.arabicShaping,
-                options.language,
-                options.capabilities,
-              ) +
-              '{/CENTER}',
+        // Meta facts (v3 bill layout): fixed-slot pairs — (bill no | date),
+        // (time | table), (guests | open time), (close time | cashier) —
+        // then the served-by line on its own. The date/time pair shows the
+        // closing moment when a bill-request stamp exists, else creation.
+        const stampText = block.closedAt?.timestamp.text ?? block.timestamp.text;
+        const stamp = parseDbTimestamp(stampText);
+        const stampDate = formatBusinessDate(stamp, tzOptions?.timeZone);
+        const stampTime = stamp.toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
+        const timeLabel = printLabel(options.language, 'print.time');
+        const timeOf = (raw: string): string =>
+          parseDbTimestamp(raw).toLocaleTimeString(options.locale + '-u-nu-latn', tzOptions);
+        const metaPairs: Array<[string | null, string | null]> = [
+          [
+            normalize(labelOf(block.invoiceNumberLabel) + ' ' + block.invoiceNumber.text),
+            normalize(labelOf(block.dateLabel) + ': ' + stampDate),
+          ],
+          [
+            normalize(timeLabel + ': ' + stampTime),
+            block.table
+              ? truncateShapedLine(
+                  block.table.label.primary.replace('{name}', block.table.name.text),
+                  cols,
+                  options.arabicShaping,
+                  options.language,
+                  options.capabilities,
+                )
+              : null,
+          ],
+          [
+            block.guests
+              ? normalize(labelOf(block.guests.label) + ': ' + String(block.guests.count))
+              : null,
+            block.openedAt
+              ? normalize(labelOf(block.openedAt.label) + ': ' + timeOf(block.openedAt.timestamp.text))
+              : null,
+          ],
+          [
+            block.closedAt
+              ? normalize(labelOf(block.closedAt.label) + ': ' + timeOf(block.closedAt.timestamp.text))
+              : null,
+            block.cashier
+              ? normalize(labelOf(block.cashier.label) + ': ' + block.cashier.name.text)
+              : null,
+          ],
+        ];
+        for (const [left, right] of metaPairs) {
+          const produced = pairedFactLines(left, right, cols, options.capabilities);
+          if (produced !== null) {
+            segment.main.push(...produced.lines);
+            segment.sourceLines.main.push(...produced.sources);
+            segment.sourceControlLines.main.push(...produced.lines);
+          }
+        }
+        if (block.servedBy) {
+          const servedLine = normalize(
+            labelOf(block.servedBy.label) + ': ' + block.servedBy.name.text,
           );
-          segment.sourceLines.main.push(
-            block.table.label.primary.replace('{name}', block.table.name.text),
-          );
-          segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
+          segment.main.push(servedLine);
+          segment.sourceLines.main.push(servedLine);
+          segment.sourceControlLines.main.push(servedLine);
         }
         segment.main.push(dash);
         segment.sourceLines.main.push(dash);
@@ -730,13 +852,28 @@ export function renderBillDocumentToClassicLines(
           cols,
           fractionDigits,
         );
-        const nameLen = itemNameWidth(cols, amtLen);
+        const rateLen = itemRateWidth(
+          {
+            items: block.rows.map((row) => ({
+              total: row.amount,
+              unit_price: row.unitPrice,
+              addons: row.addons.map((addon) => ({ price: addon.price })),
+            })),
+          },
+          prefix,
+          options.locale,
+          trimDecimals,
+          cols,
+          fractionDigits,
+        );
+        const nameLen = itemNameWidth(cols, amtLen, rateLen);
         segment.main.push(
-          classicItemHeader(block, nameLen, amtLen, options.language, options.capabilities),
+          classicItemHeader(block, nameLen, rateLen, amtLen, options.language, options.capabilities),
         );
         segment.sourceLines.main.push(
           [
             labelOf(block.header.item),
+            labelOf(block.header.rate),
             labelOf(block.header.quantity),
             labelOf(block.header.amount),
           ].join(' '),
@@ -758,6 +895,7 @@ export function renderBillDocumentToClassicLines(
             options.language,
             fractionDigits,
             options.capabilities,
+            { unitPrice: row.unitPrice ?? 0, rateLen },
           );
           segment.financialRanges.main.push({ start, count: rowLines.length });
           segment.main.push(...rowLines);
@@ -770,11 +908,19 @@ export function renderBillDocumentToClassicLines(
           );
           const sourceLines = [`${row.name.text} ${row.quantity} ${amount}`];
           const sourceControlLines = [rowLines[0] ?? ''];
+          const rateText = formatCurrency(
+            row.unitPrice ?? 0,
+            prefix,
+            options.locale,
+            trimDecimals,
+            fractionDigits,
+          );
           const sourceLayouts: Array<RasterTextLayout | undefined> = [
             {
               kind: 'financial-item',
               columns: [
                 { text: row.name.text, align: 'left', widthRatio: nameLen / cols },
+                { text: rateText.trimStart(), align: 'left', widthRatio: rateLen / cols },
                 { text: String(row.quantity), align: 'left', widthRatio: 4 / cols },
                 { text: amount.trimStart(), align: 'right', widthRatio: amtLen / cols },
               ],
@@ -883,10 +1029,13 @@ export function renderBillDocumentToClassicLines(
             value,
           );
         }
-        // When breakdown follows totals, grand total closes the breakdown segment.
+        // When breakdown follows totals, the fee section closes the bill:
+        // charges, post-fee total, discount (after the fees), grand total.
         if (block.lines.length > 0 && totalsIndex >= 0 && breakdownIndex > totalsIndex) {
           const totalsBlock = blocks[totalsIndex] as TotalsBlock;
           renderCharges(totalsBlock, segment);
+          renderPostFeeTotal(totalsBlock, segment);
+          renderDiscount(totalsBlock, segment);
           renderGrandTotal(totalsBlock, segment);
         }
         break;
@@ -921,25 +1070,6 @@ export function renderBillDocumentToClassicLines(
             value,
           );
         }
-        if (block.discount) {
-          const label = labelOf(block.discount.label);
-          const value =
-            '-' +
-            formatCurrency(
-              block.discount.amount,
-              prefix,
-              options.locale,
-              trimDecimals,
-              fractionDigits,
-            );
-          appendFinancial(
-            segment,
-            financialRows(label, value, cols, options.language, options.capabilities),
-            false,
-            label,
-            value,
-          );
-        }
         const hasBreakdownLines = blocks.some(
           (candidate) =>
             candidate.kind === 'tax-breakdown' && (candidate as TaxBreakdownBlock).lines.length > 0,
@@ -961,12 +1091,14 @@ export function renderBillDocumentToClassicLines(
             value,
           );
         }
+        // The discount is deducted after the fees (owner decision,
+        // 2026-11-06): when a breakdown follows, the breakdown segment
+        // closes with charges → post-fee total → discount → grand total;
+        // otherwise the same order completes here.
         if (!hasBreakdownLines || breakdownIndex < totalsIndex) {
           renderCharges(block, segment);
-        }
-        if (!hasBreakdownLines) {
-          renderGrandTotal(block);
-        } else if (breakdownIndex < totalsIndex) {
+          renderPostFeeTotal(block, segment);
+          renderDiscount(block, segment);
           renderGrandTotal(block);
         }
         // Loyalty earned/balance is totals-owned content.
@@ -1267,10 +1399,17 @@ export function renderClassicReceiptViaDocument(
     business: semanticBusiness,
   });
   const document = buildBillDocument(printData, printContext);
+  // v3 bill layout: the built-in customer bill never shows the payment
+  // block. The document model keeps it for merchant-authored templates,
+  // which render through renderMerchantReceiptViaDocument instead.
+  const nativeDocument: PrintDocument = {
+    ...document,
+    blocks: document.blocks.filter((block) => block.kind !== 'payments'),
+  };
   const warnings: PrintWarning[] = [];
   const rasterGroups: RasterSemanticLineGroup[] = [];
   const financialLineRanges: Array<{ lineIndex: number; lineCount: number }> = [];
-  const lines = renderBillDocumentToClassicLines(document, {
+  const lines = renderBillDocumentToClassicLines(nativeDocument, {
     columns: opts.columns,
     language: printContext.languages[0],
     locale: printContext.locale,

@@ -22,16 +22,25 @@ import {
   calculateDocumentTaxes,
   calculateItemTax,
   combineItemAndChargeTaxes,
+  computeSyriaLocalAdmin,
   getActiveCountryPack,
   getConfiguredChargeTaxCategories,
   getCountryPackByVersion,
+  getSyriaLocalAdminRate,
   invertTaxBreakdown,
   invertTaxSnapshot,
   normalizeChargeAmount,
+  SYRIA_LOCAL_ADMIN_LABEL,
   type Customer,
+  type TenantInfo,
 } from '../services/tax';
 import { applyPayableRounding } from '../services/tax-engine';
-import { calculateOrderTotals, recomputeOrderTotals } from '../services/orders';
+import {
+  calculateOrderTotals,
+  detectSyriaProfileFromSnapshots,
+  recomputeOrderTotals,
+  resolveSyriaDiscountAmount,
+} from '../services/orders';
 import {
   buildAppliedCharges,
   ChargeValidationError,
@@ -1102,6 +1111,49 @@ function resolveOrderLevelDiscountAmount(
   return Math.min(subtotal, Number(flatDiscount.toFixed(decimals)));
 }
 
+/**
+ * Syria levy orders re-derive a stored discount from the post-fee total of
+ * the current items (fees first, discount last — owner decision,
+ * 2026-11-06). Returns null when the order is not a Syria levy order or
+ * carries no discount, so callers fall back to the legacy resolution.
+ */
+function syriaAwareOrderDiscount(args: {
+  order: {
+    discount_type?: string | null;
+    discount_value?: number | null;
+    discount_amount?: number | null;
+  };
+  totals: ReturnType<typeof calculateOrderTotals>;
+  tenantInfo: TenantInfo;
+  customer: Customer | null;
+  decimals: number;
+}): number | null {
+  const { order, totals, tenantInfo, customer, decimals } = args;
+  if (!detectSyriaProfileFromSnapshots(totals.allTaxSnapshots)) return null;
+  if (order.discount_type !== 'percentage' && order.discount_type !== 'amount') return null;
+  if (Number(order.discount_value || 0) <= 0 && Number(order.discount_amount || 0) <= 0) {
+    return null;
+  }
+  const preCharges = resolveEngineCharges(order as any, totals.subtotal, 0);
+  const pre = recomputeOrderTotals({
+    tenantInfo,
+    chargeContext: order as any,
+    customer,
+    totals,
+    discountAmount: 0,
+    taxScaling: 'when-discounted',
+    appliedCharges: preCharges ? preCharges.appliedCharges : null,
+    chargeColumnOverrides: preCharges?.chargeColumnOverrides,
+  });
+  return resolveSyriaDiscountAmount({
+    discountType: order.discount_type,
+    discountValue: Number(order.discount_value || 0),
+    storedAmount: Number(order.discount_amount || 0),
+    postFeeTotal: pre.total,
+    decimals,
+  });
+}
+
 interface OrderItemRow {
   id: number;
   status: string;
@@ -2009,7 +2061,7 @@ router.post(
           }
         }
 
-        const taxRollup = combineItemAndChargeTaxes({
+        let taxRollup = combineItemAndChargeTaxes({
           itemTaxAmount: totalTax,
           itemExclusiveTaxAmount: exclusiveTax,
           itemBreakdowns: allTaxBreakdowns,
@@ -2018,6 +2070,35 @@ router.post(
           chargeTaxes,
           minorFactor,
         });
+        // Syria consumption profile: the local-administration fee is a
+        // percent OF the consumption fee, rounded up — a document-level
+        // component added to the order rollup (owner decision, 2026-11-06).
+        if (detectSyriaProfileFromSnapshots(allTaxSnapshots) === 'consumption') {
+          const adminAmount = computeSyriaLocalAdmin({
+            syriaProfile: 'consumption',
+            snapshotJson: taxRollup.snapshotJson,
+            breakdowns: taxRollup.breakdowns,
+            decimals,
+          });
+          if (adminAmount.gt(0)) {
+            const adminNum = adminAmount.toNumber();
+            taxRollup = {
+              ...taxRollup,
+              taxAmount: taxRollup.taxAmount + adminNum,
+              exclusiveTaxAmount: taxRollup.exclusiveTaxAmount + adminNum,
+              breakdowns: [
+                ...taxRollup.breakdowns,
+                [
+                  {
+                    title: SYRIA_LOCAL_ADMIN_LABEL,
+                    rate: getSyriaLocalAdminRate(),
+                    amount: adminNum,
+                  },
+                ],
+              ],
+            };
+          }
+        }
         const preRoundTotal =
           subtotal +
           taxRollup.exclusiveTaxAmount +
@@ -2276,7 +2357,9 @@ router.post(
         // BUG #12 FIX: Preserve order-level discount (scale percentage proportionally)
         const currency = getTenantCurrency();
         const decimals = getCurrencyFractionDigits(currency);
-        const newDiscountAmount = resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
+        const newDiscountAmount =
+          syriaAwareOrderDiscount({ order: currentOrder, totals, tenantInfo, customer, decimals }) ??
+          resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
 
         const engineCharges = resolveEngineCharges(currentOrder, subtotal, newDiscountAmount);
         const { taxRollup, total, roundOff } = recomputeOrderTotals({
@@ -2367,6 +2450,20 @@ router.post(
             now(),
             existingBill.id,
           );
+        }
+
+        // Adding items after the bill was requested voids that request: the
+        // printed closing-time stamp clears (the next request re-stamps it)
+        // and the table returns to occupied (owner decision, 2026-11-06).
+        if (currentOrder.bill_requested_at) {
+          db.prepare(
+            'UPDATE orders SET bill_requested_at = NULL, updated_at = ? WHERE id = ?',
+          ).run(now(), req.params.id);
+          if (currentOrder.table_id) {
+            db.prepare(
+              "UPDATE tables SET status = 'occupied', updated_at = ? WHERE id = ? AND status = 'bill_requested'",
+            ).run(now(), currentOrder.table_id);
+          }
         }
 
         recordOrderAudit(db, {
@@ -2509,6 +2606,14 @@ router.post(
             now(),
             order.table_id,
           );
+        }
+        // Undoing the request clears the printed closing-time stamp: the
+        // next request re-stamps it (owner decision, 2026-11-06).
+        if (order.bill_requested_at) {
+          db.prepare(
+            'UPDATE orders SET bill_requested_at = NULL, updated_at = ? WHERE id = ?',
+          ).run(now(), order.id);
+          order.bill_requested_at = null;
         }
         recordOrderAudit(db, {
           orderId: order.id,
@@ -2670,7 +2775,9 @@ router.post(
         const { subtotal } = totals;
         const currency = getTenantCurrency();
         const decimals = getCurrencyFractionDigits(currency);
-        const newDiscountAmount = resolveOrderLevelDiscountAmount(target, subtotal, decimals);
+        const newDiscountAmount =
+          syriaAwareOrderDiscount({ order: target, totals, tenantInfo, customer, decimals }) ??
+          resolveOrderLevelDiscountAmount(target, subtotal, decimals);
         const engineCharges = resolveEngineCharges(target, subtotal, newDiscountAmount);
         const { taxRollup, total, roundOff } = recomputeOrderTotals({
           tenantInfo,
@@ -3641,11 +3748,39 @@ router.patch(
 
         const totals = calculateOrderTotals(db, req.params.id as string);
         const decimals = getCurrencyFractionDigits(tenantInfo.currency);
-        const discountAmount = resolveOrderLevelDiscountAmount(
+        let discountAmount = resolveOrderLevelDiscountAmount(
           currentOrder,
           totals.subtotal,
           decimals,
         );
+        if (
+          detectSyriaProfileFromSnapshots(totals.allTaxSnapshots) &&
+          (currentOrder.discount_type === 'percentage' ||
+            currentOrder.discount_type === 'amount') &&
+          (Number(currentOrder.discount_value || 0) > 0 ||
+            Number(currentOrder.discount_amount || 0) > 0)
+        ) {
+          // Syria levy orders: re-derive the discount from the post-fee
+          // total of the updated items, not from the bare subtotal.
+          const preCharges = resolveEngineCharges(currentOrder, totals.subtotal, 0);
+          const pre = recomputeOrderTotals({
+            tenantInfo,
+            chargeContext: currentOrder,
+            customer,
+            totals,
+            discountAmount: 0,
+            taxScaling: 'when-discounted',
+            appliedCharges: preCharges ? preCharges.appliedCharges : null,
+            chargeColumnOverrides: preCharges?.chargeColumnOverrides,
+          });
+          discountAmount = resolveSyriaDiscountAmount({
+            discountType: currentOrder.discount_type,
+            discountValue: Number(currentOrder.discount_value || 0),
+            storedAmount: Number(currentOrder.discount_amount || 0),
+            postFeeTotal: pre.total,
+            decimals,
+          });
+        }
 
         const engineCharges = resolveEngineCharges(currentOrder, totals.subtotal, discountAmount);
         const { taxRollup, total, roundOff } = recomputeOrderTotals({
@@ -4285,12 +4420,32 @@ const handleOrderDiscount = asyncHandler(async (req: Request, res: Response) => 
       // Calculate discount amount
       let discountAmount = 0;
       if (discount_value > 0) {
-        if (discount_type === 'percentage') {
-          discountAmount = (totals.subtotal * discount_value) / 100;
+        if (detectSyriaProfileFromSnapshots(totals.allTaxSnapshots)) {
+          // Syria levy orders: the discount is taken from the post-fee
+          // total, so resolve that total with a no-discount recompute first.
+          const preCharges = resolveEngineCharges(currentOrder, totals.subtotal, 0);
+          const pre = recomputeOrderTotals({
+            tenantInfo,
+            chargeContext: currentOrder,
+            customer,
+            totals,
+            discountAmount: 0,
+            taxScaling: 'when-discounted',
+            appliedCharges: preCharges ? preCharges.appliedCharges : null,
+            chargeColumnOverrides: preCharges?.chargeColumnOverrides,
+          });
+          discountAmount = resolveSyriaDiscountAmount({
+            discountType: discount_type,
+            discountValue: discount_value,
+            storedAmount: discount_type === 'amount' ? discount_value : null,
+            postFeeTotal: pre.total,
+            decimals,
+          });
+        } else if (discount_type === 'percentage') {
+          discountAmount = Number(((totals.subtotal * discount_value) / 100).toFixed(decimals));
         } else {
-          discountAmount = Math.min(discount_value, totals.subtotal);
+          discountAmount = Number(Math.min(discount_value, totals.subtotal).toFixed(decimals));
         }
-        discountAmount = Number(discountAmount.toFixed(decimals));
       }
 
       const engineCharges = resolveEngineCharges(currentOrder, totals.subtotal, discountAmount);
@@ -4815,7 +4970,15 @@ const handleItemDiscount = asyncHandler(async (req: Request, res: Response) => {
       const orderTotals = calculateOrderTotals(db, req.params.id as string);
 
       // Recalculate order-level discount on new subtotal (scale percentage; clamp flat amount)
-      const newOrderDiscount = resolveOrderLevelDiscountAmount(
+      const newOrderDiscount =
+        syriaAwareOrderDiscount({
+          order: currentOrder,
+          totals: orderTotals,
+          tenantInfo,
+          customer,
+          decimals,
+        }) ??
+        resolveOrderLevelDiscountAmount(
         currentOrder,
         orderTotals.subtotal,
         decimals,
@@ -5123,7 +5286,15 @@ const handleItemPriceOverride = asyncHandler(async (req: Request, res: Response)
       });
 
       const orderTotals = calculateOrderTotals(db, req.params.id as string);
-      const newOrderDiscount = resolveOrderLevelDiscountAmount(
+      const newOrderDiscount =
+        syriaAwareOrderDiscount({
+          order: currentOrder,
+          totals: orderTotals,
+          tenantInfo,
+          customer,
+          decimals,
+        }) ??
+        resolveOrderLevelDiscountAmount(
         currentOrder,
         orderTotals.subtotal,
         decimals,
@@ -5645,8 +5816,6 @@ router.patch(
         // BUG #13 FIX: Preserve order-level discount (scale percentage proportionally)
         const currency = getTenantCurrency();
         const decimals = getCurrencyFractionDigits(currency);
-        const newDiscountAmount = resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
-
         const tenantInfo = {
           country: getSettingValue('country') || '',
           business_type: getSettingValue('business_type') || 'restaurant',
@@ -5659,6 +5828,15 @@ router.patch(
               .prepare('SELECT * FROM customers WHERE id = ?')
               .get(currentOrder.customer_id) as any)
           : null;
+        const newDiscountAmount =
+          syriaAwareOrderDiscount({
+            order: currentOrder,
+            totals: orderTotals,
+            tenantInfo,
+            customer,
+            decimals,
+          }) ?? resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
+
         // BUG #5 FIX: Correct round-off formula; BUG #24 FIX: include delivery_charge (was missing, causing total mismatch with bill generation)
         const engineCharges = resolveEngineCharges(currentOrder, subtotal, newDiscountAmount);
         const orderCancelled = activeItems.length === 0 && currentOrder.status !== 'cancelled';
@@ -6208,7 +6386,14 @@ router.patch(
 
         const orderTotals = calculateOrderTotals(db, orderId);
         const { subtotal } = orderTotals;
-        const newDiscountAmount = resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
+        const newDiscountAmount =
+          syriaAwareOrderDiscount({
+            order: currentOrder,
+            totals: orderTotals,
+            tenantInfo,
+            customer,
+            decimals,
+          }) ?? resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
         const engineCharges = resolveEngineCharges(currentOrder, subtotal, newDiscountAmount);
         const { taxRollup, total, roundOff } = recomputeOrderTotals({
           tenantInfo,
@@ -6467,8 +6652,6 @@ router.patch(
         // BUG #13 FIX: Preserve order-level discount (scale percentage proportionally)
         const currency = getTenantCurrency();
         const decimals = getCurrencyFractionDigits(currency);
-        const newDiscountAmount = resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
-
         const tenantInfo = {
           country: getSettingValue('country') || '',
           business_type: getSettingValue('business_type') || 'restaurant',
@@ -6481,6 +6664,15 @@ router.patch(
               .prepare('SELECT * FROM customers WHERE id = ?')
               .get(currentOrder.customer_id) as any)
           : null;
+        const newDiscountAmount =
+          syriaAwareOrderDiscount({
+            order: currentOrder,
+            totals: orderTotals,
+            tenantInfo,
+            customer,
+            decimals,
+          }) ?? resolveOrderLevelDiscountAmount(currentOrder, subtotal, decimals);
+
         // BUG #5 FIX: Correct round-off formula; BUG #24 FIX: include delivery_charge (was missing, causing total mismatch with bill generation)
         const engineCharges = resolveEngineCharges(order, subtotal, newDiscountAmount);
         const { taxRollup, total, roundOff } = recomputeOrderTotals({

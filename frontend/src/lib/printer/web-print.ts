@@ -32,8 +32,6 @@ import {
   type DocumentMetaBlock,
   type ItemTableBlock,
   type MessageBlock,
-  type PaymentsBlock,
-  paymentDisplayRows,
   type TaxBreakdownBlock,
   type TotalsBlock,
 } from '@print/document';
@@ -91,6 +89,17 @@ export interface WebPrintOptions {
   showCustomerPhone?: boolean;
   deliveryShowCustomerPhoneAlways?: boolean;
   showTableNumber?: boolean;
+  /** Establishment licence + classification lines (bill-fields feature). */
+  licence?: string;
+  classification?: string;
+  showLicence?: boolean;
+  showClassification?: boolean;
+  waiterName?: string;
+  cashierName?: string;
+  showWaiter?: boolean;
+  showCashier?: boolean;
+  showGuestCount?: boolean;
+  showOpenCloseTimes?: boolean;
   /** Ignored for browser receipts: HTML uses locale currency formatting and code fallback. */
   useUnicode?: boolean;
   /** Show a large "REPRINT" banner so a reprinted bill can't be mistaken for the original. */
@@ -256,6 +265,16 @@ export function generateBillHtml(
     showCustomerPhone = true,
     deliveryShowCustomerPhoneAlways,
     showTableNumber = true,
+    licence,
+    classification,
+    showLicence,
+    showClassification,
+    waiterName,
+    cashierName,
+    showWaiter,
+    showCashier,
+    showGuestCount,
+    showOpenCloseTimes,
     isReprint = false,
     trimDecimals = false,
   } = opts;
@@ -284,6 +303,16 @@ export function generateBillHtml(
     isReprint,
     trimDecimals,
     languages,
+    licence,
+    classification,
+    showLicence,
+    showClassification,
+    waiterName,
+    cashierName,
+    showWaiter,
+    showCashier,
+    showGuestCount,
+    showOpenCloseTimes,
   });
   const base = document.direction.base;
   const dir = base;
@@ -295,7 +324,6 @@ export function generateBillHtml(
   const itemsBlock = getBlock(document, 'item-table') as ItemTableBlock | undefined;
   const breakdown = getBlock(document, 'tax-breakdown') as TaxBreakdownBlock | undefined;
   const totals = getBlock(document, 'totals') as TotalsBlock | undefined;
-  const payments = getBlock(document, 'payments') as PaymentsBlock | undefined;
   const messages = getBlock(document, 'message') as MessageBlock | undefined;
 
   // Presentation labels come from the document or fallback to shared catalog.
@@ -303,6 +331,7 @@ export function generateBillHtml(
   const L = {
     billNumber: documentLabel(meta?.billNumberLabel, 'receipt.billNumber', lang),
     date: documentLabel(meta?.dateLabel, 'receipt.date', lang),
+    time: printLabelResolver('print.time', lang),
     table: stripLabelPlaceholder(metaTableLabel),
     customer: documentLabel(customer?.nameLabel, 'pos.customer', lang),
     customerNo: documentLabel(customer?.phoneLabel, 'print.numberShort', lang),
@@ -323,7 +352,6 @@ export function generateBillHtml(
       lang,
     ),
     taxDetails: breakdown?.heading.primary ?? printLabelResolver('receipt.taxDetails', lang),
-    paymentsHeader: payments?.heading.primary ?? printLabelResolver('receipt.payments', lang),
     thankYou: surfaceLabel(messages?.thankYou, 'print.thankYouShort', 'receipt.thankYou', lang),
     taxIncluded: messages?.taxIncluded.primary ?? printLabelResolver('receipt.taxIncluded', lang),
     printBill: printLabelResolver('receipt.printBill', lang),
@@ -358,23 +386,52 @@ export function generateBillHtml(
   <div class="bill-container">
     ${messages?.reprintBanner ? `<div class="reprint-banner">${escapeHtml(messages.reprintBanner.primary)}</div>` : ''}
     ${messages?.onlineOrderBanner ? `<div class="online-order-banner">${escapeHtml(messages.onlineOrderBanner.label.primary)}${messages.onlineOrderBanner.platform.text ? `<div class="online-order-detail">${escapeHtml(messages.onlineOrderBanner.platform.text)}</div>` : ''}${messages.onlineOrderBanner.externalOrderId.text ? `<div class="online-order-detail">#${escapeHtml(messages.onlineOrderBanner.externalOrderId.text)}</div>` : ''}</div>` : ''}
-    <!-- Header -->
+    <!-- Header: name, then fixed-slot fact pairs (v3 bill layout) -->
     <div class="header">
       ${header?.logo && header.logo.startsWith('data:image/') ? `<div class="logo-container"><img class="receipt-logo" src="${escapeHtml(header.logo)}" alt="Logo" /></div>` : ''}
       ${header?.name ? `<h1>${escapeHtml(header.name.text)}</h1>` : ''}
-      ${header?.address ? `<p>${escapeHtml(header.address.text).replace(/\n/g, '<br>')}</p>` : ''}
-      ${header?.phone && header.phoneLabel ? `<p>${escapeHtml(header.phoneLabel.primary)}: ${directionalValue(header.phone, base)}</p>` : ''}
-      ${header?.taxId ? `<p>${escapeHtml(header.taxId.label.primary)}: ${directionalValue(header.taxId.value, base)}</p>` : ''}
     </div>
 
     <!-- Bill Details -->
     <div class="bill-details">
       <table>
         <tr>
-          <td><strong>${escapeHtml(invoiceNumberLabel)}</strong> ${meta ? directionalValue(meta.invoiceNumber, base) : ''}</td>
-          <td class="text-end"><strong>${escapeHtml(L.date)}</strong> ${meta ? escapeHtml(formatReceiptDate(meta.timestamp.text, tenant, LANGUAGES[lang]?.locale ?? lang)) : ''}</td>
+          <td>${header?.address ? escapeHtml(header.address.text).replace(/\n/g, '<br>') : ''}</td>
+          <td class="text-end">${header?.phone && header.phoneLabel ? `<strong>${escapeHtml(header.phoneLabel.primary)}</strong> ${directionalValue(header.phone, base)}` : ''}</td>
         </tr>
-        ${meta?.table ? `<tr><td><strong>${escapeHtml(L.table)}</strong> ${escapeHtml(meta.table.name.text)}</td><td></td></tr>` : ''}
+        <tr>
+          <td>${header?.licence ? `<strong>${escapeHtml(header.licence.label.primary)}</strong> ${directionalValue(header.licence.value, base)}` : ''}</td>
+          <td class="text-end">${header?.taxId ? `<strong>${escapeHtml(header.taxId.label.primary)}</strong> ${directionalValue(header.taxId.value, base)}` : ''}</td>
+        </tr>
+        <tr>
+          <td>${header?.classification ? `<strong>${escapeHtml(header.classification.label.primary)}</strong> ${directionalValue(header.classification.value, base)}` : ''}</td>
+          <td class="text-end">${header?.instagramHandle ? escapeHtml(header.instagramHandle.text) : ''}</td>
+        </tr>
+        <tr>
+          <td><strong>${escapeHtml(invoiceNumberLabel)}</strong> ${meta ? directionalValue(meta.invoiceNumber, base) : ''}</td>
+          <td class="text-end"><strong>${escapeHtml(L.date)}</strong> ${meta ? escapeHtml(formatReceiptDateOnly(meta.closedAt?.timestamp.text ?? meta.timestamp.text, tenant)) : ''}</td>
+        </tr>
+        <tr>
+          <td><strong>${escapeHtml(L.time)}</strong> ${meta ? escapeHtml(formatReceiptTimeOnly(meta.closedAt?.timestamp.text ?? meta.timestamp.text, tenant, LANGUAGES[lang]?.locale ?? lang)) : ''}</td>
+          <td class="text-end">${meta?.table ? `<strong>${escapeHtml(L.table)}</strong> ${escapeHtml(meta.table.name.text)}` : ''}</td>
+        </tr>
+        ${
+          meta?.guests || meta?.openedAt
+            ? `<tr>
+          <td>${meta?.guests ? `<strong>${escapeHtml(meta.guests.label.primary)}</strong> ${escapeHtml(meta.guests.count)}` : ''}</td>
+          <td class="text-end">${meta?.openedAt ? `<strong>${escapeHtml(meta.openedAt.label.primary)}</strong> ${escapeHtml(formatReceiptTimeOnly(meta.openedAt.timestamp.text, tenant, LANGUAGES[lang]?.locale ?? lang))}` : ''}</td>
+        </tr>`
+            : ''
+        }
+        ${
+          meta?.closedAt || meta?.cashier
+            ? `<tr>
+          <td>${meta?.closedAt ? `<strong>${escapeHtml(meta.closedAt.label.primary)}</strong> ${escapeHtml(formatReceiptTimeOnly(meta.closedAt.timestamp.text, tenant, LANGUAGES[lang]?.locale ?? lang))}` : ''}</td>
+          <td class="text-end">${meta?.cashier ? `<strong>${escapeHtml(meta.cashier.label.primary)}</strong> ${escapeHtml(meta.cashier.name.text)}` : ''}</td>
+        </tr>`
+            : ''
+        }
+        ${meta?.servedBy ? `<tr><td colspan="2"><strong>${escapeHtml(meta.servedBy.label.primary)}</strong> ${escapeHtml(meta.servedBy.name.text)}</td></tr>` : ''}
         ${customer?.heading ? `<tr><td colspan="2"><strong>${escapeHtml(customer.heading.primary)}</strong></td></tr>` : ''}
         ${customer?.name ? `<tr><td><strong>${escapeHtml(L.customer)}</strong> ${escapeHtml(customer.name.text)}</td><td></td></tr>` : ''}
         ${customer?.phone ? `<tr><td><strong>${escapeHtml(L.customerNo)}</strong> ${directionalValue(customer.phone, base)}</td><td></td></tr>` : ''}
@@ -387,8 +444,8 @@ export function generateBillHtml(
       <thead>
         <tr>
           <th>${escapeHtml(itemsBlock?.header.item.primary ?? '')}</th>
-          <th class="text-end">${escapeHtml(itemsBlock?.header.quantity.primary ?? '')}</th>
           <th class="text-end">${escapeHtml(L.rate)}</th>
+          <th class="text-end">${escapeHtml(itemsBlock?.header.quantity.primary ?? '')}</th>
           <th class="text-end">${escapeHtml(itemsBlock?.header.amount.primary ?? '')}</th>
         </tr>
       </thead>
@@ -402,8 +459,8 @@ export function generateBillHtml(
               ${row.addons.length > 0 ? `<br><small class="text-muted">${row.addons.map((a) => `+ ${escapeHtml(a.name.text)}${(a.quantity ?? 1) > 1 ? ` ×${escapeHtml(a.quantity)}` : ''}${a.price > 0 ? ` (${fmtAmount(a.price)})` : ''}`).join(', ')}</small>` : ''}
               ${row.specialInstructions ? `<br><small class="text-italic">${escapeHtml(row.specialInstructions.text)}</small>` : ''}
             </td>
-            <td class="text-end num">${fmtQuantity(row.quantity)}</td>
             <td class="text-end num">${fmtAmount(row.unitPrice ?? 0)}</td>
+            <td class="text-end num">${fmtQuantity(row.quantity)}</td>
             <td class="text-end num">${fmtAmount(row.amount)}</td>
           </tr>
         `,
@@ -412,28 +469,6 @@ export function generateBillHtml(
       </tbody>
     </table>
 
-    <!-- Tax Breakdown -->
-    ${
-      breakdown && breakdown.lines.length > 0
-        ? `
-    <table class="tax-table">
-      <thead>
-        <tr><th colspan="2">${escapeHtml(L.taxDetails)}</th></tr>
-      </thead>
-      <tbody>
-        ${breakdown.lines
-          .map(
-            (line) => `
-          <tr><td>${escapeHtml(line.rate === null ? line.label.primary : `${line.label.primary} @${line.rate}%`)}</td><td class="text-end num">${fmtAmount(line.amount)}</td></tr>
-        `,
-          )
-          .join('')}
-      </tbody>
-    </table>
-    `
-        : ''
-    }
-
     <!-- Totals -->
     <table class="totals-table">
       ${
@@ -441,12 +476,22 @@ export function generateBillHtml(
           ? `
       ${totals.pointsRedeemed ? `<tr><td>${escapeHtml(totals.pointsRedeemed.label.primary)}</td><td class="text-end num">-${escapeHtml(totals.pointsRedeemed.points)} pts</td></tr>` : ''}
       <tr><td>${escapeHtml(totals.subtotal.label.primary)}</td><td class="text-end num">${fmtAmount(totals.subtotal.amount)}</td></tr>
-      ${totals.discount ? `<tr><td>${escapeHtml(totals.discount.label.primary)}</td><td class="text-end num">-${fmtAmount(totals.discount.amount)}</td></tr>` : ''}
+      ${
+        breakdown && breakdown.lines.length > 0
+          ? breakdown.lines
+              .map(
+                (line) => `<tr><td>${escapeHtml(line.rate === null ? line.label.primary : `${line.label.primary} @${line.rate}%`)}</td><td class="text-end num">${fmtAmount(line.amount)}</td></tr>`,
+              )
+              .join('')
+          : ''
+      }
       ${totals.tax ? `<tr><td>${escapeHtml(L.totalTax)}</td><td class="text-end num">${fmtAmount(totals.tax.amount)}</td></tr>` : ''}
       ${totals.serviceCharge && !itemisedChargeIds.has('service_charge') ? `<tr><td>${escapeHtml(totals.serviceCharge.label.primary)}</td><td class="text-end num">${fmtAmount(totals.serviceCharge.amount)}</td></tr>` : ''}
       ${totals.deliveryCharge ? `<tr><td>${escapeHtml(L.deliveryCharge)}</td><td class="text-end num">${fmtAmount(totals.deliveryCharge.amount)}</td></tr>` : ''}
       ${totals.packagingCharge && !itemisedChargeIds.has('packaging_charge') ? `<tr><td>${escapeHtml(L.packagingCharge)}</td><td class="text-end num">${fmtAmount(totals.packagingCharge.amount)}</td></tr>` : ''}
       ${itemisedCharges.map((charge) => `<tr><td>${escapeHtml(charge.name)}</td><td class="text-end num">${fmtAmount(charge.amount)}</td></tr>`).join('')}
+      ${totals.postFeeTotal ? `<tr><td>${escapeHtml(totals.postFeeTotal.label.primary)}</td><td class="text-end num">${fmtAmount(totals.postFeeTotal.amount)}</td></tr>` : ''}
+      ${totals.discount ? `<tr><td>${escapeHtml(totals.discount.label.primary)}</td><td class="text-end num">-${fmtAmount(totals.discount.amount)}</td></tr>` : ''}
       <tr class="total-row"><td><strong>${escapeHtml(L.grandTotal)}</strong></td><td class="text-end num"><strong>${fmtAmount(totals.grandTotal.amount)}</strong></td></tr>
       ${totals.pointsEarned ? `<tr><td>${escapeHtml(totals.pointsEarned.label.primary)}</td><td class="text-end num">${escapeHtml(totals.pointsEarned.points)} pts</td></tr>` : ''}
       ${totals.pointsBalance ? `<tr><td>${escapeHtml(totals.pointsBalance.label.primary)}</td><td class="text-end num">${escapeHtml(totals.pointsBalance.points)} pts</td></tr>` : ''}
@@ -454,32 +499,6 @@ export function generateBillHtml(
           : ''
       }
     </table>
-
-    <!-- Payments -->
-    ${
-      payments && payments.lines.length > 0
-        ? `
-    <table class="payments-table">
-      <thead>
-        <tr><th colspan="2">${escapeHtml(L.paymentsHeader)}</th></tr>
-      </thead>
-      <tbody>
-        ${payments.lines
-          .map((line) =>
-            paymentDisplayRows(line)
-              .map(
-                (row) => `
-          <tr><td>${escapeHtml(paymentLineLabel(row.label))}</td><td class="text-end num">${fmtAmount(row.amount)}</td></tr>
-        `,
-              )
-              .join(''),
-          )
-          .join('')}
-      </tbody>
-    </table>
-    `
-        : ''
-    }
 
     <!-- Footer -->
     <div class="footer">
@@ -533,13 +552,6 @@ function stripLabelPlaceholder(label: string): string {
     .replace('{name}', '')
     .replace(/[:：]\s*$/, '')
     .trim();
-}
-
-/** Unknown payment methods keep their legacy capitalized literal rendering. */
-function paymentLineLabel(label: { conceptId?: string; primary: string }): string {
-  return label.conceptId !== undefined
-    ? label.primary
-    : label.primary.charAt(0).toUpperCase() + label.primary.slice(1);
 }
 
 function getPaperStyles(size: PaperSize): string {
@@ -630,22 +642,34 @@ function formatAmount(value: number, tenant: ReceiptTenant, trimDecimals = false
   return formatCurrencyForTenant(numeric, tenant.country, tenant.currency, prefs);
 }
 
-function formatReceiptDate(iso: string, tenant: ReceiptTenant, locale?: string): string {
+function formatReceiptDateOnly(iso: string, tenant: ReceiptTenant): string {
   if (!iso) return '';
   try {
     const d = parseDbTimestamp(iso);
     if (isNaN(d.getTime())) return iso;
     const timeZone = tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const time = formatDateForTenant(
-      d,
-      tenant.country,
-      timeZone,
-      { digits: tenant.number_digits, calendar: tenant.calendar },
-      { hour: '2-digit', minute: '2-digit' },
-      locale,
-    );
-    return `${formatBusinessDate(d, timeZone)} ${time}`;
+    return formatBusinessDate(d, timeZone);
   } catch {
     return iso;
   }
 }
+
+function formatReceiptTimeOnly(iso: string, tenant: ReceiptTenant, locale?: string): string {
+  if (!iso) return '';
+  try {
+    const d = parseDbTimestamp(iso);
+    if (isNaN(d.getTime())) return iso;
+    const timeZone = tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return formatDateForTenant(
+      d,
+      tenant.country,
+      timeZone,
+      { digits: tenant.number_digits, calendar: tenant.calendar },
+      { hour: '2-digit', minute: '2-digit', second: '2-digit' },
+      locale,
+    );
+  } catch {
+    return iso;
+  }
+}
+

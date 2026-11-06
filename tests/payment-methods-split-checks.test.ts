@@ -65,10 +65,14 @@ async function main() {
         .map((row: any) => [row.key, row.value]),
     );
     assertEqual(billContentDefaults.bill_show_name, 'true', 'fresh database shows restaurant name by default');
-    assertEqual(billContentDefaults.bill_show_tax_id, 'false', 'fresh database hides tax ID by default');
+    // v3 bill-fields defaults (migration v125): the tax ID shows by
+    // default, and the customer name/number rows stay unseeded — unset
+    // carries the decided default (hidden on dine-in bills, shown on
+    // other order types).
+    assertEqual(billContentDefaults.bill_show_tax_id, 'true', 'fresh database shows tax ID by default');
     assertEqual(billContentDefaults.bill_show_tax_breakdown, 'true', 'fresh database shows tax breakdown by default');
-    assertEqual(billContentDefaults.bill_show_customer_name, 'true', 'fresh database shows customer name by default');
-    assertEqual(billContentDefaults.bill_show_customer_phone, 'true', 'fresh database shows customer number by default');
+    assertEqual(billContentDefaults.bill_show_customer_name, undefined, 'fresh database leaves customer name unseeded (v125 dine-in default)');
+    assertEqual(billContentDefaults.bill_show_customer_phone, undefined, 'fresh database leaves customer number unseeded (v125 dine-in default)');
     assertEqual(billContentDefaults.bill_show_table_number, 'true', 'fresh database shows table number by default');
     const rejectDetailedTemplate = await api(baseUrl, '/api/settings/bill_template', { method: 'PUT', body: { value: 'detailed' }, headers: authHeader });
     assertEqual(rejectDetailedTemplate.status, 400, 'tax-specific bill templates cannot be saved as built-ins');

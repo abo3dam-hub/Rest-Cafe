@@ -323,11 +323,56 @@ export function buildReceiptBusiness(
 
   const country = settings.country || '';
   const currency = resolveTenantCurrency(settings.currency, country);
+  const isDineIn = String(order?.type ?? '') === 'dine_in';
+
+  // Optional bill fields (owner decisions, 2026-11-06): each field has its
+  // own show toggle, and a field with no recorded value prints nothing
+  // regardless of its toggle. Customer identity belongs on the delivery
+  // slip, so on a dine-in bill it prints only when explicitly enabled.
+  const userName = (userId: unknown): string => {
+    if (userId === null || userId === undefined || String(userId) === '') return '';
+    try {
+      const row = db
+        .prepare('SELECT name FROM users WHERE id = ?')
+        .get(String(userId)) as { name?: string } | undefined;
+      return row?.name || '';
+    } catch {
+      return '';
+    }
+  };
+  let cashierName = '';
+  try {
+    const paymentActor = db
+      .prepare(
+        'SELECT user_id FROM payment_idempotency WHERE bill_id = ? ORDER BY created_at DESC LIMIT 1',
+      )
+      .get(String(bill.id)) as { user_id?: string } | undefined;
+    if (paymentActor?.user_id) cashierName = userName(paymentActor.user_id);
+    if (!cashierName && order?.id) {
+      const auditActor = db
+        .prepare(
+          "SELECT actor_user_id FROM order_audit_log WHERE order_id = ? AND action = 'bill_requested' ORDER BY id DESC LIMIT 1",
+        )
+        .get(order.id) as { actor_user_id?: string } | undefined;
+      if (auditActor?.actor_user_id) cashierName = userName(auditActor.actor_user_id);
+    }
+  } catch {
+    cashierName = '';
+  }
   return {
     name: settings.business_name || '',
     address: settings.business_address || '',
     phone: settings.business_phone || '',
     taxRegistrationNumber: settings.tax_registration_number || '',
+    licence: settings.business_licence || '',
+    classification: settings.business_classification || '',
+    waiter_name: userName(order?.user_id),
+    cashier_name: cashierName,
+    guest_count: order?.guest_count ?? null,
+    opened_at: typeof order?.created_at === 'string' ? order.created_at : '',
+    // The printed closing time is the first bill request (owner decision,
+    // 2026-11-06); the real payment time stays internal to reports.
+    closed_at: typeof order?.bill_requested_at === 'string' ? order.bill_requested_at : '',
     currency,
     // Rest&Cafe: the currency unit is the owner's own setting (e.g. SP);
     // CLDR is only the fallback when no unit is stored.
@@ -345,7 +390,9 @@ export function buildReceiptBusiness(
       : '',
     // One shared rule, so the receipt and the slip cannot disagree.
     show_customer_phone: shouldShowCustomerNumber({
-      showOnReceipts: settings.bill_show_customer_phone !== 'false',
+      showOnReceipts: isDineIn
+        ? settings.bill_show_customer_phone === 'true'
+        : settings.bill_show_customer_phone !== 'false',
       alwaysForDeliveryOrders: settings.bill_delivery_show_customer_phone_always !== 'false',
       orderType: String(order?.type ?? ''),
     }),
@@ -357,9 +404,17 @@ export function buildReceiptBusiness(
     show_name: settings.bill_show_name !== 'false',
     show_address: settings.bill_show_address !== 'false',
     show_phone: settings.bill_show_phone !== 'false',
-    show_tax_id: settings.bill_show_tax_id === 'true',
+    show_tax_id: settings.bill_show_tax_id !== 'false',
+    show_licence: settings.bill_show_licence !== 'false',
+    show_classification: settings.bill_show_classification !== 'false',
+    show_waiter: settings.bill_show_waiter !== 'false',
+    show_cashier: settings.bill_show_cashier === 'true',
+    show_guest_count: settings.bill_show_guest_count === 'true',
+    show_open_close_times: settings.bill_show_open_close_times === 'true',
     show_tax_breakdown: settings.bill_show_tax_breakdown !== 'false',
-    show_customer_name: settings.bill_show_customer_name !== 'false',
+    show_customer_name: isDineIn
+      ? settings.bill_show_customer_name === 'true'
+      : settings.bill_show_customer_name !== 'false',
     show_table_number: settings.bill_show_table_number !== 'false',
     show_logo: settings.bill_show_logo === 'true',
     receipt_logo: resolveBrandLogo(settings.receipt_logo),

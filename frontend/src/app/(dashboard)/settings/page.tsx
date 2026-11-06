@@ -1242,6 +1242,12 @@ export default function SettingsPage() {
     billShowAddress: posSettings.billShowAddress,
     billShowPhone: posSettings.billShowPhone,
     billShowTaxId: posSettings.billShowTaxId,
+    billShowLicence: posSettings.billShowLicence,
+    billShowClassification: posSettings.billShowClassification,
+    billShowWaiter: posSettings.billShowWaiter,
+    billShowCashier: posSettings.billShowCashier,
+    billShowGuestCount: posSettings.billShowGuestCount,
+    billShowOpenCloseTimes: posSettings.billShowOpenCloseTimes,
     billShowTaxBreakdown: posSettings.billShowTaxBreakdown,
     billShowCustomerName: posSettings.billShowCustomerName,
     billShowCustomerPhone: posSettings.billShowCustomerPhone,
@@ -1327,6 +1333,12 @@ export default function SettingsPage() {
         bill_show_address: formSnapshot.billShowAddress,
         bill_show_phone: formSnapshot.billShowPhone,
         bill_show_tax_id: formSnapshot.billShowTaxId,
+        bill_show_licence: formSnapshot.billShowLicence,
+        bill_show_classification: formSnapshot.billShowClassification,
+        bill_show_waiter: formSnapshot.billShowWaiter,
+        bill_show_cashier: formSnapshot.billShowCashier,
+        bill_show_guest_count: formSnapshot.billShowGuestCount,
+        bill_show_open_close_times: formSnapshot.billShowOpenCloseTimes,
         bill_show_tax_breakdown: formSnapshot.billShowTaxBreakdown,
         bill_show_customer_name: formSnapshot.billShowCustomerName,
         bill_show_customer_phone: formSnapshot.billShowCustomerPhone,
@@ -1355,6 +1367,12 @@ export default function SettingsPage() {
       posSettings.setBillShowAddress(formSnapshot.billShowAddress);
       posSettings.setBillShowPhone(formSnapshot.billShowPhone);
       posSettings.setBillShowTaxId(formSnapshot.billShowTaxId);
+      posSettings.setBillShowLicence(formSnapshot.billShowLicence);
+      posSettings.setBillShowClassification(formSnapshot.billShowClassification);
+      posSettings.setBillShowWaiter(formSnapshot.billShowWaiter);
+      posSettings.setBillShowCashier(formSnapshot.billShowCashier);
+      posSettings.setBillShowGuestCount(formSnapshot.billShowGuestCount);
+      posSettings.setBillShowOpenCloseTimes(formSnapshot.billShowOpenCloseTimes);
       posSettings.setBillShowTaxBreakdown(formSnapshot.billShowTaxBreakdown);
       posSettings.setBillShowCustomerName(formSnapshot.billShowCustomerName);
       posSettings.setBillShowCustomerPhone(formSnapshot.billShowCustomerPhone);
@@ -1413,6 +1431,8 @@ export default function SettingsPage() {
     tablesRequired: true,
     taxRegistered: false,
     taxRegistrationNumber: '',
+    businessLicence: '',
+    businessClassification: '',
     businessAddress: '',
     businessPhone: '',
     instagramHandle: '',
@@ -1535,6 +1555,8 @@ export default function SettingsPage() {
         taxRegistered:
           d.tax_registered === 'true' || d.tax_registered === true || d.tax_registered === 1,
         taxRegistrationNumber: d.tax_registration_number || '',
+        businessLicence: d.business_licence || '',
+        businessClassification: d.business_classification || '',
         businessAddress: d.business_address || '',
         businessPhone: d.business_phone || '',
         instagramHandle: d.instagram_handle || '',
@@ -1564,6 +1586,12 @@ export default function SettingsPage() {
         billShowAddress: d.bill_show_address !== false,
         billShowPhone: d.bill_show_phone !== false,
         billShowTaxId: d.bill_show_tax_id === true,
+        billShowLicence: d.bill_show_licence !== false,
+        billShowClassification: d.bill_show_classification !== false,
+        billShowWaiter: d.bill_show_waiter !== false,
+        billShowCashier: d.bill_show_cashier === true,
+        billShowGuestCount: d.bill_show_guest_count === true,
+        billShowOpenCloseTimes: d.bill_show_open_close_times === true,
         billShowTaxBreakdown: d.bill_show_tax_breakdown !== false,
         billShowCustomerName: d.bill_show_customer_name !== false,
         billShowCustomerPhone: d.bill_show_customer_phone !== false,
@@ -1742,6 +1770,8 @@ export default function SettingsPage() {
           taxRegistered:
             d.tax_registered === 'true' || d.tax_registered === true || d.tax_registered === 1,
           taxRegistrationNumber: d.tax_registration_number || '',
+          businessLicence: d.business_licence || '',
+          businessClassification: d.business_classification || '',
           businessAddress: d.business_address || '',
           businessPhone: d.business_phone || '',
           instagramHandle: d.instagram_handle || '',
@@ -1777,6 +1807,12 @@ export default function SettingsPage() {
           billShowAddress: d.bill_show_address !== false,
           billShowPhone: d.bill_show_phone !== false,
           billShowTaxId: d.bill_show_tax_id === true,
+          billShowLicence: d.bill_show_licence !== false,
+          billShowClassification: d.bill_show_classification !== false,
+          billShowWaiter: d.bill_show_waiter !== false,
+          billShowCashier: d.bill_show_cashier === true,
+          billShowGuestCount: d.bill_show_guest_count === true,
+          billShowOpenCloseTimes: d.bill_show_open_close_times === true,
           billShowTaxBreakdown: d.bill_show_tax_breakdown !== false,
           billShowCustomerName: d.bill_show_customer_name !== false,
           billShowCustomerPhone: d.bill_show_customer_phone !== false,
@@ -2630,6 +2666,8 @@ export default function SettingsPage() {
         tables_required: form.tablesRequired,
         tax_registered: form.taxRegistered,
         tax_registration_number: form.taxRegistrationNumber,
+        business_licence: form.businessLicence,
+        business_classification: form.businessClassification,
         business_address: form.businessAddress,
         business_phone: normalizedBusinessPhone,
         instagram_handle: form.instagramHandle,
@@ -2652,6 +2690,8 @@ export default function SettingsPage() {
       setTaxIdFormatCountryCode(form.countryCode);
       posSettings.hydrateReceiptSettings({
         tax_registration_number: form.taxRegistrationNumber,
+        business_licence: form.businessLicence,
+        business_classification: form.businessClassification,
         business_address: form.businessAddress,
         business_phone: normalizedBusinessPhone,
         billing_type: form.billingType,

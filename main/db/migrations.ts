@@ -3632,6 +3632,42 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       );
     },
   },
+  {
+    version: 125,
+    name: 'bill_content_fields_defaults',
+    up: () => {
+      // Bill-content fields (owner decisions, 2026-11-06): the tax id joins
+      // the fields shown by default (the v65 seed predates that decision),
+      // and the new optional fields are seeded at their decided defaults:
+      // licence/classification/waiter shown, cashier/guest count/open-close
+      // times hidden.
+      const db = getRawDatabase();
+      db.prepare(
+        "UPDATE settings SET value = 'true', updated_at = ? WHERE key = 'bill_show_tax_id' AND value = 'false'",
+      ).run(now());
+      // Customer name/phone on the dine-in bill are opt-in (they belong on
+      // the delivery slip). The legacy seeds stored 'true', which would read
+      // as an explicit opt-in; clear those two rows so "unset" carries the
+      // decided default — hidden for dine-in, shown for other order types.
+      // An owner can re-enable either field in printing settings.
+      db.prepare(
+        "DELETE FROM settings WHERE key IN ('bill_show_customer_name', 'bill_show_customer_phone') AND value = 'true'",
+      ).run();
+      const insert = db.prepare(`
+        INSERT OR IGNORE INTO settings (key, value, updated_at)
+        VALUES (?, ?, ?)
+      `);
+      const defaults = [
+        ['bill_show_licence', 'true'],
+        ['bill_show_classification', 'true'],
+        ['bill_show_waiter', 'true'],
+        ['bill_show_cashier', 'false'],
+        ['bill_show_guest_count', 'false'],
+        ['bill_show_open_close_times', 'false'],
+      ];
+      for (const [key, value] of defaults) insert.run(key, value, now());
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {

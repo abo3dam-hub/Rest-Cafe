@@ -838,7 +838,8 @@ console.log('\n✅ Test 1b2: Arabic shaping capability gate');
   );
   assert(
     'formatReceipt with arabicShaping prints the Persian item name',
-    receipt.toString('utf8').includes('چای زعفرانی مخصوص'),
+    receipt.toString('utf8').includes('چای زعفرانی') &&
+      receipt.toString('utf8').includes('مخصوص'),
   );
   assert(
     'formatReceipt with arabicShaping prints Persian addons',
@@ -1275,15 +1276,18 @@ console.log('\n✅ Test 2: Compact receipt (80mm, 48 cols)');
   assert('renders discount line with negative sign', /-\s*₹15\.00/.test(text));
   assert('renders tax total ₹40.00', text.includes('₹40.00'));
   assert('renders TOTAL with grand amount', text.includes('TOTAL') && text.includes('₹950.00'));
-  assert('renders Cash payment', text.includes('Cash') && text.includes('₹500.00'));
-  assert('renders UPI payment', text.includes('UPI') && text.includes('₹450.00'));
+  // v3 bill layout: payment lines never appear on the customer bill.
+  assert('omits Cash payment (v3)', !text.includes('Cash') && !text.includes('₹500.00'));
+  assert('omits UPI payment (v3)', !text.includes('UPI') && !text.includes('₹450.00'));
   assert('renders tax registration number', text.includes('TAXID-0001'));
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Powered by Rest&Cafe'));
+  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
   const rowLines = visiblePreview(buf, 48).split('\n');
-  const longRowIndex = rowLines.findIndex((l) => l.includes('Very Long Product Name That'));
+  const longRowIndex = rowLines.findIndex((l) => l.includes('Very Long Product Name'));
   assert(
     'long product name wraps cleanly onto multiple lines',
-    longRowIndex >= 0 && rowLines[longRowIndex + 1]?.includes('Truncated By Formatter'),
+    longRowIndex >= 0 &&
+      rowLines[longRowIndex + 1]?.includes('That Should Get') &&
+      rowLines.slice(longRowIndex + 1).some((l) => l.includes('Truncated By Formatter')),
   );
   assert('ends with cut byte sequence', bytesContain(buf, [GS, 0x56, 0x00]));
   const cheeseLine = rowLines.find((l) => l.startsWith('Cheeseburger') && l.includes('₹540'));
@@ -1456,7 +1460,7 @@ console.log('\n✅ Test 4: Classic receipt template');
 
   assert('renders business name', text.includes('Flo Test Cafe'));
   assert('renders item and total', text.includes('Cheeseburger') && text.includes('₹950.00'));
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Powered by Rest&Cafe'));
+  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
   assert('ends with cut', bytesContain(buf, [GS, 0x56, 0x00]));
 
   console.log('\n   — Rendered classic —');
@@ -1473,7 +1477,7 @@ console.log('\n✅ Test 5: Tax-specific labels fall back to the default template
     'legacy detailed label does not render the GST-style tax invoice',
     !text.includes('TAX INVOICE'),
   );
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Powered by Rest&Cafe'));
+  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
 
   console.log('\n   — Rendered detailed fallback —');
   console.log(visiblePreview(buf, 48));
@@ -1894,8 +1898,8 @@ console.log(
         text.includes('IRR99,000.00'),
       );
       assert(
-        `[backend IR ${template} unicode=${useUnicode}] preserves Payment line`,
-        text.includes('Cash'),
+        `[backend IR ${template} unicode=${useUnicode}] omits Payment line (v3)`,
+        !text.includes('Cash'),
       );
       assert(
         `[backend IR ${template} unicode=${useUnicode}] preserves Payment amount`,
@@ -2082,11 +2086,13 @@ console.log(
   ];
 
   // These are the existing financial-line contracts of the four frontend
-  // templates. Compact intentionally omits Subtotal, while detailed uses a
-  // subtotal label but does not print a separate Discount line.
+  // templates. Under the v3 bill layout the classic/compact customer bills
+  // carry no payment lines, and compact prints the permanent Subtotal line;
+  // the legacy detailed encoder uses a subtotal label but does not print a
+  // separate Discount line, and it and tax-bill keep their payment lines.
   const expectedLabels: Record<string, string[]> = {
-    compact: ['Discount', 'Tax', 'TOTAL', 'Cash'],
-    classic: ['Subtotal', 'Discount', 'Tax', 'TOTAL', 'Cash'],
+    compact: ['Subtotal', 'Discount', 'Tax', 'TOTAL'],
+    classic: ['Subtotal', 'Discount', 'Tax', 'TOTAL'],
     detailed: ['Subtotal (excl. tax)', 'Tax', 'TOTAL', 'Cash'],
     'tax-bill': ['Subtotal', 'Discount', 'Total Tax', 'TOTAL', 'Cash'],
   };
@@ -2115,6 +2121,12 @@ console.log(
         assert(
           `[frontend ${enc.name} unicode=${useUnicode}] preserves ${label} line`,
           text.includes(label),
+        );
+      }
+      if (enc.name === 'classic' || enc.name === 'compact') {
+        assert(
+          `[frontend ${enc.name} unicode=${useUnicode}] omits Cash line (v3)`,
+          !text.includes('Cash'),
         );
       }
       for (const amount of expectedAmounts[enc.name]) {

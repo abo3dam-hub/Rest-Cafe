@@ -484,6 +484,8 @@ function faFallbackErrors(
  * untranslated so the French UI cannot silently regress to English.
  */
 const FR_INTENTIONAL_IDENTICAL: ReadonlySet<string> = new Set([
+  'print.licence', // same word in French
+  'print.classification', // same word in French
   'auth.emailPlaceholder', // example email
   'dashboard.exportCsv', // format label "CSV (.csv)"
   'dashboard.exportXlsx', // format label "Excel (.xlsx)"
@@ -671,6 +673,7 @@ function trFallbackErrors(
 }
 
 const FIL_INTENTIONAL_IDENTICAL = new Set<string>([
+  'print.waiter', // "waiter" is the standard Filipino loanword
   'dashboard.exportCsv', // format label "CSV (.csv)"
   'dashboard.exportXlsx', // format label "Excel (.xlsx)"
   'auth.countryIndia',

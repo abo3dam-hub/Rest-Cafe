@@ -29,6 +29,121 @@ export function computeDiscountTaxRatio(
   return new TaxDecimal(discounted.toString()).div(base);
 }
 
+export type SyriaProfileKind = 'consumption' | 'sales';
+
+export const SYRIA_CONSUMPTION_LABEL = 'رسم الإنفاق الاستهلاكي';
+export const SYRIA_LOCAL_ADMIN_LABEL = 'رسم الإدارة المحلية';
+
+/**
+ * Syria levy profiles tax the whole bill. Detected from the pack id stamped
+ * on the order's own tax snapshots, so an order keeps the semantics of the
+ * pack it was actually taxed under even after the store switches profile.
+ */
+export function detectSyriaProfileFromSnapshots(
+  snapshots: (string | null | undefined)[],
+): SyriaProfileKind | null {
+  for (const raw of snapshots) {
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw) as { packId?: string };
+      if (parsed?.packId === 'syria-consumption') return 'consumption';
+      if (parsed?.packId === 'syria-sales') return 'sales';
+    } catch {}
+  }
+  return null;
+}
+
+/** Syria profile kind for a pack id, when the pack is a Syria levy. */
+export function syriaProfileKindForPackId(packId: string | null | undefined): SyriaProfileKind | null {
+  if (packId === 'syria-consumption') return 'consumption';
+  if (packId === 'syria-sales') return 'sales';
+  return null;
+}
+
+/** Local-administration rate (percent of the consumption fee); default 5. */
+export function getSyriaLocalAdminRate(): number {
+  const raw = getSettingValue('syria_local_admin_rate');
+  if (raw === null || raw === '') return 5;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : 5;
+}
+
+/** Sums one rule's component amounts across a combined snapshot document. */
+export function sumSnapshotRuleAmounts(snapshotJson: string | null, ruleId: string): Decimal {
+  let total = new Decimal(0);
+  if (!snapshotJson) return total;
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    const lines = (node as { lines?: unknown }).lines;
+    if (Array.isArray(lines)) {
+      for (const line of lines) {
+        const components = (line as { components?: unknown })?.components;
+        if (!Array.isArray(components)) continue;
+        for (const comp of components) {
+          const entry = comp as { ruleId?: string; amount?: string | number };
+          if (entry?.ruleId === ruleId && entry.amount !== undefined) {
+            const amount = new Decimal(entry.amount);
+            if (amount.isFinite()) total = total.plus(amount);
+          }
+        }
+      }
+    }
+  };
+  try {
+    walk(JSON.parse(snapshotJson));
+  } catch {}
+  return total;
+}
+
+/**
+ * Local-administration amount for a Syria consumption rollup: a percent OF
+ * the consumption fee itself, fractions rounded up at currency precision.
+ * Returns 0 when the profile rate or the fee makes it inapplicable.
+ */
+export function computeSyriaLocalAdmin(args: {
+  syriaProfile: SyriaProfileKind | null;
+  snapshotJson: string | null;
+  breakdowns: TaxBreakdown[][];
+  decimals: number;
+}): Decimal {
+  if (args.syriaProfile !== 'consumption') return new Decimal(0);
+  const adminRate = getSyriaLocalAdminRate();
+  if (adminRate <= 0) return new Decimal(0);
+  let consumption = sumSnapshotRuleAmounts(args.snapshotJson, 'consumption-fee');
+  if (consumption.lte(0)) {
+    for (const group of args.breakdowns) {
+      for (const entry of group) {
+        if (entry.title === SYRIA_CONSUMPTION_LABEL) {
+          consumption = consumption.plus(entry.amount || 0);
+        }
+      }
+    }
+  }
+  if (consumption.lte(0)) return new Decimal(0);
+  return consumption.mul(adminRate).div(100).toDecimalPlaces(args.decimals, Decimal.ROUND_CEIL);
+}
+
+/** Discount amount under Syria semantics: percentage of the post-fee total. */
+export function resolveSyriaDiscountAmount(args: {
+  discountType: string | null | undefined;
+  discountValue: number | null | undefined;
+  storedAmount: number | null | undefined;
+  postFeeTotal: number;
+  decimals: number;
+}): number {
+  const base = Math.max(0, args.postFeeTotal);
+  if (base <= 0) return 0;
+  if (args.discountType === 'percentage' && Number(args.discountValue || 0) > 0) {
+    return Number(((base * Number(args.discountValue)) / 100).toFixed(args.decimals));
+  }
+  const amount = Number(args.storedAmount ?? args.discountValue ?? 0);
+  return amount > 0 ? Number(Math.min(amount, base).toFixed(args.decimals)) : 0;
+}
+
 export interface TenantInfo {
   country: string;
   business_type: string;
@@ -1591,7 +1706,17 @@ export async function calculateTaxPreview(req: any, res: any): Promise<void> {
     const delivery = normalizeChargeAmount(delivery_charge, 'delivery');
     let service = normalizeChargeAmount(service_charge, 'service_charge');
 
+    const pack = getActiveCountryPack(tenantInfo.country);
+    // Syria levy profiles charge the fee on the whole pre-discount bill and
+    // deduct the discount from the post-fee total (owner decision,
+    // 2026-11-06); the preview mirrors the order pipeline exactly.
+    const syriaProfile = tenantInfo.taxes_enabled
+      ? syriaProfileKindForPackId(pack.id)
+      : null;
+
     let discountAmount = new Decimal(0);
+    let syriaDiscountType: string | null = null;
+    let syriaDiscountValue = 0;
     if (discount_type !== undefined || discount_value !== undefined) {
       if (!['percentage', 'amount'].includes(discount_type)) {
         res.status(400).json({ error: 'discount_type must be percentage or amount' });
@@ -1602,15 +1727,18 @@ export async function calculateTaxPreview(req: any, res: any): Promise<void> {
         res.status(400).json({ error: 'discount_value must be a finite non-negative number' });
         return;
       }
-      const subtotalDecimal = totalSubtotalDec;
-      if (discount_type === 'percentage') {
-        if (parsedDiscount > 100) {
-          res.status(400).json({ error: 'discount_value must not exceed 100 percent' });
-          return;
-        }
-        discountAmount = subtotalDecimal.mul(parsedDiscount).div(100);
+      if (discount_type === 'percentage' && parsedDiscount > 100) {
+        res.status(400).json({ error: 'discount_value must not exceed 100 percent' });
+        return;
+      }
+      if (syriaProfile) {
+        // Resolved after the rollup, once the post-fee total is known.
+        syriaDiscountType = discount_type;
+        syriaDiscountValue = parsedDiscount;
+      } else if (discount_type === 'percentage') {
+        discountAmount = totalSubtotalDec.mul(parsedDiscount).div(100);
       } else {
-        discountAmount = Decimal.min(new Decimal(parsedDiscount), subtotalDecimal);
+        discountAmount = Decimal.min(new Decimal(parsedDiscount), totalSubtotalDec);
       }
       discountAmount = discountAmount.toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP);
     }
@@ -1678,7 +1806,7 @@ export async function calculateTaxPreview(req: any, res: any): Promise<void> {
     const subtotalDecimal = totalSubtotalDec;
     const discountedSubtotal = Decimal.max(0, subtotalDecimal.minus(discountAmount));
     const taxRatio =
-      discountAmount.gt(0) && subtotalDecimal.gt(0)
+      !syriaProfile && discountAmount.gt(0) && subtotalDecimal.gt(0)
         ? computeDiscountTaxRatio(discountedSubtotal, subtotalDecimal)
         : new Decimal(1);
 
@@ -1697,16 +1825,70 @@ export async function calculateTaxPreview(req: any, res: any): Promise<void> {
       itemTaxRatio: taxRatio,
       taxesEnabled: tenantInfo.taxes_enabled,
     });
-    const aggregatedBreakdown = aggregateTaxBreakdown(taxRollup.breakdowns, minorFactor);
-    const exactTotal = discountedSubtotal
-      .plus(taxRollup.exclusiveTaxAmount)
-      .plus(packaging)
-      .plus(delivery)
-      .plus(service)
-      .plus(otherCharges)
-      .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
-      .toNumber();
-    const pack = getActiveCountryPack(tenantInfo.country);
+    let previewTaxAmount = taxRollup.taxAmount;
+    let previewExclusiveTaxAmount = taxRollup.exclusiveTaxAmount;
+    let previewBreakdowns = taxRollup.breakdowns;
+    if (syriaProfile === 'consumption') {
+      const adminAmount = computeSyriaLocalAdmin({
+        syriaProfile,
+        snapshotJson: taxRollup.snapshotJson,
+        breakdowns: taxRollup.breakdowns,
+        decimals,
+      });
+      if (adminAmount.gt(0)) {
+        previewTaxAmount = new Decimal(previewTaxAmount).plus(adminAmount).toNumber();
+        previewExclusiveTaxAmount = new Decimal(previewExclusiveTaxAmount)
+          .plus(adminAmount)
+          .toNumber();
+        previewBreakdowns = [
+          ...taxRollup.breakdowns,
+          [
+            {
+              title: SYRIA_LOCAL_ADMIN_LABEL,
+              rate: getSyriaLocalAdminRate(),
+              amount: adminAmount.toNumber(),
+            },
+          ],
+        ];
+      }
+    }
+    const aggregatedBreakdown = aggregateTaxBreakdown(previewBreakdowns, minorFactor);
+    let summaryDiscountedSubtotal = discountedSubtotal;
+    let exactTotal: number;
+    if (syriaProfile) {
+      const postFeeTotal = subtotalDecimal
+        .plus(previewExclusiveTaxAmount)
+        .plus(packaging)
+        .plus(delivery)
+        .plus(service)
+        .plus(otherCharges);
+      if (syriaDiscountType) {
+        discountAmount = new Decimal(
+          resolveSyriaDiscountAmount({
+            discountType: syriaDiscountType,
+            discountValue: syriaDiscountValue,
+            storedAmount: syriaDiscountType === 'amount' ? syriaDiscountValue : null,
+            postFeeTotal: postFeeTotal.toNumber(),
+            decimals,
+          }),
+        );
+      }
+      // The discount is not taken from the subtotal under Syria semantics.
+      summaryDiscountedSubtotal = subtotalDecimal;
+      exactTotal = postFeeTotal
+        .minus(discountAmount)
+        .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
+        .toNumber();
+    } else {
+      exactTotal = discountedSubtotal
+        .plus(taxRollup.exclusiveTaxAmount)
+        .plus(packaging)
+        .plus(delivery)
+        .plus(service)
+        .plus(otherCharges)
+        .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
+        .toNumber();
+    }
     const { total, adjustment: roundOff } = applyPayableRounding(exactTotal, pack, currency);
     if (!Number.isSafeInteger(Math.round(total * minorFactor))) {
       throw new ChargeValidationError('Order total exceeds the supported currency precision');
@@ -1717,8 +1899,8 @@ export async function calculateTaxPreview(req: any, res: any): Promise<void> {
       summary: {
         subtotal: round(totalSubtotal, decimals),
         discount_amount: discountAmount.toNumber(),
-        discounted_subtotal: discountedSubtotal.toNumber(),
-        tax_amount: round(taxRollup.taxAmount, decimals),
+        discounted_subtotal: summaryDiscountedSubtotal.toNumber(),
+        tax_amount: round(previewTaxAmount, decimals),
         tax_breakdown: aggregatedBreakdown,
         packaging_charge: packaging,
         delivery_charge: delivery,

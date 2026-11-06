@@ -91,6 +91,12 @@ export type PrintingForm = {
   billShowAddress: boolean;
   billShowPhone: boolean;
   billShowTaxId: boolean;
+  billShowLicence: boolean;
+  billShowClassification: boolean;
+  billShowWaiter: boolean;
+  billShowCashier: boolean;
+  billShowGuestCount: boolean;
+  billShowOpenCloseTimes: boolean;
   billShowTaxBreakdown: boolean;
   billShowCustomerName: boolean;
   billShowCustomerPhone: boolean;
@@ -1087,6 +1093,12 @@ export function PrintersSettingsTab({
                     { label: t('showRestaurantAddress'), key: 'billShowAddress' as const },
                     { label: t('showRestaurantPhone'), key: 'billShowPhone' as const },
                     { label: t('showTaxId'), key: 'billShowTaxId' as const },
+                    { label: t('showLicence'), key: 'billShowLicence' as const },
+                    { label: t('showClassification'), key: 'billShowClassification' as const },
+                    { label: t('showWaiter'), key: 'billShowWaiter' as const },
+                    { label: t('showCashier'), key: 'billShowCashier' as const },
+                    { label: t('showGuestCount'), key: 'billShowGuestCount' as const },
+                    { label: t('showOpenCloseTimes'), key: 'billShowOpenCloseTimes' as const },
                     { label: t('showTaxBreakdown'), key: 'billShowTaxBreakdown' as const },
                     { label: t('showCustomerName'), key: 'billShowCustomerName' as const },
                     { label: t('showCustomerPhone'), key: 'billShowCustomerPhone' as const },

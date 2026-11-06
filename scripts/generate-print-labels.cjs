@@ -146,6 +146,16 @@ const PRINT_NAMESPACE_KEYS = [
   'print.test.columns',
   'print.test.wrapHint',
   'print.test.success',
+  'print.licence',
+  'print.classification',
+  'print.waiter',
+  'print.servedBy',
+  'print.cashier',
+  'print.guests',
+  'print.openTime',
+  'print.closeTime',
+  'print.unitPrice',
+  'print.postFeeTotal',
 ];
 
 /**

@@ -865,6 +865,17 @@ router.patch('/:id/status', requirePermission('tables.manage'), (req: Request, r
       );
     }
 
+    // Manually moving a table out of bill_requested undoes the bill
+    // request: clear the printed closing-time stamp on its open order so
+    // the next request re-stamps it (owner decision, 2026-11-06).
+    if ((table as any).status === 'bill_requested' && status !== 'bill_requested') {
+      db.prepare(
+        `UPDATE orders SET bill_requested_at = NULL, updated_at = ?
+         WHERE table_id = ? AND bill_requested_at IS NOT NULL
+           AND status NOT IN ('completed', 'cancelled')`,
+      ).run(now(), req.params.id);
+    }
+
     const updated = db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id) as {
       status: string;
       reservation_customer_id?: string | null;

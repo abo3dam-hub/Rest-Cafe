@@ -30,7 +30,7 @@ import type { PrinterCutMode } from './profiles';
 
 export type { PrintWarning };
 
-const RECEIPT_BRANDING = 'Powered by Rest&Cafe';
+const RECEIPT_BRANDING = 'Rest&Cafe System Powered by Ali.J';
 
 const CURRENCY_TOKEN_RE = new RegExp(
   Object.keys(CURRENCY_ASCII_MAP)
@@ -66,8 +66,34 @@ function makeUnsupportedLineWarning(isStoreName: boolean, text: string): string 
   return `${label} was not printed because ${why}: ${text}`;
 }
 
-export function itemNameWidth(cols: number, amtLen: number): number {
-  return Math.max(1, cols - 4 - amtLen);
+export function itemNameWidth(cols: number, amtLen: number, rateLen: number = 0): number {
+  return Math.max(1, cols - 4 - amtLen - rateLen);
+}
+
+/** Width of the unit-price (rate) column: widest formatted unit price + 1. */
+export function itemRateWidth(
+  order:
+    | { items?: Array<{ status?: unknown; unit_price?: number; price?: number }> }
+    | null
+    | undefined,
+  prefix: string,
+  locale: string,
+  trimDecimals: boolean,
+  cols: number,
+  fractionDigits: number = 2,
+): number {
+  let width = 5;
+  for (const item of order?.items ?? []) {
+    if (isExcludedFromBillReceipt(item.status)) continue;
+    const unit = Number(item.unit_price ?? item.price ?? 0) || 0;
+    width = Math.max(
+      width,
+      displayCellWidth(formatCurrency(unit, prefix, locale, trimDecimals, fractionDigits)) + 1,
+    );
+  }
+  // Never below the widest formatted rate: the segment is padded, not
+  // truncated, so a smaller width would push the amount off the line.
+  return width;
 }
 
 export function itemAmountWidth(
@@ -115,21 +141,28 @@ export function itemRows(
   _language: string = 'en',
   fractionDigits: number = 2,
   capabilities?: ThermalPrinterCapabilities,
+  rate?: { unitPrice: number; rateLen: number },
 ): string[] {
   const qtyW = 4;
   const productName = normalizeThermalText(String(item.product_name ?? ''), capabilities);
   const amount = formatCurrency(item.total, prefix, locale, trimDecimals, fractionDigits);
   const qty = padToDisplayCells(String(item.quantity), qtyW);
+  const rateSegment = rate
+    ? padToDisplayCells(
+        formatCurrency(rate.unitPrice, prefix, locale, trimDecimals, fractionDigits),
+        rate.rateLen,
+      )
+    : '';
   const maxLine1Name = Math.max(1, nameLen - 1);
 
   if (displayCellWidth(productName) <= maxLine1Name) {
-    const label = padToDisplayCells(productName, nameLen) + qty;
+    const label = padToDisplayCells(productName, nameLen) + rateSegment + qty;
     return [label + rightAlign(amount, cols - displayCellWidth(label))];
   }
 
   const nameLines = wrapText(productName, maxLine1Name);
   const firstLineName = padToDisplayCells(nameLines[0] || '', nameLen);
-  const firstRowLabel = firstLineName + qty;
+  const firstRowLabel = firstLineName + rateSegment + qty;
   const firstRow = firstRowLabel + rightAlign(amount, cols - displayCellWidth(firstRowLabel));
 
   const result = [firstRow];

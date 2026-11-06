@@ -35,6 +35,8 @@ export interface PosSettingsState {
   billTemplateSource: 'core' | 'pack' | 'merchant' | null;
   billFooterMessage: string;
   billTaxRegistrationNumber: string;
+  billLicence: string;
+  billClassification: string;
   billAddress: string;
   billPhone: string;
   receiptLogo: string;
@@ -44,6 +46,12 @@ export interface PosSettingsState {
   billShowAddress: boolean;
   billShowPhone: boolean;
   billShowTaxId: boolean;
+  billShowLicence: boolean;
+  billShowClassification: boolean;
+  billShowWaiter: boolean;
+  billShowCashier: boolean;
+  billShowGuestCount: boolean;
+  billShowOpenCloseTimes: boolean;
   billShowTaxBreakdown: boolean;
   billShowCustomerName: boolean;
   billShowCustomerPhone: boolean;
@@ -86,6 +94,12 @@ export interface PosSettingsState {
   setBillShowAddress: (v: boolean) => void;
   setBillShowPhone: (v: boolean) => void;
   setBillShowTaxId: (v: boolean) => void;
+  setBillShowLicence: (v: boolean) => void;
+  setBillShowClassification: (v: boolean) => void;
+  setBillShowWaiter: (v: boolean) => void;
+  setBillShowCashier: (v: boolean) => void;
+  setBillShowGuestCount: (v: boolean) => void;
+  setBillShowOpenCloseTimes: (v: boolean) => void;
   setBillShowTaxBreakdown: (v: boolean) => void;
   setBillShowCustomerName: (v: boolean) => void;
   setBillShowCustomerPhone: (v: boolean) => void;
@@ -114,6 +128,18 @@ export interface ReceiptSettingsHydrationData {
   billShowPhone?: boolean | string | null;
   bill_show_tax_id?: boolean | string | null;
   billShowTaxId?: boolean | string | null;
+  bill_show_licence?: boolean | string | null;
+  billShowLicence?: boolean | string | null;
+  bill_show_classification?: boolean | string | null;
+  billShowClassification?: boolean | string | null;
+  bill_show_waiter?: boolean | string | null;
+  billShowWaiter?: boolean | string | null;
+  bill_show_cashier?: boolean | string | null;
+  billShowCashier?: boolean | string | null;
+  bill_show_guest_count?: boolean | string | null;
+  billShowGuestCount?: boolean | string | null;
+  bill_show_open_close_times?: boolean | string | null;
+  billShowOpenCloseTimes?: boolean | string | null;
   bill_show_tax_breakdown?: boolean | string | null;
   billShowTaxBreakdown?: boolean | string | null;
   bill_show_customer_name?: boolean | string | null;
@@ -129,6 +155,8 @@ export interface ReceiptSettingsHydrationData {
   receipt_logo_raster?: string | null;
   receiptLogoRaster?: string | null;
   tax_registration_number?: string | null;
+  business_licence?: string | null;
+  business_classification?: string | null;
   business_address?: string | null;
   business_phone?: string | null;
   bill_footer_message?: string | null;
@@ -164,6 +192,8 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       billTemplateSource: null,
       billFooterMessage: '',
       billTaxRegistrationNumber: '',
+      billLicence: '',
+      billClassification: '',
       billAddress: '',
       billPhone: '',
       receiptLogo: '',
@@ -172,7 +202,13 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       billShowName: true,
       billShowAddress: true,
       billShowPhone: true,
-      billShowTaxId: false,
+      billShowTaxId: true,
+      billShowLicence: true,
+      billShowClassification: true,
+      billShowWaiter: true,
+      billShowCashier: false,
+      billShowGuestCount: false,
+      billShowOpenCloseTimes: false,
       billShowTaxBreakdown: true,
       billShowCustomerName: true,
       billShowCustomerPhone: true,
@@ -212,6 +248,12 @@ export const usePosSettingsStore = create<PosSettingsState>()(
       setBillShowAddress: (v) => set({ billShowAddress: v }),
       setBillShowPhone: (v) => set({ billShowPhone: v }),
       setBillShowTaxId: (v) => set({ billShowTaxId: v }),
+      setBillShowLicence: (v) => set({ billShowLicence: v }),
+      setBillShowClassification: (v) => set({ billShowClassification: v }),
+      setBillShowWaiter: (v) => set({ billShowWaiter: v }),
+      setBillShowCashier: (v) => set({ billShowCashier: v }),
+      setBillShowGuestCount: (v) => set({ billShowGuestCount: v }),
+      setBillShowOpenCloseTimes: (v) => set({ billShowOpenCloseTimes: v }),
       setBillShowTaxBreakdown: (v) => set({ billShowTaxBreakdown: v }),
       setBillShowCustomerName: (v) => set({ billShowCustomerName: v }),
       setBillShowCustomerPhone: (v) => set({ billShowCustomerPhone: v }),
@@ -250,6 +292,31 @@ export const usePosSettingsStore = create<PosSettingsState>()(
           if (showTaxId !== undefined && showTaxId !== null) {
             updates.billShowTaxId = showTaxId === true || showTaxId === 'true';
           }
+          const showLicence = d.bill_show_licence ?? d.billShowLicence;
+          if (showLicence !== undefined && showLicence !== null) {
+            updates.billShowLicence = showLicence !== false && showLicence !== 'false';
+          }
+          const showClassification = d.bill_show_classification ?? d.billShowClassification;
+          if (showClassification !== undefined && showClassification !== null) {
+            updates.billShowClassification =
+              showClassification !== false && showClassification !== 'false';
+          }
+          const showWaiter = d.bill_show_waiter ?? d.billShowWaiter;
+          if (showWaiter !== undefined && showWaiter !== null) {
+            updates.billShowWaiter = showWaiter !== false && showWaiter !== 'false';
+          }
+          const showCashier = d.bill_show_cashier ?? d.billShowCashier;
+          if (showCashier !== undefined && showCashier !== null) {
+            updates.billShowCashier = showCashier === true || showCashier === 'true';
+          }
+          const showGuestCount = d.bill_show_guest_count ?? d.billShowGuestCount;
+          if (showGuestCount !== undefined && showGuestCount !== null) {
+            updates.billShowGuestCount = showGuestCount === true || showGuestCount === 'true';
+          }
+          const showOpenClose = d.bill_show_open_close_times ?? d.billShowOpenCloseTimes;
+          if (showOpenClose !== undefined && showOpenClose !== null) {
+            updates.billShowOpenCloseTimes = showOpenClose === true || showOpenClose === 'true';
+          }
           const showTaxBreakdown = d.bill_show_tax_breakdown ?? d.billShowTaxBreakdown;
           if (showTaxBreakdown !== undefined && showTaxBreakdown !== null) {
             updates.billShowTaxBreakdown =
@@ -283,6 +350,12 @@ export const usePosSettingsStore = create<PosSettingsState>()(
           }
           if (d.tax_registration_number !== undefined) {
             updates.billTaxRegistrationNumber = d.tax_registration_number || '';
+          }
+          if (d.business_licence !== undefined) {
+            updates.billLicence = d.business_licence || '';
+          }
+          if (d.business_classification !== undefined) {
+            updates.billClassification = d.business_classification || '';
           }
           if (d.business_address !== undefined) {
             updates.billAddress = d.business_address || '';
