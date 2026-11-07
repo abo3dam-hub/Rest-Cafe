@@ -43,13 +43,17 @@
  *     1 merged); units SH 42 / FA 15 / CO 51 / KU 20 / TE 13 / MA 4;
  *     cash close: opening 100,000 + cash 2,708,000 - refunds 0 -
  *     expense 25,000 = counted 2,783,000, variance 0.
- *   Round 2: gross collected (before refunds) 3,220,800; discounts 27,000;
- *     fee 292,800; cash 2,978,800; card 242,000; refunds 158,500
- *     (partial item 10,000 + full bill 148,500, both cash);
- *     net collected 3,062,300; cash net 2,820,300; card 242,000;
+ *   Round 2: gross collected (before refunds) 3,235,440; discounts 29,835
+ *     (T21 10% of 77,350 = 7,735; T22 20% of 110,500 = 22,100 — discount
+ *     after the fees, owner decision 2026-11-06); fee 310,275 (consumption
+ *     295,500 + local admin 14,775); cash 2,992,340; card 243,100;
+ *     refunds 160,175 (partial item 11,000 — tea 10,000 + 1,000
+ *     consumption-fee share; the local admin is document-level and never
+ *     lands on an item line — + full bill 149,175, both cash);
+ *     net collected 3,075,265; cash net 2,832,165; card 243,100;
  *     same order counts as Round 1; units as Round 1 except TE 12
  *     (the refunded tea line is excluded); cash close:
- *     100,000 + 2,978,800 - 158,500 - 25,000 = 2,895,300, variance 0.
+ *     100,000 + 2,992,340 - 160,175 - 25,000 = 2,907,165, variance 0.
  *   Round 3: gross 235,750; discounts 5,000; tax 30,750 (sales 5%:
  *     10,250 + fee 10%: 20,500); cash 178,250; card 57,500;
  *     orders created 4, completed 4, cancelled 0;
@@ -281,14 +285,15 @@ const EXPECTED_R1 = {
   countedCash: 2783000,
 };
 const EXPECTED_R2 = {
-  grossCollected: 3220800,
-  discounts: 27000,
-  fee: 292800,
-  refunds: 159500,
-  netCollected: 3061300,
-  cash: 2978800,
-  card: 242000,
-  cashNet: 2819300,
+  grossCollected: 3235440,
+  discounts: 29835,
+  fee: 310275,
+  consumptionFee: 295500,
+  refunds: 160175,
+  netCollected: 3075265,
+  cash: 2992340,
+  card: 243100,
+  cashNet: 2832165,
   ordersCreated: 52,
   ordersCompleted: 43,
   ordersCancelled: 9,
@@ -305,11 +310,11 @@ const EXPECTED_R2 = {
     'p-mansaf': 4,
   },
   billsCount: 44,
-  billsTotal: 3220800,
+  billsTotal: 3235440,
   openingFloat: 100000,
   expense: 25000,
-  cashRefunds: 159500,
-  countedCash: 2894300,
+  cashRefunds: 160175,
+  countedCash: 2907165,
 };
 const EXPECTED_R3 = {
   grossCollected: 235750,
@@ -373,8 +378,15 @@ function median(values) {
 // finale compares this ledger against the pinned constants above FIRST, so
 // a script bug cannot masquerade as a system bug.
 class Ledger {
-  constructor(feePct) {
+  // syria: the round runs under the Syria consumption profile (Stage B,
+  // owner decision 2026-11-06): consumption fee rounded UP on the whole
+  // pre-discount subtotal, local-admin fee 5% of the consumption fee
+  // (rounded up, document-level), discount AFTER the fees on the post-fee
+  // total. The manual-pack round (R3) keeps the old model: discount first,
+  // tax on the discounted base, no local admin.
+  constructor(feePct, syria = false) {
     this.feePct = feePct;
+    this.syria = syria;
     this.orders = new Map(); // orderId -> entry
     this.refunds = []; // {label, amount, method}
     this.expense = 0;
@@ -400,6 +412,24 @@ class Ledger {
   entry(orderId) {
     return this.orders.get(orderId);
   }
+  // Syria money: fee rounded UP on the pre-discount subtotal, local admin
+  // 5% of that fee (rounded up), discount AFTER the fees on the post-fee
+  // total. `fee` is the combined tax the bill carries (consumption +
+  // admin); `admin` is exposed separately for the split-payment math.
+  // Manual-pack money: discount first, tax on the discounted base.
+  moneyFor(sub, discountPct) {
+    if (this.syria) {
+      const fee = Math.ceil((sub * this.feePct) / 100);
+      const admin = Math.ceil((fee * 5) / 100);
+      const postFee = sub + fee + admin;
+      const disc = Math.round((postFee * discountPct) / 100);
+      return { sub, disc, base: sub, fee: fee + admin, admin, total: postFee - disc };
+    }
+    const disc = Math.round((sub * discountPct) / 100);
+    const base = sub - disc;
+    const fee = Math.round((base * this.feePct) / 100);
+    return { sub, disc, base, fee, admin: 0, total: base + fee };
+  }
   orderMoney(e) {
     // Refunded items stay in the money totals: a refund never changes the
     // order or bill total, it only records a separate refund row. Units
@@ -407,10 +437,7 @@ class Ledger {
     const sub = e.items
       .filter((i) => i.status === 'active' || i.status === 'refunded')
       .reduce((s, i) => s + PRICE[i.productId] * i.qty, 0);
-    const disc = Math.round((sub * e.discountPct) / 100);
-    const base = sub - disc;
-    const fee = Math.round((base * this.feePct) / 100);
-    return { sub, disc, base, fee, total: base + fee };
+    return this.moneyFor(sub, e.discountPct);
   }
   setItemQty(orderId, productId, qty) {
     const e = this.entry(orderId);
@@ -544,7 +571,7 @@ async function createDineInOrder(A, authHeader, ledger, label, tableId, tableNo,
   expectMoney(
     label,
     'order total at creation',
-    m.sub + Math.round((m.sub * ledger.feePct) / 100),
+    ledger.moneyFor(m.sub, 0).total,
     order.total,
     'at creation',
   );
@@ -968,7 +995,7 @@ async function runRound(cfg) {
   const app = buildApp();
   const { server, baseUrl } = await startServer(app);
   const A = baseUrl + '/api';
-  const ledger = new Ledger(feePct);
+  const ledger = new Ledger(feePct, feePct > 0);
   let serverAppOn = false;
   try {
     const { ownerAuth } = await setupShop(
@@ -1947,6 +1974,8 @@ async function runRound(cfg) {
       assertEqualOrThrow(pref.status, 201, 'R2 refund: partial item refund accepted');
       // The item refund defaults to the line total INCLUDING its fee share
       // (tea 10,000 + 1,000 fee = 11,000); the order/bill totals do not move.
+      // The local admin stays out: it is a document-level component and
+      // never lands on an item line, so the item total is unchanged by it.
       assertEqualOrThrow(
         Number(pref.data.refund?.amount_cents),
         11000,
@@ -1959,7 +1988,7 @@ async function runRound(cfg) {
       );
       ledger.refundItem(orderByTable[1], TE);
       ledger.refunds.push({ label: 'T1-tea', amount: 11000, method: 'cash' });
-      // Full refund: T2's whole bill (148,500) in cash.
+      // Full refund: T2's whole bill (149,175) in cash.
       const t2bill = (await api(A, `/bills/order/${orderByTable[2]}`, { headers: ownerAuth })).data
         .bill;
       const fref = await api(A, '/refunds', {
@@ -1967,7 +1996,7 @@ async function runRound(cfg) {
         headers: ownerAuth,
         body: {
           bill_id: t2bill.id,
-          amount: 148500,
+          amount: 149175,
           method: 'cash',
           reason: 'إرجاع كامل',
           approver_id: ownerId,
@@ -1976,7 +2005,7 @@ async function runRound(cfg) {
       });
       assertEqualOrThrow(fref.status, 201, 'R2 refund: full refund accepted');
       assertEqualOrThrow(fref.data.bill?.payment_status, 'refunded', 'R2 refund: bill is refunded');
-      ledger.refunds.push({ label: 'T2-full', amount: 148500, method: 'cash' });
+      ledger.refunds.push({ label: 'T2-full', amount: 149175, method: 'cash' });
     }
 
     // ── Cash closure: counted = opening + cash in - cash refunds - expense ──
@@ -2283,7 +2312,7 @@ async function finale(A, ownerAuth, db, ledger, expected, round) {
     expectMoney(
       `${round} tax-components`,
       'consumption fee component',
-      expected.fee,
+      expected.consumptionFee ?? expected.fee,
       feeComp?.amount,
       'tax-components',
     );

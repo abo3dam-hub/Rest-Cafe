@@ -16,10 +16,12 @@
  *     cash payment → table freed → reports reconcile to hand-computed
  *     numbers.
  *
- *   Round B — Syria consumption fee 5% + 10% discount + split payment:
- *     same skeleton; every money figure (fee on the discounted base,
- *     split cash/card, tax components, cash summary) is reconciled against
- *     numbers computed by hand in this file before any response is read.
+ *   Round B — Syria consumption fee 5% + local admin 5% of the fee +
+ *     10% discount after the fees + split payment:
+ *     same skeleton; every money figure (fee on the whole bill, local
+ *     admin, discount on the post-fee total, split cash/card, tax
+ *     components, cash summary) is reconciled against numbers computed
+ *     by hand in this file before any response is read.
  *
  * The expected numbers below are the contract. Any mismatch is a finding,
  * not something to tune away.
@@ -432,12 +434,14 @@ async function runRoundB() {
     let order = create.data.order;
     const oid = order.id;
     assertEqual(order.subtotal, 60000, 'B1: subtotal = 60,000');
-    assertEqual(order.tax_amount, 3000, 'B1: fee = 5% × 60,000 = 3,000');
-    assertEqual(order.total, 63000, 'B1: total = 63,000');
+    assertEqual(order.tax_amount, 3150, 'B1: tax = fee 3,000 + local admin 150');
+    assertEqual(order.total, 63150, 'B1: total = 63,150');
     const bd = normalizeBreakdown(order.tax_breakdown);
-    assertEqual(bd.length, 1, 'B1: exactly one tax line');
+    assertEqual(bd.length, 2, 'B1: two tax lines (consumption + local admin)');
     assertEqual(bd[0]?.title, 'رسم الإنفاق الاستهلاكي', 'B1: the tax line is the consumption fee');
     assertEqual(bd[0]?.amount, 3000, 'B1: fee line amount = 3,000');
+    assertEqual(bd[1]?.title, 'رسم الإدارة المحلية', 'B1: second line is the local admin fee');
+    assertEqual(bd[1]?.amount, 150, 'B1: local admin line amount = 150');
 
     // 2) Kitchen serves everything.
     for (const it of order.items) {
@@ -447,7 +451,9 @@ async function runRoundB() {
       assertEqual(r.status, 200, `B2: ${it.product_name} → served`);
     }
 
-    // 3) A 10% order discount — the fee must shrink proportionally.
+    // 3) A 10% order discount — taken AFTER the fees (owner decision
+    // 2026-11-06): the fee never rescales, the discount is 10% of the
+    // post-fee total 63,150 = 6,315.
     const disc = await api(A, `/orders/${oid}/discount`, {
       method: 'PATCH', headers: ownerAuth,
       body: { discount_type: 'percentage', discount_value: 10, discount_reason: 'زبون دائم' },
@@ -455,9 +461,9 @@ async function runRoundB() {
     assertEqual(disc.status, 200, 'B3: 10% discount applied');
     if (disc.status === 200) {
       order = disc.data.order;
-      assertEqual(order.discount_amount, 6000, 'B3: discount = 6,000');
-      assertEqual(order.tax_amount, 2700, 'B3: fee rescales to 5% × 54,000 = 2,700');
-      assertEqual(order.total, 56700, 'B3: total = 54,000 + 2,700 = 56,700');
+      assertEqual(order.discount_amount, 6315, 'B3: discount = 6,315');
+      assertEqual(order.tax_amount, 3150, 'B3: fee does not rescale — stays 3,150');
+      assertEqual(order.total, 56835, 'B3: total = 63,150 − 6,315 = 56,835');
     }
 
     // 4) Bill + print.
@@ -465,24 +471,26 @@ async function runRoundB() {
     assert([200, 201].includes(gen.status), 'B4: bill generated');
     if (![200, 201].includes(gen.status)) throw new Error('B4 generate failed: ' + JSON.stringify(gen.data));
     const bill = gen.data.bill;
-    assertEqual(bill.total, 56700, 'B4: bill total = 56,700');
+    assertEqual(bill.total, 56835, 'B4: bill total = 56,835');
     const bbd = normalizeBreakdown(bill.tax_breakdown);
-    assertEqual(bbd.length, 1, 'B4: bill carries exactly one tax line');
+    assertEqual(bbd.length, 2, 'B4: bill carries two tax lines');
     assertEqual(bbd[0]?.title, 'رسم الإنفاق الاستهلاكي', 'B4: bill tax line is the consumption fee');
-    assertEqual(bbd[0]?.amount, 2700, 'B4: bill fee line = 2,700');
+    assertEqual(bbd[0]?.amount, 3000, 'B4: bill fee line = 3,000');
+    assertEqual(bbd[1]?.title, 'رسم الإدارة المحلية', 'B4: bill second line is the local admin fee');
+    assertEqual(bbd[1]?.amount, 150, 'B4: bill local admin line = 150');
     const print = await api(A, `/bills/${bill.id}/print`, {
       method: 'POST', headers: ownerAuth, body: { print_type: 'receipt' },
     });
     assertEqual(print.status, 200, 'B4: bill print recorded');
 
-    // 5) Split payment: 30,000 cash + 26,700 card.
+    // 5) Split payment: 30,000 cash + 26,835 card.
     const pay = await api(A, `/bills/${bill.id}/payments`, {
       method: 'POST', headers: ownerAuth,
-      body: { payments: [{ method: 'cash', amount: 30000 }, { method: 'card', amount: 26700 }] },
+      body: { payments: [{ method: 'cash', amount: 30000 }, { method: 'card', amount: 26835 }] },
     });
     assertEqual(pay.status, 200, 'B5: split payment accepted');
     assertEqual(pay.data.bill?.payment_status, 'paid', 'B5: bill is paid');
-    assertEqual(Number(pay.data.bill?.paid_amount), 56700, 'B5: paid amount = 56,700');
+    assertEqual(Number(pay.data.bill?.paid_amount), 56835, 'B5: paid amount = 56,835');
     const done = (await api(A, `/orders/${oid}`, { headers: ownerAuth })).data.order;
     assertEqual(done.status, 'completed', 'B5: order completes on full payment');
     const tables = await api(A, '/tables', { headers: waiter.authHeader });
@@ -493,23 +501,23 @@ async function runRoundB() {
     const date = damascusToday();
     const summary = await api(A, `/reports/summary?date=${date}`, { headers: ownerAuth });
     const s = summary.data.summary || {};
-    assertEqual(s.bills?.collected, 56700, 'B6: summary collected = 56,700');
+    assertEqual(s.bills?.collected, 56835, 'B6: summary collected = 56,835');
     assertEqual((s.paymentMethods || []).find((p) => p.method === 'cash')?.total, 30000,
       'B6: summary payment methods: cash = 30,000');
-    assertEqual((s.paymentMethods || []).find((p) => p.method === 'card')?.total, 26700,
-      'B6: summary payment methods: card = 26,700');
+    assertEqual((s.paymentMethods || []).find((p) => p.method === 'card')?.total, 26835,
+      'B6: summary payment methods: card = 26,835');
     const taxComp = await api(A, '/reports/tax-components', { headers: ownerAuth });
-    assertEqual(taxComp.data.taxComponents?.taxAmount, 2700, 'B6: tax components total = 2,700');
+    assertEqual(taxComp.data.taxComponents?.taxAmount, 3150, 'B6: tax components total = 3,150');
     const fee = (taxComp.data.taxComponents?.components || []).find((c) => c.title === 'رسم الإنفاق الاستهلاكي');
-    assertEqual(fee?.amount, 2700, 'B6: fee component = 2,700 at 5%');
+    assertEqual(fee?.amount, 3000, 'B6: fee component = 3,000 at 5%');
     const cashSummary = await api(A, '/reports/cash-summary', { headers: ownerAuth });
     const day = (cashSummary.data.cashSummary?.days || [])[0];
     assertEqual(day?.cash_collected, 30000, 'B6: cash summary — cash collected = 30,000');
-    assertEqual(day?.net_collected, 56700, 'B6: cash summary — net collected = 56,700');
+    assertEqual(day?.net_collected, 56835, 'B6: cash summary — net collected = 56,835');
     const x = await api(A, `/reports/x-report?date=${date}`, { headers: ownerAuth });
-    assertEqual(x.data.xReport?.netCollected, 56700, 'B6: X report net collected = 56,700');
-    assertEqual((x.data.xReport?.taxComponents || []).find((c) => c.title === 'رسم الإنفاق الاستهلاكي')?.amount, 2700,
-      'B6: X report carries the fee component = 2,700');
+    assertEqual(x.data.xReport?.netCollected, 56835, 'B6: X report net collected = 56,835');
+    assertEqual((x.data.xReport?.taxComponents || []).find((c) => c.title === 'رسم الإنفاق الاستهلاكي')?.amount, 3000,
+      'B6: X report carries the fee component = 3,000');
   } finally {
     server.close();
     closeDatabase();
