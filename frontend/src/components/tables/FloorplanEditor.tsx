@@ -30,7 +30,7 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { Ltr } from '@/components/layout/Ltr';
 
 const formatClock = (iso: string): string => {
-  const d = new Date(iso);
+  const d = parseDbTimestamp(iso);
   return Number.isNaN(d.getTime())
     ? ''
     : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -814,8 +814,7 @@ export default function FloorplanEditor({
     // outside and gets cut. Anchor the hint to the tile's own edge when the
     // table sits near a canvas side, and flip it below top-row tables.
     const hintPos = posOf(tb);
-    const hintVerticalClass =
-      hintPos && hintPos.y <= 28 ? 'top-full mt-2' : 'bottom-full mb-2';
+    const hintVerticalClass = hintPos && hintPos.y <= 28 ? 'top-full mt-2' : 'bottom-full mb-2';
     const hintHorizontalClass =
       !hintPos || (hintPos.x > 22 && hintPos.x < 78)
         ? 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2'
@@ -887,9 +886,7 @@ export default function FloorplanEditor({
         {showHint && activeOrder && (
           <div className={hintClass}>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold">
-                {tb.name}
-              </span>
+              <span className="text-sm font-bold">{tb.name}</span>
               <span className="text-xs font-semibold text-amber-400">
                 <Ltr>#{activeOrder.order_number}</Ltr>
               </span>

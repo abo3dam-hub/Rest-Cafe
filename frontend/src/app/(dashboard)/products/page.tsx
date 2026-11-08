@@ -27,6 +27,8 @@ import {
   Search,
   Star,
   PackageX,
+  GripVertical,
+  BadgePercent,
 } from 'lucide-react';
 import type { Product, Category, AddonGroup, Addon } from '@/lib/types';
 import {
@@ -51,6 +53,13 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { nameToColor } from '@/lib/image-utils';
 import { useTranslations, type AppConfig } from 'use-intl';
 import { tenantCan } from '@/lib/permissions';
+import {
+  DEFAULT_SPECIAL_CARDS_CONFIG,
+  mergeCatalogChips,
+  parseSpecialCardsConfig,
+  type SpecialCardKind,
+  type SpecialCardsConfig,
+} from '@/lib/special-cards';
 
 type ProductsKey = keyof AppConfig['Messages']['products'];
 
@@ -222,6 +231,14 @@ export default function ProductsPage() {
   const [bulkPercent, setBulkPercent] = useState('');
   const [bulkCategoryId, setBulkCategoryId] = useState('');
   const [savingPrices, setSavingPrices] = useState(false);
+  const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
+  const [draggedChipKey, setDraggedChipKey] = useState<string | null>(null);
+  const [specialCardsConfig, setSpecialCardsConfig] = useState<SpecialCardsConfig>(
+    DEFAULT_SPECIAL_CARDS_CONFIG,
+  );
+  const [offersTitleDraft, setOffersTitleDraft] = useState('');
+  const [savingSpecialCards, setSavingSpecialCards] = useState(false);
 
   const router = useRouter();
   const currency = getCurrencySymbol(
@@ -236,6 +253,11 @@ export default function ProductsPage() {
   const canManageAddons = isRestaurant || isOwnerOrManager;
   const productAddonGroupOptions = [...addonGroups, ...productInactiveAddonGroups];
   const categoryAddonGroupOptions = [...addonGroups, ...categoryAddonGroups];
+  const editorChips = mergeCatalogChips(
+    categories,
+    specialCardsConfig,
+    new Set<SpecialCardKind>(['top', 'offers']),
+  );
 
   const handleTabChange = useCallback(
     (value: string) => {
@@ -305,6 +327,14 @@ export default function ProductsPage() {
         if (!(err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError')))
           setTaxCategories([]);
       });
+    api
+      .get('/settings/special-cards', { signal: controller.signal })
+      .then((res) => {
+        const config = parseSpecialCardsConfig(res.data ?? {});
+        setSpecialCardsConfig(config);
+        setOffersTitleDraft(config.offers_title);
+      })
+      .catch(() => {});
     api
       .get('/settings/loyalty', { signal: controller.signal })
       .then((res) => {
@@ -887,9 +917,7 @@ export default function ProductsPage() {
 
   const handleTogglePin = async (product: Product) => {
     const next = !isPinnedProduct(product);
-    setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? { ...p, is_pinned: next } : p)),
-    );
+    setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_pinned: next } : p)));
     try {
       await api.patch(`/products/${product.id}/pin`, { pinned: next });
     } catch {
@@ -902,9 +930,7 @@ export default function ProductsPage() {
 
   const handleToggleSoldOut = async (product: Product) => {
     const next = !isSoldOutProduct(product);
-    setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? { ...p, is_sold_out: next } : p)),
-    );
+    setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_sold_out: next } : p)));
     try {
       await api.patch(`/products/${product.id}/sold-out`, { sold_out: next });
     } catch {
@@ -915,10 +941,131 @@ export default function ProductsPage() {
     }
   };
 
-  const enterPriceEditMode = () => {
-    setPriceDrafts(
-      Object.fromEntries(products.map((p) => [String(p.id), String(p.price)])),
+  const reorderSubset = <T extends { id: string }>(items: T[], orderedIds: string[]): T[] => {
+    const byId = new Map(items.map((item) => [String(item.id), item]));
+    let cursor = 0;
+    return items.map((item) =>
+      orderedIds.includes(String(item.id)) ? byId.get(orderedIds[cursor++])! : item,
     );
+  };
+
+  const moveId = (ids: string[], draggedId: string, targetId: string): string[] => {
+    const from = ids.indexOf(draggedId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return ids;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  };
+
+  const saveProductOrder = async (orderedIds: string[]) => {
+    setProducts((prev) => reorderSubset(prev, orderedIds));
+    try {
+      await api.patch('/products/list-order', { ids: orderedIds });
+      toast.success(t('orderSaved'));
+    } catch {
+      toast.error(t('orderSaveFailed'));
+      fetchData();
+    }
+  };
+
+  const saveCategoryOrder = async (orderedIds: string[]) => {
+    setCategories((prev) => reorderSubset(prev, orderedIds));
+    try {
+      await api.patch('/categories/list-order', { ids: orderedIds });
+      toast.success(t('orderSaved'));
+    } catch {
+      toast.error(t('orderSaveFailed'));
+      fetchData();
+    }
+  };
+
+  const handleProductDrop = (targetId: string) => {
+    if (!draggedProductId) return;
+    const orderedIds = moveId(
+      listedProducts.map((product) => String(product.id)),
+      draggedProductId,
+      targetId,
+    );
+    setDraggedProductId(null);
+    void saveProductOrder(orderedIds);
+  };
+
+  const handleCategoryDrop = (targetId: string) => {
+    if (!draggedCategoryId) return;
+    const orderedIds = moveId(
+      visibleCategories.map((category) => String(category.id)),
+      draggedCategoryId,
+      targetId,
+    );
+    setDraggedCategoryId(null);
+    void saveCategoryOrder(orderedIds);
+  };
+
+  const isInSpecialCard = (product: Product, kind: 'top' | 'offers') =>
+    kind === 'top'
+      ? product.in_top_card === true || product.in_top_card === 1
+      : product.in_offers_card === true || product.in_offers_card === 1;
+
+  const handleToggleSpecialCard = async (product: Product, kind: 'top' | 'offers') => {
+    const field = kind === 'top' ? 'in_top_card' : 'in_offers_card';
+    const next = !isInSpecialCard(product, kind);
+    setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, [field]: next } : p)));
+    try {
+      await api.patch(`/products/${product.id}/special-cards`, { [field]: next });
+    } catch {
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, [field]: !next } : p)));
+      toast.error(t('specialCardUpdateFailed'));
+    }
+  };
+
+  const saveSpecialCardsConfig = async (config: SpecialCardsConfig) => {
+    setSavingSpecialCards(true);
+    try {
+      const { data } = await api.put('/settings/special-cards', config);
+      const saved = parseSpecialCardsConfig(data ?? config);
+      setSpecialCardsConfig(saved);
+      setOffersTitleDraft(saved.offers_title);
+      toast.success(t('specialCardsSaved'));
+      return saved;
+    } catch {
+      toast.error(t('specialCardsSaveFailed'));
+      return null;
+    } finally {
+      setSavingSpecialCards(false);
+    }
+  };
+
+  const handleChipDrop = (targetKey: string) => {
+    if (!draggedChipKey) return;
+    const currentKeys = editorChips.map((chip) => chip.key);
+    const orderedKeys = moveId(currentKeys, draggedChipKey, targetKey);
+    setDraggedChipKey(null);
+    if (orderedKeys === currentKeys) return;
+    const categoryIds = orderedKeys.filter((key) =>
+      categories.some((cat) => String(cat.id) === key),
+    );
+    const nextConfig: SpecialCardsConfig = {
+      offers_title: offersTitleDraft,
+      top_position: Math.max(0, orderedKeys.indexOf('__special_top')),
+      offers_position: Math.max(0, orderedKeys.indexOf('__special_offers')),
+    };
+    setCategories((prev) => reorderSubset(prev, categoryIds));
+    setSpecialCardsConfig(nextConfig);
+    void Promise.all([
+      api.patch('/categories/list-order', { ids: categoryIds }),
+      api.put('/settings/special-cards', nextConfig),
+    ])
+      .then(() => toast.success(t('orderSaved')))
+      .catch(() => {
+        toast.error(t('orderSaveFailed'));
+        fetchData();
+      });
+  };
+
+  const enterPriceEditMode = () => {
+    setPriceDrafts(Object.fromEntries(products.map((p) => [String(p.id), String(p.price)])));
     setBulkPercent('');
     setBulkCategoryId('');
     setPriceEditMode(true);
@@ -935,8 +1082,7 @@ export default function ProductsPage() {
     setPriceDrafts((prev) => {
       const next = { ...prev };
       for (const product of products) {
-        if (bulkCategoryId !== '' && String(product.category_id ?? '') !== bulkCategoryId)
-          continue;
+        if (bulkCategoryId !== '' && String(product.category_id ?? '') !== bulkCategoryId) continue;
         const current = Number(next[String(product.id)] ?? product.price);
         if (!Number.isFinite(current)) continue;
         next[String(product.id)] = String(Math.round(current * (1 + pct / 100)));
@@ -996,9 +1142,7 @@ export default function ProductsPage() {
             )?.name,
           ]),
         );
-  const listedProducts = soldOutOnly
-    ? visibleProducts.filter(isSoldOutProduct)
-    : visibleProducts;
+  const listedProducts = soldOutOnly ? visibleProducts.filter(isSoldOutProduct) : visibleProducts;
   const visibleCategories =
     normalizedSearch === ''
       ? categories
@@ -1192,10 +1336,19 @@ export default function ProductsPage() {
                 {t('bulkPercentApply')}
               </Button>
               <span className="ms-auto flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={exitPriceEditMode} disabled={savingPrices}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={exitPriceEditMode}
+                  disabled={savingPrices}
+                >
                   {tCommon('cancel')}
                 </Button>
-                <Button size="sm" onClick={() => void handleSaveAllPrices()} disabled={savingPrices}>
+                <Button
+                  size="sm"
+                  onClick={() => void handleSaveAllPrices()}
+                  disabled={savingPrices}
+                >
                   {t('saveAllPrices')}
                 </Button>
               </span>
@@ -1209,6 +1362,11 @@ export default function ProductsPage() {
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
+                  {isOwnerOrManager && (
+                    <th className="w-10 p-4 text-center text-xs font-medium text-muted-foreground uppercase">
+                      <span className="sr-only">{t('columnReorder')}</span>
+                    </th>
+                  )}
                   <th className="text-start p-4 text-xs font-medium text-muted-foreground uppercase">
                     {t('columnProduct')}
                   </th>
@@ -1235,6 +1393,11 @@ export default function ProductsPage() {
                   <th className="text-center p-4 text-xs font-medium text-muted-foreground uppercase">
                     {t('columnStatus')}
                   </th>
+                  {isOwnerOrManager && (
+                    <th className="text-center p-4 text-xs font-medium text-muted-foreground uppercase">
+                      {t('columnSpecialCards')}
+                    </th>
+                  )}
                   <th className="text-end p-4 text-xs font-medium text-muted-foreground uppercase">
                     {t('columnActions')}
                   </th>
@@ -1255,7 +1418,33 @@ export default function ProductsPage() {
                       : product.tax_category_id
                     : '—';
                   return (
-                    <tr key={product.id} className="hover:bg-muted">
+                    <tr
+                      key={product.id}
+                      draggable={isOwnerOrManager && !priceEditMode}
+                      onDragStart={(event) => {
+                        setDraggedProductId(String(product.id));
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', String(product.id));
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleProductDrop(String(product.id));
+                      }}
+                      onDragEnd={() => setDraggedProductId(null)}
+                      className={`hover:bg-muted ${draggedProductId === String(product.id) ? 'opacity-50' : ''}`}
+                    >
+                      {isOwnerOrManager && (
+                        <td className="p-4 text-center text-muted-foreground">
+                          <span
+                            className="inline-flex cursor-grab active:cursor-grabbing"
+                            title={t('dragToReorder')}
+                            aria-label={t('dragToReorder')}
+                          >
+                            <GripVertical size={17} />
+                          </span>
+                        </td>
+                      )}
                       <td className="p-4 max-w-[220px]">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center">
@@ -1423,14 +1612,55 @@ export default function ProductsPage() {
                           </span>
                         )}
                       </td>
+                      {isOwnerOrManager && (
+                        <td className="p-4 text-center">
+                          <div className="flex flex-wrap justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleSpecialCard(product, 'top')}
+                              aria-pressed={isInSpecialCard(product, 'top')}
+                              title={tPos('mostOrderedCard')}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                                isInSpecialCard(product, 'top')
+                                  ? 'border-amber-400 bg-amber-100 text-amber-800'
+                                  : 'border-border bg-card text-muted-foreground hover:border-amber-300 hover:text-amber-700'
+                              }`}
+                            >
+                              <Star
+                                size={12}
+                                fill={isInSpecialCard(product, 'top') ? 'currentColor' : 'none'}
+                              />
+                              {tPos('mostOrderedCard')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleSpecialCard(product, 'offers')}
+                              aria-pressed={isInSpecialCard(product, 'offers')}
+                              title={specialCardsConfig.offers_title || tPos('todaysOffersCard')}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                                isInSpecialCard(product, 'offers')
+                                  ? 'border-rose-400 bg-rose-100 text-rose-800'
+                                  : 'border-border bg-card text-muted-foreground hover:border-rose-300 hover:text-rose-700'
+                              }`}
+                            >
+                              <BadgePercent size={13} />
+                              {specialCardsConfig.offers_title || tPos('todaysOffersCard')}
+                            </button>
+                          </div>
+                        </td>
+                      )}
                       <td className="p-4 text-end">
                         <div className="flex gap-2 justify-end">
                           {isOwnerOrManager && (
                             <>
                               <button
                                 onClick={() => void handleTogglePin(product)}
-                                aria-label={isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')}
-                                title={isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')}
+                                aria-label={
+                                  isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')
+                                }
+                                title={
+                                  isPinnedProduct(product) ? t('unpinProduct') : t('pinProduct')
+                                }
                                 aria-pressed={isPinnedProduct(product)}
                                 className={`p-1.5 ${isPinnedProduct(product) ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'}`}
                               >
@@ -1441,8 +1671,12 @@ export default function ProductsPage() {
                               </button>
                               <button
                                 onClick={() => void handleToggleSoldOut(product)}
-                                aria-label={isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')}
-                                title={isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')}
+                                aria-label={
+                                  isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')
+                                }
+                                title={
+                                  isSoldOutProduct(product) ? t('clearSoldOut') : t('markSoldOut')
+                                }
                                 aria-pressed={isSoldOutProduct(product)}
                                 className={`p-1.5 ${isSoldOutProduct(product) ? 'text-red-600' : 'text-gray-400 hover:text-red-600'}`}
                               >
@@ -1987,6 +2221,79 @@ export default function ProductsPage() {
           value="categories"
           className="dashboard-scroll-pane flex min-h-0 flex-1 flex-col"
         >
+          {isOwnerOrManager && (
+            <div className="mb-4 shrink-0 rounded-xl border border-border bg-card p-4">
+              <h2 className="text-sm font-bold text-foreground">{t('chipOrderTitle')}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{t('chipOrderHint')}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {editorChips.map((chip) => {
+                  const label =
+                    chip.kind === 'category'
+                      ? chip.category.name
+                      : chip.kind === 'top'
+                        ? tPos('mostOrderedCard')
+                        : offersTitleDraft || tPos('todaysOffersCard');
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggedChipKey(chip.key);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', chip.key);
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleChipDrop(chip.key);
+                      }}
+                      onDragEnd={() => setDraggedChipKey(null)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-semibold ${
+                        chip.kind === 'top'
+                          ? 'border-amber-300 bg-amber-50 text-amber-800'
+                          : chip.kind === 'offers'
+                            ? 'border-rose-300 bg-rose-50 text-rose-800'
+                            : 'border-border bg-muted/50 text-foreground'
+                      } ${draggedChipKey === chip.key ? 'opacity-50' : ''}`}
+                    >
+                      <GripVertical size={14} className="cursor-grab" />
+                      {chip.kind === 'top' && <Star size={14} className="fill-current" />}
+                      {chip.kind === 'offers' && <BadgePercent size={15} />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-4 flex flex-wrap items-end gap-2">
+                <label className="min-w-56 flex-1">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {t('offersTitleLabel')}
+                  </span>
+                  <input
+                    value={offersTitleDraft}
+                    onChange={(event) => setOffersTitleDraft(event.target.value)}
+                    placeholder={tPos('todaysOffersCard')}
+                    maxLength={80}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={savingSpecialCards}
+                  onClick={() =>
+                    void saveSpecialCardsConfig({
+                      ...specialCardsConfig,
+                      offers_title: offersTitleDraft.trim(),
+                    })
+                  }
+                >
+                  {t('saveOffersTitle')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div
             data-testid="categories-list-scroll"
             className="bg-card rounded-xl border border-border flex-1 min-h-0 overflow-x-hidden overflow-y-auto"
@@ -1994,6 +2301,11 @@ export default function ProductsPage() {
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
+                  {isOwnerOrManager && (
+                    <th className="w-10 p-4 text-center text-xs font-medium text-muted-foreground uppercase">
+                      <span className="sr-only">{t('columnReorder')}</span>
+                    </th>
+                  )}
                   <th className="text-start p-4 text-xs font-medium text-muted-foreground uppercase">
                     {t('categoryName')}
                   </th>
@@ -2015,7 +2327,33 @@ export default function ProductsPage() {
                 {visibleCategories.map((cat) => {
                   const colorObj = CATEGORY_COLORS.find((c) => c.key === cat.color);
                   return (
-                    <tr key={cat.id} className="hover:bg-muted">
+                    <tr
+                      key={cat.id}
+                      draggable={isOwnerOrManager}
+                      onDragStart={(event) => {
+                        setDraggedCategoryId(String(cat.id));
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', String(cat.id));
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleCategoryDrop(String(cat.id));
+                      }}
+                      onDragEnd={() => setDraggedCategoryId(null)}
+                      className={`hover:bg-muted ${draggedCategoryId === String(cat.id) ? 'opacity-50' : ''}`}
+                    >
+                      {isOwnerOrManager && (
+                        <td className="p-4 text-center text-muted-foreground">
+                          <span
+                            className="inline-flex cursor-grab active:cursor-grabbing"
+                            title={t('dragToReorder')}
+                            aria-label={t('dragToReorder')}
+                          >
+                            <GripVertical size={17} />
+                          </span>
+                        </td>
+                      )}
                       <td className="p-4 font-medium text-foreground">{cat.name}</td>
                       <td className="p-4 text-center">
                         {cat.addon_group_ids?.length ? (

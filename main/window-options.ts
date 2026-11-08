@@ -71,6 +71,7 @@ export function createMainWindow(
     minWidth: 1024,
     minHeight: 768,
     title: 'Rest&Cafe',
+    backgroundColor: isDark ? '#171412' : '#fff7ed',
     titleBarStyle: platform === 'darwin' ? 'hiddenInset' : 'hidden',
     ...(resolvedTitleBarMode === 'native-overlay'
       ? {

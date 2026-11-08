@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
+import { parseDbTimestamp } from '@/lib/utils';
 import type { UsePosTableWorkspaceResult } from '@/hooks/usePosTableWorkspace';
 import type { Order, Table } from '@/lib/types';
 
@@ -38,7 +39,7 @@ export default function PosWorkspaceBanner({
         <span className="text-sm text-muted-foreground">
           <Ltr>#{wsOrder.order_number}</Ltr> · {tTables('openedFirstOrder')}{' '}
           <Ltr>
-            {new Date(wsOrder.created_at).toLocaleTimeString([], {
+            {parseDbTimestamp(wsOrder.created_at).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             })}

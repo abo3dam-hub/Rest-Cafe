@@ -38,6 +38,11 @@ import {
 import { normalizeOptionalPhone } from '../lib/phone';
 import { isPosCategorySort, isPosItemSort, readPosSortSettings } from '../lib/pos-sort';
 import {
+  parseSpecialCardsRequest,
+  readSpecialCardsConfig,
+  specialCardsSettings,
+} from '../lib/special-cards';
+import {
   CORE_BILL_TEMPLATES,
   isAvailableBillTemplate,
   listInstalledPrintTemplates,
@@ -471,11 +476,15 @@ router.put('/business', requirePermission('settings.manage'), (req: Request, res
       tax_registration_number,
       business_licence:
         business_licence !== undefined
-          ? String(business_licence || '').trim().slice(0, 100)
+          ? String(business_licence || '')
+              .trim()
+              .slice(0, 100)
           : undefined,
       business_classification:
         business_classification !== undefined
-          ? String(business_classification || '').trim().slice(0, 100)
+          ? String(business_classification || '')
+              .trim()
+              .slice(0, 100)
           : undefined,
       state_code,
       business_address,
@@ -735,6 +744,42 @@ router.get(
   (_req: Request, res: Response) => {
     try {
       res.json(readPosSortSettings(getAllSettings(getDatabase())));
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+// ─── Special POS cards (must come BEFORE /:key wildcard) ───────────────────
+
+router.get(
+  '/special-cards',
+  settingsReadRateLimit,
+  requireAnyPermission('settings.view', 'orders.read', 'orders.create'),
+  (_req: Request, res: Response) => {
+    try {
+      res.json(readSpecialCardsConfig(getAllSettings(getDatabase())));
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+router.put(
+  '/special-cards',
+  settingsWriteRateLimit,
+  requireAnyPermission('settings.manage', 'catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const current = readSpecialCardsConfig(getAllSettings(getDatabase()));
+      const config = parseSpecialCardsRequest(req.body, current);
+      if (!config) {
+        return res.status(400).json({ error: 'Invalid special cards settings' });
+      }
+      upsertSettings(getDatabase(), specialCardsSettings(config));
+      res.json(config);
     } catch (error) {
       console.error('[API] Internal error:', error);
       res.status(500).json({ error: 'Internal server error' });

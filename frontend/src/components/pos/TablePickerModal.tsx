@@ -2,13 +2,17 @@
 
 import { X } from 'lucide-react';
 import type { Table } from '@/lib/types';
+import { parseDbTimestamp } from '@/lib/utils';
 import { useHeldOrdersStore } from '@/store/held-orders';
 import { useTranslations, type AppConfig } from 'use-intl';
 
 interface Props {
   tables: Table[];
   selectedTableId: string | null;
-  onSelectAvailable: (tableId: string, customer?: { id: string; name: string; phone: string } | null) => void;
+  onSelectAvailable: (
+    tableId: string,
+    customer?: { id: string; name: string; phone: string } | null,
+  ) => void;
   onSelectOccupied: (table: Table) => void;
   onSelectHeld: (tableId: string) => void;
   onPlaceOrder: () => void;
@@ -20,11 +24,27 @@ type PosKey = keyof AppConfig['Messages']['pos'];
 
 const statusStyles: Record<string, { border: string; badge: string; badgeKey: PosKey | null }> = {
   available: { border: 'border-border hover:border-brand/40', badge: '', badgeKey: null },
-  occupied: { border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40', badge: 'bg-orange-500', badgeKey: 'tableOccupied' },
-  reserved: { border: 'border-yellow-300 dark:border-yellow-800/40 bg-yellow-50 dark:bg-yellow-950/40', badge: 'bg-yellow-500', badgeKey: 'tableReserved' },
+  occupied: {
+    border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40',
+    badge: 'bg-orange-500',
+    badgeKey: 'tableOccupied',
+  },
+  reserved: {
+    border: 'border-yellow-300 dark:border-yellow-800/40 bg-yellow-50 dark:bg-yellow-950/40',
+    badge: 'bg-yellow-500',
+    badgeKey: 'tableReserved',
+  },
   cleaning: { border: 'border-border hover:border-brand/40', badge: '', badgeKey: null },
-  held: { border: 'border-blue-400 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-950/40', badge: 'bg-blue-500', badgeKey: 'tableHeld' },
-  bill_requested: { border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40', badge: 'bg-orange-500', badgeKey: 'tableBillRequested' },
+  held: {
+    border: 'border-blue-400 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-950/40',
+    badge: 'bg-blue-500',
+    badgeKey: 'tableHeld',
+  },
+  bill_requested: {
+    border: 'border-orange-300 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-950/40',
+    badge: 'bg-orange-500',
+    badgeKey: 'tableBillRequested',
+  },
 };
 
 // 'cleaning' never surfaces (owner decision): such a table behaves as available.
@@ -32,7 +52,14 @@ const shownStatus = (table: Table): Table['status'] =>
   table.status === 'cleaning' ? 'available' : table.status;
 
 export default function TablePickerModal({
-  tables, selectedTableId, onSelectAvailable, onSelectOccupied, onSelectHeld, onPlaceOrder, onHoldTable, onClose,
+  tables,
+  selectedTableId,
+  onSelectAvailable,
+  onSelectOccupied,
+  onSelectHeld,
+  onPlaceOrder,
+  onHoldTable,
+  onClose,
 }: Props) {
   const heldOrders = useHeldOrdersStore();
   const t = useTranslations('pos');
@@ -49,9 +76,14 @@ export default function TablePickerModal({
       return;
     }
     if (shown === 'available' || shown === 'reserved') {
-      const customer = table.status === 'reserved' && table.reservation_customer_id
-        ? { id: table.reservation_customer_id, name: table.reservation_customer_name ?? '', phone: table.reservation_customer_phone ?? '' }
-        : null;
+      const customer =
+        table.status === 'reserved' && table.reservation_customer_id
+          ? {
+              id: table.reservation_customer_id,
+              name: table.reservation_customer_name ?? '',
+              phone: table.reservation_customer_phone ?? '',
+            }
+          : null;
       onSelectAvailable(table.id, customer);
       return;
     }
@@ -62,7 +94,11 @@ export default function TablePickerModal({
       <div className="bg-card rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{t('selectTable')}</h2>
-          <button onClick={onClose} className="touch-target rounded-full text-gray-400 hover:text-muted-foreground active:bg-muted" aria-label={t('close')}>
+          <button
+            onClick={onClose}
+            className="touch-target rounded-full text-gray-400 hover:text-muted-foreground active:bg-muted"
+            aria-label={t('close')}
+          >
             <X size={20} />
           </button>
         </div>
@@ -92,21 +128,26 @@ export default function TablePickerModal({
                   </span>
                 )}
                 {!isHeld && style.badgeKey && (
-                  <span className={`absolute -top-2 -end-2 ${style.badge} text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold`}>
+                  <span
+                    className={`absolute -top-2 -end-2 ${style.badge} text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold`}
+                  >
                     {t(style.badgeKey)}
                   </span>
                 )}
                 <p className="font-bold text-foreground">{table.name}</p>
-                <p className="text-xs text-muted-foreground">{t('tableSeats', { count: table.capacity })}</p>
-                {(shown === 'occupied' || shown === 'bill_requested') && (table.current_order || table.activeOrder) && (
-                  <p className="text-xs text-orange-600 font-medium mt-1">
-                    #{(table.current_order || table.activeOrder)?.order_number}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  {t('tableSeats', { count: table.capacity })}
+                </p>
+                {(shown === 'occupied' || shown === 'bill_requested') &&
+                  (table.current_order || table.activeOrder) && (
+                    <p className="text-xs text-orange-600 font-medium mt-1">
+                      #{(table.current_order || table.activeOrder)?.order_number}
+                    </p>
+                  )}
                 {(shown === 'occupied' || shown === 'bill_requested') && table.seated_at && (
                   <p className="text-[11px] text-muted-foreground mt-1">
                     {tTables('openedFirstOrder')} ·{' '}
-                    {new Date(table.seated_at).toLocaleTimeString([], {
+                    {parseDbTimestamp(table.seated_at).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}

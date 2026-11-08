@@ -24,10 +24,24 @@ function activeOrderForTable(
   `)
       .get(...params) as any,
   );
-  if (!order?.customer_id) return order;
+  if (!order) return order;
+
+  const kitchenSummary = { pending: 0, preparing: 0, ready: 0, served: 0 };
+  const statusRows = db
+    .prepare(
+      `SELECT status, COALESCE(SUM(quantity), 0) AS quantity
+       FROM order_items
+       WHERE order_id = ? AND status IN ('pending', 'preparing', 'ready', 'served')
+       GROUP BY status`,
+    )
+    .all(order.id) as { status: keyof typeof kitchenSummary; quantity: number }[];
+  for (const row of statusRows) kitchenSummary[row.status] = Number(row.quantity) || 0;
+  const orderWithKitchenSummary = { ...order, kitchen_summary: kitchenSummary };
+
+  if (!order.customer_id) return orderWithKitchenSummary;
 
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(order.customer_id);
-  return { ...order, customer: customer || null };
+  return { ...orderWithKitchenSummary, customer: customer || null };
 }
 
 function reservationCustomerShape(

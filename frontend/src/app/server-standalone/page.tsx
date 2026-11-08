@@ -38,6 +38,8 @@ import { productNeedsCustomizer, scannedVariantNeedsCustomizer } from '@/lib/pro
 import AddonModal from '@/components/pos/AddonModal';
 import ProductGrid from '@/components/pos/ProductGrid';
 import type { PosCategorySort, PosItemSort } from '@/lib/pos-sort';
+import type { SpecialCardsConfig } from '@/lib/special-cards';
+import { parseDbTimestamp } from '@/lib/utils';
 import MoveTableModal from '@/components/tables/MoveTableModal';
 import { tenantCan } from '@/lib/permissions';
 import type {
@@ -75,6 +77,12 @@ type Order = {
   table_id?: string | null;
   status: string;
   created_at?: string;
+  kitchen_summary?: {
+    pending: number;
+    preparing: number;
+    ready: number;
+    served: number;
+  };
   items?: OrderItem[];
   customer?: { id: string; name: string; phone?: string } | null;
 };
@@ -87,6 +95,7 @@ type ServerAppInfo = {
   currency_fraction_digits: number;
   category_sort?: PosCategorySort;
   item_sort?: PosItemSort;
+  special_cards?: SpecialCardsConfig;
 };
 
 type ServerAppKey = keyof AppConfig['Messages']['serverApp'];
@@ -236,6 +245,9 @@ export default function ServerStandalonePage() {
   // cashier POS keeps its own flow; this stepper is the waiter's path and
   // never lands on a print screen.
   const [flowStep, setFlowStep] = useState<'tables' | 'order' | 'review' | 'success'>('tables');
+  const [tableStatusFilter, setTableStatusFilter] = useState<
+    'all' | 'occupied' | 'available' | 'reserved'
+  >('all');
   const [sentInfo, setSentInfo] = useState<{ orderNumber: string; tableLabel: string } | null>(
     null,
   );
@@ -1051,6 +1063,50 @@ export default function ServerStandalonePage() {
     return () => clearInterval(id);
   }, []);
 
+  // The tables step is the waiter's live board: refresh it while it is visible
+  // so kitchen progress reaches the cards without a manual reload.
+  useEffect(() => {
+    if (!api || !userId || flowStep !== 'tables') return;
+    let cancelled = false;
+    const refreshTables = () => {
+      if (sendInFlightRef.current) return;
+      api
+        .get('/api/tables', { params: { active: 'true' } })
+        .then((tablesRes) => {
+          if (cancelled || sendInFlightRef.current) return;
+          setTables(tablesRes.data.tables || []);
+          setTablesLoaded(true);
+        })
+        .catch(() => {});
+    };
+    const id = setInterval(refreshTables, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [api, flowStep, userId]);
+
+  const tableStatusBucket = (table: Table): 'occupied' | 'available' | 'reserved' => {
+    if (
+      table.activeOrder ||
+      table.current_order ||
+      table.status === 'occupied' ||
+      table.status === 'bill_requested'
+    )
+      return 'occupied';
+    if (table.status === 'reserved') return 'reserved';
+    return 'available';
+  };
+  const tableStatusCounts = {
+    all: tables.length,
+    occupied: tables.filter((table) => tableStatusBucket(table) === 'occupied').length,
+    available: tables.filter((table) => tableStatusBucket(table) === 'available').length,
+    reserved: tables.filter((table) => tableStatusBucket(table) === 'reserved').length,
+  };
+  const visibleTables =
+    tableStatusFilter === 'all'
+      ? tables
+      : tables.filter((table) => tableStatusBucket(table) === tableStatusFilter);
   const activeTable = tables.find((table) => table.id === selectedTableId) || null;
   const canMoveTable = tenantCan(user as unknown as Tenant, 'tables.orders.move');
   const draftTotal = draft.reduce((sum, line) => {
@@ -1586,10 +1642,40 @@ export default function ServerStandalonePage() {
               {t('waiterLabel', { name: user.name })}
             </p>
           )}
+          <div
+            className="mb-3 flex gap-2 overflow-x-auto pb-1"
+            role="group"
+            aria-label={tTables('floorFilter')}
+          >
+            {(
+              [
+                ['all', t('filterAllTables')],
+                ['occupied', tTables('statusOccupied')],
+                ['available', tTables('statusAvailable')],
+                ['reserved', tTables('statusReserved')],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTableStatusFilter(value)}
+                aria-pressed={tableStatusFilter === value}
+                className={`whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
+                  tableStatusFilter === value
+                    ? 'bg-brand text-white'
+                    : 'border border-border bg-card text-foreground hover:bg-muted'
+                }`}
+              >
+                {label} · {tableStatusCounts[value]}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {tables.map((table) => {
+            {visibleTables.map((table) => {
               const order = table.activeOrder || table.current_order;
-              const openedAt = order?.created_at ? Date.parse(order.created_at) : NaN;
+              const openedAt = order?.created_at
+                ? parseDbTimestamp(order.created_at).getTime()
+                : NaN;
               const minutes = Number.isFinite(openedAt)
                 ? Math.max(0, Math.floor((nowTs - openedAt) / 60000))
                 : null;
@@ -1611,6 +1697,29 @@ export default function ServerStandalonePage() {
                       {t('openForMinutes', { minutes })}
                     </span>
                   )}
+                  {order?.kitchen_summary &&
+                    (() => {
+                      const preparing =
+                        order.kitchen_summary.pending + order.kitchen_summary.preparing;
+                      const ready = order.kitchen_summary.ready;
+                      if (preparing === 0 && ready === 0) return null;
+                      return (
+                        <span className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                          {preparing > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                              <Flame size={12} />
+                              {t('kitchenPreparing', { count: preparing })}
+                            </span>
+                          )}
+                          {ready > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 font-bold text-green-800 dark:bg-green-950/50 dark:text-green-200">
+                              <CheckCircle2 size={12} />
+                              {t('kitchenReady', { count: ready })}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })()}
                 </button>
               );
             })}
@@ -1639,6 +1748,7 @@ export default function ServerStandalonePage() {
               currency={regional?.currency || ''}
               categorySort={regional?.category_sort}
               itemSort={regional?.item_sort}
+              specialCards={regional?.special_cards}
               disabled={sending}
               onProductClick={(product, quantity) => {
                 if (sendInFlightRef.current) return;
@@ -1671,24 +1781,24 @@ export default function ServerStandalonePage() {
       )}
 
       {flowStep === 'order' && (
-      <Drawer open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
-        <DrawerTrigger asChild>
-          <button
-            className="fixed bottom-5 end-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg hover:bg-brand-hover active:bg-brand-hover md:hidden"
-            aria-label={t('currentTicket')}
-          >
-            <ShoppingCart size={22} />
-            {draftItemCount > 0 && (
-              <span className="absolute -top-0.5 -end-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                <Ltr>{draftItemCount}</Ltr>
-              </span>
-            )}
-          </button>
-        </DrawerTrigger>
-        <DrawerContent className="max-h-[85vh] text-foreground">
-          <div className="max-h-[80vh] overflow-y-auto px-3 pb-3">{ticketPanelBody}</div>
-        </DrawerContent>
-      </Drawer>
+        <Drawer open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
+          <DrawerTrigger asChild>
+            <button
+              className="fixed bottom-5 end-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg hover:bg-brand-hover active:bg-brand-hover md:hidden"
+              aria-label={t('currentTicket')}
+            >
+              <ShoppingCart size={22} />
+              {draftItemCount > 0 && (
+                <span className="absolute -top-0.5 -end-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  <Ltr>{draftItemCount}</Ltr>
+                </span>
+              )}
+            </button>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[85vh] text-foreground">
+            <div className="max-h-[80vh] overflow-y-auto px-3 pb-3">{ticketPanelBody}</div>
+          </DrawerContent>
+        </Drawer>
       )}
 
       {addonModalProduct && (

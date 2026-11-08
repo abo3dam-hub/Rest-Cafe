@@ -117,6 +117,8 @@ export interface Product {
   low_stock_threshold: number | null;
   is_active: boolean;
   is_pinned?: boolean | number;
+  in_top_card?: boolean | number;
+  in_offers_card?: boolean | number;
   is_sold_out?: boolean | number;
   sold_out_at?: string | null;
   available_online: boolean;
@@ -234,6 +236,12 @@ export interface Order {
   online_platform?: string | null;
   external_order_id?: string | null;
   created_by: number;
+  kitchen_summary?: {
+    pending: number;
+    preparing: number;
+    ready: number;
+    served: number;
+  };
   created_at: string;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;

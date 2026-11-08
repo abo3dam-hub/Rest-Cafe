@@ -9,15 +9,17 @@ let readyEpoch: number | null = null;
 let rendererDocumentNonce: string | null = null;
 let rendererReadinessFailSafeShown = false;
 let showWindowFn: (() => void) | null = null;
+let failSafeFn: ((epoch: number) => void) | null = null;
 let failsafeTimer: ReturnType<typeof setTimeout> | null = null;
 let failsafeMs = RENDERER_READINESS_FAILSAFE_MS;
 
 /** Registers the callback used to surface the window (fail-safe path). */
 export function initWindowReadiness(
   showWindow: () => void,
-  options?: { failsafeMs?: number },
+  options?: { failsafeMs?: number; onFailSafe?: (epoch: number) => void },
 ): void {
   showWindowFn = showWindow;
+  failSafeFn = options?.onFailSafe ?? null;
   failsafeMs = Math.max(0, options?.failsafeMs ?? RENDERER_READINESS_FAILSAFE_MS);
 }
 
@@ -51,6 +53,7 @@ export function beginRendererDocument(): number {
       );
       showWindowFn();
     }
+    failSafeFn?.(epoch);
   }, failsafeMs);
 
   return epoch;
@@ -69,7 +72,8 @@ export function isFullDocumentMainFrameNavigation(details: {
 }
 
 export function registerRendererDocument(documentNonce: unknown): boolean {
-  if (typeof documentNonce !== 'string' || !DOCUMENT_NONCE_PATTERN.test(documentNonce)) return false;
+  if (typeof documentNonce !== 'string' || !DOCUMENT_NONCE_PATTERN.test(documentNonce))
+    return false;
   rendererDocumentNonce = documentNonce;
   return true;
 }
@@ -102,11 +106,11 @@ export function isCurrentRendererFrame(
   currentFrame: { frameToken?: string; detached?: boolean } | null | undefined,
 ): boolean {
   return Boolean(
-    senderFrame
-      && currentFrame
-      && senderFrame.detached !== true
-      && currentFrame.detached !== true
-      && typeof senderFrame.frameToken === 'string'
-      && senderFrame.frameToken === currentFrame.frameToken,
+    senderFrame &&
+    currentFrame &&
+    senderFrame.detached !== true &&
+    currentFrame.detached !== true &&
+    typeof senderFrame.frameToken === 'string' &&
+    senderFrame.frameToken === currentFrame.frameToken,
   );
 }

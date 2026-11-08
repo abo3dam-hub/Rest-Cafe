@@ -1227,7 +1227,9 @@
     "staleAttemptBodyUnknown": "بيع سابق لم يصل تأكيد نتيجته. تحقّق منه قبل المتابعة.",
     "staleAttemptPlaced": "هذا البيع تمّ تسجيله سابقاً كطلب رقم {number}.",
     "staleAttemptRecover": "تحقّق من الحالة",
-    "staleAttemptDismiss": "تجاهل مؤقتاً"
+    "staleAttemptDismiss": "تجاهل مؤقتاً",
+    "mostOrderedCard": "الأكثر طلباً",
+    "todaysOffersCard": "عروض اليوم"
   },
   "printTest": {
     "amt": "المبلغ",
@@ -1630,7 +1632,19 @@
     "variantToggle": "هذا الصنف له خيارات (مثل: الحجم، نوع العجينة، النكهة)",
     "variantsSection": "الخيارات",
     "variantDeactivateConfirm": "سيتم تعطيل هذا الخيار عند الحفظ ولا يمكن استعادته من هذه الشاشة.",
-    "variantRemoveAllConfirm": "سيؤدي إيقاف هذا إلى تعطيل جميع خيارات الصنف. تحتفظ الطلبات السابقة بها."
+    "variantRemoveAllConfirm": "سيؤدي إيقاف هذا إلى تعطيل جميع خيارات الصنف. تحتفظ الطلبات السابقة بها.",
+    "columnReorder": "إعادة الترتيب",
+    "dragToReorder": "اسحب لإعادة الترتيب",
+    "orderSaved": "تم حفظ الترتيب",
+    "orderSaveFailed": "تعذر حفظ الترتيب",
+    "columnSpecialCards": "الكروت الخاصة",
+    "specialCardUpdateFailed": "تعذر تحديث الكرت الخاص",
+    "chipOrderTitle": "ترتيب شريط التصنيفات والكروت الخاصة",
+    "chipOrderHint": "اسحب أي بطاقة لتغيير مكان ظهورها في نقطة البيع وتطبيق النادل وطلب الزبون الذاتي.",
+    "offersTitleLabel": "عنوان كرت العروض",
+    "saveOffersTitle": "حفظ العنوان",
+    "specialCardsSaved": "تم حفظ إعدادات الكروت الخاصة",
+    "specialCardsSaveFailed": "تعذر حفظ إعدادات الكروت الخاصة"
   },
   "productAnalytics": {
     "title": "ساعدنا في تحديد ما نبنيه بعد ذلك",
@@ -1820,7 +1834,10 @@
     "itemsSubtotal": "مجموع الأصناف",
     "grandTotal": "الإجمالي",
     "waiterLabel": "النادل: {name}",
-    "openForMinutes": "منذ {minutes} د"
+    "openForMinutes": "منذ {minutes} د",
+    "filterAllTables": "كل الطاولات",
+    "kitchenPreparing": "قيد التحضير {count}",
+    "kitchenReady": "جاهز {count}"
   },
   "settings": {
     "tabCustomerDisplay": "شاشة الزبون",
@@ -3201,7 +3218,9 @@
     "mergeSuccess": "تم الدمج بنجاح",
     "mergeNoTargets": "لا توجد طلبات نشطة أخرى للدمج إليها",
     "openedFirstOrder": "فُتح أول طلب",
-    "newOrder": "طلب جديد"
+    "newOrder": "طلب جديد",
+    "statusFilter": "تصفية حسب الحالة",
+    "statusFilterAll": "الكل"
   },
   "tax": {
     "actionActivate": "تم تفعيل الحزمة",
@@ -3719,6 +3738,8 @@
     "regeneratedToast": "تم إصدار رمز جديد — الرمز القديم لم يعد يعمل.",
     "loadFailed": "تعذّر تحميل إعدادات الطلب الذاتي.",
     "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",
-    "openPage": "فتح الصفحة"
+    "openPage": "فتح الصفحة",
+    "mostOrderedCard": "الأكثر طلباً",
+    "todaysOffersCard": "عروض اليوم"
   }
 }

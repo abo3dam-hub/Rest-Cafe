@@ -23,6 +23,7 @@ import {
   beginDatabaseShutdown,
   pruneIdempotencyRecords,
 } from './db';
+import { openDatabaseWithRetry } from './db-open-retry';
 import { computeTaxPackUpdates, fetchRemoteTaxPackCatalog } from './tax-packs/catalog';
 import { startServer, stopServer, getLocalIP, isServerRunning, getServerPort } from './server';
 import { operationDiagnostics } from './services/operation-diagnostics';
@@ -409,9 +410,26 @@ function createWindow(): void {
   clearStaleRenderCachesOnVersionChange(app.getPath('userData'), process.versions.electron, log);
 
   // Initialize readiness fail-safe and start document epoch.
-  initWindowReadiness(() => {
-    showMainWindow();
-  });
+  let watchdogWindow: BrowserWindow | null = null;
+  let rendererReloadAttempts = 0;
+  initWindowReadiness(
+    () => {
+      showMainWindow();
+    },
+    {
+      onFailSafe: () => {
+        if (rendererReloadAttempts >= 2) return;
+        setTimeout(() => {
+          if (!watchdogWindow || watchdogWindow.isDestroyed() || isWindowRendererReady()) return;
+          rendererReloadAttempts += 1;
+          log.error(
+            `[Window] Renderer still not ready after fail-safe; reloading document (attempt ${rendererReloadAttempts}/2).`,
+          );
+          watchdogWindow.webContents.reload();
+        }, 4_000);
+      },
+    },
+  );
   beginRendererDocument();
 
   // Resolve whether native title bar overlay is supported or if fallback is required.
@@ -445,6 +463,7 @@ function createWindow(): void {
       ? { webPreferences: { backgroundThrottling: false } }
       : undefined,
   );
+  watchdogWindow = createdWindow;
   mainWindow = createdWindow;
 
   mainWindow.once('ready-to-show', () => {
@@ -1156,7 +1175,10 @@ async function initialize(): Promise<void> {
     console.log('[Flo] Initializing...');
 
     console.log('[Flo] Initializing database...');
-    initDatabase();
+    await openDatabaseWithRetry(initDatabase, {
+      reset: closeDatabase,
+      logger: log,
+    });
     if (isShutdownRequested()) return;
 
     // Idempotency retention (F-033): drop keyed order/payment/refund records

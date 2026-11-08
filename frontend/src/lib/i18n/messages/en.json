@@ -1227,7 +1227,9 @@
     "staleAttemptBodyUnknown": "An earlier sale never confirmed its result. Check it before continuing.",
     "staleAttemptPlaced": "This sale was already placed as order {number}.",
     "staleAttemptRecover": "Check status",
-    "staleAttemptDismiss": "Dismiss for now"
+    "staleAttemptDismiss": "Dismiss for now",
+    "mostOrderedCard": "Most ordered",
+    "todaysOffersCard": "Today's offers"
   },
   "printTest": {
     "amt": "Amt",
@@ -1630,7 +1632,19 @@
     "variantToggle": "This product has variants (e.g. Size, Crust, Flavor)",
     "variantsSection": "Variants",
     "variantDeactivateConfirm": "This variant is deactivated on save and cannot be restored from this screen.",
-    "variantRemoveAllConfirm": "Turning this off deactivates every variant of this product. Historical orders keep them."
+    "variantRemoveAllConfirm": "Turning this off deactivates every variant of this product. Historical orders keep them.",
+    "columnReorder": "Reorder",
+    "dragToReorder": "Drag to reorder",
+    "orderSaved": "Order saved",
+    "orderSaveFailed": "Could not save the order",
+    "columnSpecialCards": "Special cards",
+    "specialCardUpdateFailed": "Could not update the special card",
+    "chipOrderTitle": "Category and special-card order",
+    "chipOrderHint": "Drag any chip to change where it appears in the POS, waiter app, and customer self-ordering.",
+    "offersTitleLabel": "Offers card title",
+    "saveOffersTitle": "Save title",
+    "specialCardsSaved": "Special-card settings saved",
+    "specialCardsSaveFailed": "Could not save special-card settings"
   },
   "productAnalytics": {
     "title": "Help us decide what to build next",
@@ -1820,7 +1834,10 @@
     "itemsSubtotal": "Items subtotal",
     "grandTotal": "Total",
     "waiterLabel": "Waiter: {name}",
-    "openForMinutes": "Open for {minutes} min"
+    "openForMinutes": "Open for {minutes} min",
+    "filterAllTables": "All tables",
+    "kitchenPreparing": "Preparing {count}",
+    "kitchenReady": "Ready {count}"
   },
   "settings": {
     "tabCustomerDisplay": "Customer Display",
@@ -3201,7 +3218,9 @@
     "mergeSuccess": "Orders merged",
     "mergeNoTargets": "No other active orders to merge into",
     "openedFirstOrder": "First order opened",
-    "newOrder": "New order"
+    "newOrder": "New order",
+    "statusFilter": "Filter by status",
+    "statusFilterAll": "All"
   },
   "tax": {
     "actionActivate": "Pack activated",
@@ -3719,6 +3738,8 @@
     "regeneratedToast": "New QR code issued — the old one no longer works.",
     "loadFailed": "Could not load self-ordering settings.",
     "saveFailed": "Could not save. Please try again.",
-    "openPage": "Open page"
+    "openPage": "Open page",
+    "mostOrderedCard": "Most ordered",
+    "todaysOffersCard": "Today's offers"
   }
 }

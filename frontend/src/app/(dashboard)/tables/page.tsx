@@ -386,6 +386,9 @@ export default function TablesPage() {
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [movingTable, setMovingTable] = useState<Table | null>(null);
   const [selectedFloor, setSelectedFloor] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'occupied' | 'available' | 'reserved'>(
+    'all',
+  );
   const [reservingTable, setReservingTable] = useState<Table | null>(null);
   // The map is the home screen for floor roles (cashier/server); everyone
   // else keeps the management list as the default view.
@@ -1016,12 +1019,29 @@ export default function TablesPage() {
     );
   }
 
-  const visibleTables =
+  const floorVisibleTables =
     floorFilter === 'all'
       ? tables
       : floorFilter === '__unassigned__'
         ? tables.filter((table) => !table.floor?.trim())
         : tables.filter((table) => table.floor?.trim() === floorFilter);
+  const tableStatusBucket = (table: Table): 'occupied' | 'available' | 'reserved' => {
+    const shownStatus = displayTableStatus(table.status);
+    if (shownStatus === 'occupied' || shownStatus === 'bill_requested') return 'occupied';
+    if (shownStatus === 'reserved') return 'reserved';
+    return 'available';
+  };
+  const statusCounts = {
+    all: floorVisibleTables.length,
+    occupied: floorVisibleTables.filter((table) => tableStatusBucket(table) === 'occupied').length,
+    available: floorVisibleTables.filter((table) => tableStatusBucket(table) === 'available')
+      .length,
+    reserved: floorVisibleTables.filter((table) => tableStatusBucket(table) === 'reserved').length,
+  };
+  const visibleTables =
+    statusFilter === 'all'
+      ? floorVisibleTables
+      : floorVisibleTables.filter((table) => tableStatusBucket(table) === statusFilter);
 
   const baseSelectableFloors = namedFloors.length === 0 ? ['الصالة الرئيسية'] : namedFloors;
   const selectableFloors =
@@ -1142,6 +1162,39 @@ export default function TablesPage() {
         </div>
       </div>
 
+      {tables.length > 0 && (
+        <div
+          className="mb-5 flex flex-wrap items-center gap-2"
+          aria-label={tTables('statusFilter')}
+        >
+          {(
+            [
+              ['all', tTables('statusFilterAll')],
+              ['occupied', tTables('statusOccupied')],
+              ['available', tTables('statusAvailable')],
+              ['reserved', tTables('statusReserved')],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              aria-pressed={statusFilter === value}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                statusFilter === value
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-border bg-card text-muted-foreground hover:border-brand hover:text-brand'
+              }`}
+            >
+              <span>{label}</span>
+              <span aria-hidden="true" className="text-xs opacity-80">
+                ({statusCounts[value]})
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {todaysReservations.length > 0 && (
         <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-950/40">
           <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
@@ -1168,7 +1221,7 @@ export default function TablesPage() {
         <FloorplanEditor
           mode={layoutMode && canManageTables ? 'edit' : 'service'}
           canManage={canManageTables}
-          tables={tables}
+          tables={visibleTables}
           ordersByTable={ordersByTable}
           onSaved={fetchTables}
           onReserve={(tb) => setReservingTable(tb)}
@@ -1369,8 +1422,7 @@ export default function TablesPage() {
                     const canOpenWorkspace =
                       shownStatus === 'occupied' || shownStatus === 'bill_requested';
                     const canPayThisTable = canTakePayments && shownStatus === 'bill_requested';
-                    const canRequestBillThisTable =
-                      canGenerateBills && shownStatus === 'occupied';
+                    const canRequestBillThisTable = canGenerateBills && shownStatus === 'occupied';
                     const canUnrequestBillThisTable =
                       canGenerateBills && shownStatus === 'bill_requested';
                     const canMergeThisTable = canMoveThisTable;
@@ -1447,7 +1499,7 @@ export default function TablesPage() {
                               table.seated_at && (
                                 <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                                   {tTables('openedFirstOrder')} ·{' '}
-                                  {new Date(table.seated_at).toLocaleTimeString([], {
+                                  {parseDbTimestamp(table.seated_at).toLocaleTimeString([], {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                   })}

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import expressRateLimit from 'express-rate-limit';
-import { getDatabase, now, generateShortId } from '../db';
+import { getDatabase, now, generateShortId, withTxn } from '../db';
 import { requirePermission } from '../services/authorization';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
@@ -296,6 +296,49 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+router.patch(
+  '/list-order',
+  categoryWriteRateLimit,
+  requirePermission('catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const ids = (req.body ?? {}).ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.some((id) => typeof id !== 'string' || !id)
+      ) {
+        return res.status(400).json({ error: 'ids must be a non-empty array of category ids' });
+      }
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length !== ids.length) {
+        return res.status(400).json({ error: 'ids must not contain duplicates' });
+      }
+      const db = getDatabase();
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const rows = db
+        .prepare(
+          `SELECT id, sort_order FROM categories WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+        )
+        .all(...uniqueIds) as { id: string; sort_order: number }[];
+      if (rows.length !== uniqueIds.length) {
+        return res.status(404).json({ error: 'One or more categories were not found' });
+      }
+      const sortOrders = rows.map((row) => row.sort_order).sort((a, b) => a - b);
+      const update = db.prepare(
+        'UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?',
+      );
+      withTxn(() => {
+        uniqueIds.forEach((id, index) => update.run(sortOrders[index], now(), id));
+      });
+      res.json({ updated: uniqueIds.length });
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
 
 router.get('/:id', requirePermission('catalog.view'), (req: Request, res: Response) => {
   try {

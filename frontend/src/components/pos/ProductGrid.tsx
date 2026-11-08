@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Search, SlidersHorizontal, PackageX, PackageCheck, Star } from 'lucide-react';
+import {
+  Search,
+  SlidersHorizontal,
+  PackageX,
+  PackageCheck,
+  Star,
+  BadgePercent,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Category, Product, ProductVariant } from '@/lib/types';
 import { useCartStore } from '@/store/cart';
@@ -23,6 +30,15 @@ import {
   type PosItemSort,
 } from '@/lib/pos-sort';
 import CollapsiblePosChoices from './CollapsiblePosChoices';
+import {
+  DEFAULT_SPECIAL_CARDS_CONFIG,
+  SPECIAL_OFFERS_CARD_ID,
+  SPECIAL_TOP_CARD_ID,
+  mergeCatalogChips,
+  type CatalogChip,
+  type SpecialCardKind,
+  type SpecialCardsConfig,
+} from '@/lib/special-cards';
 
 /** The category chip shared by both category row modes. */
 function CategoryChip({
@@ -30,27 +46,42 @@ function CategoryChip({
   categoryColor,
   isSelected,
   onSelect,
+  specialKind,
 }: {
   categoryName: string;
   categoryColor: string | null;
   isSelected: boolean;
   onSelect: () => void;
+  specialKind?: SpecialCardKind;
 }) {
   const colorClasses = getCategoryColorClasses(categoryColor);
+  const specialClasses =
+    specialKind === 'top'
+      ? isSelected
+        ? 'bg-gradient-to-l from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20'
+        : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-700'
+      : specialKind === 'offers'
+        ? isSelected
+          ? 'bg-gradient-to-l from-rose-500 to-red-500 text-white shadow-md shadow-rose-500/20'
+          : 'bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-700'
+        : null;
   return (
     <button
       onClick={onSelect}
       title={categoryName}
       className={`max-w-56 truncate px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-        isSelected
+        specialClasses ??
+        (isSelected
           ? colorClasses
             ? `${colorClasses.activeBg} ${colorClasses.activeText}`
             : 'bg-brand text-white'
           : colorClasses
             ? `${colorClasses.bg} ${colorClasses.text} border ${colorClasses.border} hover:opacity-80`
-            : 'bg-card text-foreground border border-border hover:bg-muted'
+            : 'bg-card text-foreground border border-border hover:bg-muted')
       }`}
     >
+      {specialKind === 'top' && <Star size={14} className="me-1.5 inline-block fill-current" />}
+      {specialKind === 'offers' && <BadgePercent size={15} className="me-1.5 inline-block" />}
       {categoryName}
     </button>
   );
@@ -68,14 +99,16 @@ function CategoryRow({
   setSelectedCategory,
   allLabel,
   resetKey,
+  specialLabels,
 }: {
   className: string;
   collapse: boolean;
-  categories: Category[];
-  selectedCategory: Category['id'] | null;
-  setSelectedCategory: (id: Category['id'] | null) => void;
+  categories: CatalogChip<Category>[];
+  selectedCategory: string | null;
+  setSelectedCategory: (id: string | null) => void;
   allLabel: string;
   resetKey: string | null;
+  specialLabels: Record<SpecialCardKind, string>;
 }) {
   const allChip = (
     <button
@@ -91,19 +124,26 @@ function CategoryRow({
     </button>
   );
 
-  const categoryChips = categories
-    .filter((cat) => cat.id != null)
-    .map((cat) => ({
-      key: String(cat.id),
-      render: () => (
+  const categoryChips = categories.map((chip) => ({
+    key: chip.key,
+    render: () =>
+      chip.kind === 'category' ? (
         <CategoryChip
-          categoryName={cat.name}
-          categoryColor={cat.color}
-          isSelected={selectedCategory === cat.id}
-          onSelect={() => setSelectedCategory(cat.id)}
+          categoryName={chip.category.name}
+          categoryColor={chip.category.color}
+          isSelected={selectedCategory === chip.key}
+          onSelect={() => setSelectedCategory(chip.key)}
+        />
+      ) : (
+        <CategoryChip
+          categoryName={specialLabels[chip.kind]}
+          categoryColor={null}
+          isSelected={selectedCategory === chip.key}
+          onSelect={() => setSelectedCategory(chip.key)}
+          specialKind={chip.kind}
         />
       ),
-    }));
+  }));
 
   if (!collapse) {
     return (
@@ -305,6 +345,7 @@ interface Props {
   collapseCategories?: boolean;
   categorySort?: PosCategorySort;
   itemSort?: PosItemSort;
+  specialCards?: SpecialCardsConfig;
   /** Card density for this surface; 'large' is the original size. */
   density?: PosGridDensity;
   onDensityChange?: (density: PosGridDensity) => void;
@@ -336,6 +377,7 @@ export default function ProductGrid({
   collapseCategories = false,
   categorySort = 'saved',
   itemSort = 'saved',
+  specialCards = DEFAULT_SPECIAL_CARDS_CONFIG,
   density = 'large',
   onDensityChange,
   onToggleSoldOut,
@@ -379,15 +421,41 @@ export default function ProductGrid({
     [categories, categorySort],
   );
   const sortedProducts = useMemo(() => sortProducts(products, itemSort), [products, itemSort]);
+  const visibleSpecialCards = useMemo(() => {
+    const visible = new Set<SpecialCardKind>();
+    if (products.some((p) => p.in_top_card === true || p.in_top_card === 1)) visible.add('top');
+    if (products.some((p) => p.in_offers_card === true || p.in_offers_card === 1))
+      visible.add('offers');
+    return visible;
+  }, [products]);
+  const catalogChips = useMemo(
+    () => mergeCatalogChips(sortedCategories, specialCards, visibleSpecialCards),
+    [sortedCategories, specialCards, visibleSpecialCards],
+  );
+  const specialKind: SpecialCardKind | null =
+    selectedCategory === SPECIAL_TOP_CARD_ID
+      ? 'top'
+      : selectedCategory === SPECIAL_OFFERS_CARD_ID
+        ? 'offers'
+        : null;
 
   const filtered = sortedProducts
     .filter((p) => {
-      const matchCat = !selectedCategory || p.category_id === selectedCategory;
+      const matchCat =
+        specialKind === 'top'
+          ? p.in_top_card === true || p.in_top_card === 1
+          : specialKind === 'offers'
+            ? p.in_offers_card === true || p.in_offers_card === 1
+            : !selectedCategory || p.category_id === selectedCategory;
       const matchSearch = !activeQuery || p.name.toLowerCase().includes(activeQuery.toLowerCase());
       return matchCat && matchSearch;
     })
     // Pinned staples always lead the grid (stable within the saved sort).
-    .sort((a, b) => Number(b.is_pinned === true || b.is_pinned === 1) - Number(a.is_pinned === true || a.is_pinned === 1));
+    .sort(
+      (a, b) =>
+        Number(b.is_pinned === true || b.is_pinned === 1) -
+        Number(a.is_pinned === true || a.is_pinned === 1),
+    );
 
   const effectiveShowImages = showProductImages && density !== 'small';
 
@@ -464,10 +532,14 @@ export default function ProductGrid({
         <CategoryRow
           className="pb-1"
           collapse={collapseCategories}
-          categories={sortedCategories}
+          categories={catalogChips}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
           allLabel={t('allCategories')}
+          specialLabels={{
+            top: t('mostOrderedCard'),
+            offers: specialCards.offers_title.trim() || t('todaysOffersCard'),
+          }}
           resetKey={
             collapseCategories
               ? cart.customer?.id == null
@@ -507,7 +579,13 @@ export default function ProductGrid({
                         : 'bg-card text-foreground border-border hover:bg-muted'
                     }`}
                   >
-                    {t(d === 'large' ? 'densityLarge' : d === 'medium' ? 'densityMedium' : 'densitySmall')}
+                    {t(
+                      d === 'large'
+                        ? 'densityLarge'
+                        : d === 'medium'
+                          ? 'densityMedium'
+                          : 'densitySmall',
+                    )}
                   </button>
                 ))}
               </>
@@ -532,129 +610,147 @@ export default function ProductGrid({
 
             return (
               <div key={product.id} className="relative">
-              <button
-                data-testid="pos-product-card"
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  if (disabled) return;
-                  if (soldOut) {
-                    toast.error(t('soldOutEnded'));
-                    return;
-                  }
-                  const quantity = parsedSearch?.quantity ?? 1;
-                  if (!validateSelectionQuantity(product, quantity)) return;
-                  onProductClick(product, quantity);
-                }}
-                className={`w-full h-full bg-card rounded-xl border border-border hover:border-brand/40 active:border-brand active:bg-muted/40 hover:shadow-md transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed ${
-                  density === 'small' ? 'min-h-20 p-2' : density === 'medium' ? 'min-h-28 p-2' : 'min-h-36 p-2.5'
-                }`}
-              >
-                {!!product.track_inventory && (
-                  <>
-                    {product.stock_quantity <= 0 ? (
-                      <span className="absolute top-2 start-2 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-red-200 dark:border-red-800/40 pointer-events-none">
-                        {t('outOfStock')}
-                      </span>
-                    ) : product.stock_quantity <= (product.low_stock_threshold || 0) ? (
-                      <span className="absolute top-2 start-2 bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-orange-200 dark:border-orange-800/40 pointer-events-none">
-                        {t('lowStock')}
-                      </span>
-                    ) : null}
-                  </>
-                )}
-                {inCartQty > 0 && (
-                  <span className="absolute top-0 end-0 bg-brand text-white text-xs w-6 h-6 rounded-es-lg flex items-center justify-center font-bold z-10">
-                    {inCartQty}
-                  </span>
-                )}
+                <button
+                  data-testid="pos-product-card"
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return;
+                    if (soldOut) {
+                      toast.error(t('soldOutEnded'));
+                      return;
+                    }
+                    const quantity = parsedSearch?.quantity ?? 1;
+                    if (!validateSelectionQuantity(product, quantity)) return;
+                    onProductClick(product, quantity);
+                  }}
+                  className={`w-full h-full bg-card rounded-xl border border-border hover:border-brand/40 active:border-brand active:bg-muted/40 hover:shadow-md transition-all text-start relative cursor-pointer overflow-hidden touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed ${
+                    specialKind === 'top'
+                      ? 'border-amber-300 bg-amber-50/70 ring-1 ring-amber-200 dark:border-amber-700 dark:bg-amber-950/30 dark:ring-amber-800'
+                      : specialKind === 'offers'
+                        ? 'border-rose-300 bg-rose-50/70 ring-1 ring-rose-200 dark:border-rose-700 dark:bg-rose-950/30 dark:ring-rose-800'
+                        : ''
+                  } ${
+                    density === 'small'
+                      ? 'min-h-20 p-2'
+                      : density === 'medium'
+                        ? 'min-h-28 p-2'
+                        : 'min-h-36 p-2.5'
+                  }`}
+                >
+                  {!!product.track_inventory && (
+                    <>
+                      {product.stock_quantity <= 0 ? (
+                        <span className="absolute top-2 start-2 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-red-200 dark:border-red-800/40 pointer-events-none">
+                          {t('outOfStock')}
+                        </span>
+                      ) : product.stock_quantity <= (product.low_stock_threshold || 0) ? (
+                        <span className="absolute top-2 start-2 bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm border border-orange-200 dark:border-orange-800/40 pointer-events-none">
+                          {t('lowStock')}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                  {inCartQty > 0 && (
+                    <span className="absolute top-0 end-0 bg-brand text-white text-xs w-6 h-6 rounded-es-lg flex items-center justify-center font-bold z-10">
+                      {inCartQty}
+                    </span>
+                  )}
 
-                {effectiveShowImages && (
-                  <div className="w-full aspect-square rounded-lg mb-3 relative overflow-hidden">
-                    {/* Always-visible background tile — no flash when image loads */}
-                    <div
-                      className="absolute inset-0 flex items-center justify-center"
-                      style={{ backgroundColor: nameToColor(product.name) }}
-                    >
-                      <span className="text-2xl font-bold text-white">
-                        {product.name.substring(0, 2).toUpperCase()}
-                      </span>
+                  {effectiveShowImages && (
+                    <div className="w-full aspect-square rounded-lg mb-3 relative overflow-hidden">
+                      {/* Always-visible background tile — no flash when image loads */}
+                      <div
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{ backgroundColor: nameToColor(product.name) }}
+                      >
+                        <span className="text-2xl font-bold text-white">
+                          {product.name.substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Image overlays the tile when available */}
+                      {product.has_image && (
+                        <img
+                          src={`${api.defaults.baseURL}/products/${product.id}/image?t=${product.updated_at ? parseDbTimestamp(product.updated_at).getTime() : 0}`}
+                          alt={product.name}
+                          className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
+
+                      {product.tags && product.tags.length > 0 && (
+                        <span className="absolute bottom-1.5 end-1.5 z-10">
+                          <TagBadge tag={product.tags[0]} />
+                        </span>
+                      )}
                     </div>
+                  )}
 
-                    {/* Image overlays the tile when available */}
-                    {product.has_image && (
-                      <img
-                        src={`${api.defaults.baseURL}/products/${product.id}/image?t=${product.updated_at ? parseDbTimestamp(product.updated_at).getTime() : 0}`}
-                        alt={product.name}
-                        className="absolute inset-0 w-full h-full object-cover rounded-lg"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
+                  <h3
+                    className={`font-medium text-foreground leading-snug ${
+                      density === 'small' ? 'text-xs line-clamp-1' : 'text-sm line-clamp-2'
+                    }`}
+                  >
+                    {pinned && (
+                      <Star
+                        size={12}
+                        className="inline-block me-1 -mt-0.5 fill-amber-400 text-amber-400"
                       />
                     )}
-
-                    {product.tags && product.tags.length > 0 && (
-                      <span className="absolute bottom-1.5 end-1.5 z-10">
-                        <TagBadge tag={product.tags[0]} />
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <h3
-                  className={`font-medium text-foreground leading-snug ${
-                    density === 'small' ? 'text-xs line-clamp-1' : 'text-sm line-clamp-2'
-                  }`}
-                >
-                  {pinned && (
-                    <Star size={12} className="inline-block me-1 -mt-0.5 fill-amber-400 text-amber-400" />
+                    {product.name}
+                  </h3>
+                  {specialKind && product.description && density !== 'small' && (
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {product.description}
+                    </p>
                   )}
-                  {product.name}
-                </h3>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-brand font-bold">{fmt(Number(product.price))}</p>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {!effectiveShowImages && product.tags && product.tags.length > 0 && (
-                      <TagBadge tag={product.tags[0]} />
-                    )}
-                    {productNeedsCustomizer(product) && (
-                      <span
-                        className="touch-target -me-2 -my-2 rounded-lg text-muted-foreground"
-                        title={t('customisable')}
-                        aria-label={t('customisable')}
-                      >
-                        <SlidersHorizontal size={16} />
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-brand font-bold">{fmt(Number(product.price))}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!effectiveShowImages && product.tags && product.tags.length > 0 && (
+                        <TagBadge tag={product.tags[0]} />
+                      )}
+                      {productNeedsCustomizer(product) && (
+                        <span
+                          className="touch-target -me-2 -my-2 rounded-lg text-muted-foreground"
+                          title={t('customisable')}
+                          aria-label={t('customisable')}
+                        >
+                          <SlidersHorizontal size={16} />
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {soldOut && (
-                  <span className="absolute inset-0 z-10 flex items-center justify-center bg-card/75">
-                    <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-xs font-bold px-3 py-1 rounded-full border border-red-200 dark:border-red-800/50">
-                      {t('soldOutEnded')}
+                  {soldOut && (
+                    <span className="absolute inset-0 z-10 flex items-center justify-center bg-card/75">
+                      <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-xs font-bold px-3 py-1 rounded-full border border-red-200 dark:border-red-800/50">
+                        {t('soldOutEnded')}
+                      </span>
                     </span>
+                  )}
+                </button>
+                {onToggleSoldOut && (
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    title={soldOut ? t('soldOutRestore') : t('soldOutMark')}
+                    aria-label={soldOut ? t('soldOutRestore') : t('soldOutMark')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSoldOut(product);
+                    }}
+                    className={`absolute bottom-1.5 end-1.5 z-20 rounded-full border p-1.5 shadow-sm cursor-pointer ${
+                      soldOut
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-card/90 text-muted-foreground border-border hover:text-red-600 hover:border-red-300'
+                    }`}
+                  >
+                    {soldOut ? <PackageCheck size={14} /> : <PackageX size={14} />}
                   </span>
                 )}
-              </button>
-              {onToggleSoldOut && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  title={soldOut ? t('soldOutRestore') : t('soldOutMark')}
-                  aria-label={soldOut ? t('soldOutRestore') : t('soldOutMark')}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleSoldOut(product);
-                  }}
-                  className={`absolute bottom-1.5 end-1.5 z-20 rounded-full border p-1.5 shadow-sm cursor-pointer ${
-                    soldOut
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
-                      : 'bg-card/90 text-muted-foreground border-border hover:text-red-600 hover:border-red-300'
-                  }`}
-                >
-                  {soldOut ? <PackageCheck size={14} /> : <PackageX size={14} />}
-                </span>
-              )}
               </div>
             );
           })}

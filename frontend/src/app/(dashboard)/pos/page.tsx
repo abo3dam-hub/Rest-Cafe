@@ -34,6 +34,7 @@ import { ShiftOpenModal } from '@/components/dashboard/ShiftOpenModal';
 import { ShiftCloseModal } from '@/components/dashboard/ShiftCloseModal';
 import { useCashSession } from '@/hooks/useCashSession';
 import { usePosSortPreference } from '@/hooks/usePosSort';
+import { useSpecialCardsPreference } from '@/hooks/useSpecialCards';
 import { tenantCan } from '@/lib/permissions';
 import { CashDrawerMovementModal } from '@/components/dashboard/CashDrawerMovementModal';
 import { useCashDrawerMovements } from '@/hooks/useCashDrawerMovements';
@@ -80,6 +81,7 @@ export default function POSPage() {
   const canUseShift = tenantCan(currentTenant, 'cash.shifts.view');
 
   const { categorySort, itemSort } = usePosSortPreference();
+  const specialCards = useSpecialCardsPreference();
   const [submitting, setSubmitting] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [showPrintMenuModal, setShowPrintMenuModal] = useState(false);
@@ -504,6 +506,7 @@ export default function POSPage() {
             sidebarOpen={leftSidebarOpen}
             categorySort={categorySort}
             itemSort={itemSort}
+            specialCards={specialCards}
             collapseCategories
             density={gridDensity}
             onDensityChange={setGridDensity}

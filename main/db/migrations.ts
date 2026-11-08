@@ -3685,6 +3685,28 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    version: 127,
+    name: 'products_special_cards',
+    up: () => {
+      // Special-card membership («الأكثر طلباً» / offers) lives on the product
+      // row so every catalog surface sees the same truth; title/positions are settings.
+      const productColumns = getRawDatabase()
+        .prepare('PRAGMA table_info(products)')
+        .all()
+        .map((c: any) => c.name);
+      if (!productColumns.includes('in_top_card')) {
+        getRawDatabase().exec(
+          'ALTER TABLE products ADD COLUMN in_top_card INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+      if (!productColumns.includes('in_offers_card')) {
+        getRawDatabase().exec(
+          'ALTER TABLE products ADD COLUMN in_offers_card INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {

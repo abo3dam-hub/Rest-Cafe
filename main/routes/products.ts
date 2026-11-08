@@ -5,7 +5,7 @@ import {
   OfflineModeError,
 } from '../services/offline-mode';
 import { Router, Request, Response } from 'express';
-import { getDatabase, now, generateShortId, getSettingValue } from '../db';
+import { getDatabase, now, generateShortId, getSettingValue, withTxn } from '../db';
 import { isBlockedSsrfTarget } from '../middleware/security';
 import { hasPermission, requireAnyPermission, requirePermission } from '../services/authorization';
 import { getHttpRequestSignal } from '../shutdown';
@@ -489,6 +489,8 @@ function serializeProduct(product: any): any {
     is_active: toBoolean(product.is_active),
     is_sold_out: toBoolean(product.is_sold_out),
     is_pinned: toBoolean(product.is_pinned),
+    in_top_card: toBoolean(product.in_top_card),
+    in_offers_card: toBoolean(product.in_offers_card),
     track_inventory: toBoolean(product.track_inventory),
     allow_fractional_quantity: toBoolean(product.allow_fractional_quantity),
     has_image: toBoolean(product.has_image),
@@ -1189,7 +1191,7 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
     let query = `SELECT p.id, p.category_id, p.name, p.description, p.price, p.cost, p.sku, p.barcode,
       p.sale_unit, p.allow_fractional_quantity, p.weight_precision,
       p.inventory_product_id, p.inventory_deduction_quantity,
-      p.is_active, p.is_sold_out, p.sold_out_at, p.is_pinned, p.sort_order, p.track_inventory, p.stock_quantity, p.low_stock_threshold,
+      p.is_active, p.is_sold_out, p.sold_out_at, p.is_pinned, p.in_top_card, p.in_offers_card, p.sort_order, p.track_inventory, p.stock_quantity, p.low_stock_threshold,
       p.tax_type, p.tax_rate, p.tax_category_id, p.tax_behavior, p.cb_percent, p.tags, p.dietary_tags, p.deleted_at, p.created_at, p.updated_at,
       CASE WHEN p.image_url IS NULL OR p.image_url = '' THEN 0 ELSE 1 END AS has_image
       FROM products p 
@@ -2288,6 +2290,42 @@ router.patch(
   },
 );
 
+router.patch('/list-order', requirePermission('catalog.manage'), (req: Request, res: Response) => {
+  try {
+    const ids = (req.body ?? {}).ids;
+    if (
+      !Array.isArray(ids) ||
+      ids.length === 0 ||
+      ids.some((id) => typeof id !== 'string' || !id)
+    ) {
+      return res.status(400).json({ error: 'ids must be a non-empty array of product ids' });
+    }
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length !== ids.length) {
+      return res.status(400).json({ error: 'ids must not contain duplicates' });
+    }
+    const db = getDatabase();
+    const placeholders = uniqueIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT id, sort_order FROM products WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+      )
+      .all(...uniqueIds) as { id: string; sort_order: number }[];
+    if (rows.length !== uniqueIds.length) {
+      return res.status(404).json({ error: 'One or more products were not found' });
+    }
+    const sortOrders = rows.map((row) => row.sort_order).sort((a, b) => a - b);
+    const update = db.prepare('UPDATE products SET sort_order = ?, updated_at = ? WHERE id = ?');
+    withTxn(() => {
+      uniqueIds.forEach((id, index) => update.run(sortOrders[index], now(), id));
+    });
+    res.json({ updated: uniqueIds.length });
+  } catch (error) {
+    console.error('[API] Internal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.patch('/:id/pin', requirePermission('catalog.manage'), (req: Request, res: Response) => {
   try {
     const { pinned } = req.body ?? {};
@@ -2312,6 +2350,49 @@ router.patch('/:id/pin', requirePermission('catalog.manage'), (req: Request, res
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+router.patch(
+  '/:id/special-cards',
+  requirePermission('catalog.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const { in_top_card, in_offers_card } = req.body ?? {};
+      if (
+        (in_top_card !== undefined && typeof in_top_card !== 'boolean') ||
+        (in_offers_card !== undefined && typeof in_offers_card !== 'boolean') ||
+        (in_top_card === undefined && in_offers_card === undefined)
+      ) {
+        return res.status(400).json({ error: 'in_top_card or in_offers_card must be a boolean' });
+      }
+      const db = getDatabase();
+      const product = db
+        .prepare('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL')
+        .get(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      const assignments: string[] = [];
+      const values: number[] = [];
+      if (in_top_card !== undefined) {
+        assignments.push('in_top_card = ?');
+        values.push(in_top_card ? 1 : 0);
+      }
+      if (in_offers_card !== undefined) {
+        assignments.push('in_offers_card = ?');
+        values.push(in_offers_card ? 1 : 0);
+      }
+      db.prepare(`UPDATE products SET ${assignments.join(', ')}, updated_at = ? WHERE id = ?`).run(
+        ...values,
+        now(),
+        req.params.id,
+      );
+      res.json({ product: loadSerializedProduct(db, req, req.params.id as string) });
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
 
 // Bulk repricing for fast menu-wide adjustments: every entry is validated
 // and resolved before the single transaction writes, so one bad id or price

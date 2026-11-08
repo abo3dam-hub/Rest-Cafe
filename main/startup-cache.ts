@@ -40,24 +40,20 @@ export function clearStaleRenderCachesOnVersionChange(
   }
 
   if (previousVersion !== currentElectronVersion) {
-    let allCleared = true;
+    let failedDirs = 0;
     for (const dir of STALE_RENDER_CACHE_DIRS) {
       try {
         fsOps.rmSync(path.join(userDataPath, dir), { recursive: true, force: true });
       } catch (err) {
-        allCleared = false;
+        failedDirs += 1;
         logger.warn(`[Flo] Failed to clear stale cache dir "${dir}":`, (err as Error).message);
       }
     }
 
-    if (!allCleared) {
-      // Leave the marker as it was so the next launch retries the
-      // directories that failed to clear, instead of silently giving up.
-      return;
-    }
-
+    // Chromium can keep cache folders locked for the whole app run, so advance
+    // the marker and do not repeat the same failed cleanup on every launch.
     logger.debug(
-      `[Flo] Electron version marker ${previousVersion ?? '(none)'} -> ${currentElectronVersion}; cleared render caches to avoid a stale-cache crash loop.`,
+      `[Flo] Electron version marker ${previousVersion ?? '(none)'} -> ${currentElectronVersion}; cleared render caches${failedDirs ? ` (${failedDirs} locked dirs skipped)` : ''} to avoid a stale-cache crash loop.`,
     );
   }
 

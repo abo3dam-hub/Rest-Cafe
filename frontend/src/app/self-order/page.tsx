@@ -5,6 +5,15 @@ import { useTranslations } from 'use-intl';
 import { usePosSettingsStore } from '@/store/pos-settings';
 import { getLanguageDirection, isLanguage } from '@/lib/i18n/languages';
 import type { Addon, Category, Product, ProductVariant } from '@/lib/types';
+import { BadgePercent, Star } from 'lucide-react';
+import {
+  DEFAULT_SPECIAL_CARDS_CONFIG,
+  SPECIAL_OFFERS_CARD_ID,
+  SPECIAL_TOP_CARD_ID,
+  mergeCatalogChips,
+  type SpecialCardKind,
+  type SpecialCardsConfig,
+} from '@/lib/special-cards';
 
 interface SelfOrderInfo {
   business_name: string;
@@ -15,6 +24,7 @@ interface SelfOrderInfo {
   currency_symbol: string;
   currency_position: 'prefix' | 'suffix';
   currency_fraction_digits: number;
+  special_cards?: SpecialCardsConfig;
 }
 
 interface CartAddon {
@@ -120,14 +130,39 @@ export default function SelfOrderPage() {
     };
   }, [info]);
 
+  const specialCards = info?.special_cards ?? DEFAULT_SPECIAL_CARDS_CONFIG;
+  const visibleSpecialCards = useMemo(() => {
+    const visible = new Set<SpecialCardKind>();
+    if (products.some((p) => p.in_top_card === true || p.in_top_card === 1)) visible.add('top');
+    if (products.some((p) => p.in_offers_card === true || p.in_offers_card === 1))
+      visible.add('offers');
+    return visible;
+  }, [products]);
+  const catalogChips = useMemo(
+    () => mergeCatalogChips(categories, specialCards, visibleSpecialCards),
+    [categories, specialCards, visibleSpecialCards],
+  );
+  const specialKind: SpecialCardKind | null =
+    activeCategory === SPECIAL_TOP_CARD_ID
+      ? 'top'
+      : activeCategory === SPECIAL_OFFERS_CARD_ID
+        ? 'offers'
+        : null;
+
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
-      if (activeCategory !== 'all' && p.category_id !== activeCategory) return false;
+      const matchesCategory =
+        specialKind === 'top'
+          ? p.in_top_card === true || p.in_top_card === 1
+          : specialKind === 'offers'
+            ? p.in_offers_card === true || p.in_offers_card === 1
+            : activeCategory === 'all' || p.category_id === activeCategory;
+      if (!matchesCategory) return false;
       if (q && !p.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, activeCategory, search]);
+  }, [products, activeCategory, search, specialKind]);
 
   const cartCount = cart.reduce((sum, l) => sum + l.quantity, 0);
   const cartTotal = cart.reduce((sum, l) => sum + lineUnitPrice(l) * l.quantity, 0);
@@ -307,19 +342,44 @@ export default function SelfOrderPage() {
           >
             {t('allCategories')}
           </button>
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium ${
-                activeCategory === category.id
-                  ? 'bg-brand text-white'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
+          {catalogChips.map((chip) =>
+            chip.kind === 'category' ? (
+              <button
+                key={chip.key}
+                onClick={() => setActiveCategory(chip.key)}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium ${
+                  activeCategory === chip.key
+                    ? 'bg-brand text-white'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {chip.category.name}
+              </button>
+            ) : (
+              <button
+                key={chip.key}
+                onClick={() => setActiveCategory(chip.key)}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  activeCategory === chip.key
+                    ? chip.kind === 'top'
+                      ? 'bg-gradient-to-l from-amber-500 to-orange-500 text-white'
+                      : 'bg-gradient-to-l from-rose-500 to-red-500 text-white'
+                    : chip.kind === 'top'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-rose-100 text-rose-800'
+                }`}
+              >
+                {chip.kind === 'top' ? (
+                  <Star size={14} className="me-1 inline-block fill-current" />
+                ) : (
+                  <BadgePercent size={15} className="me-1 inline-block" />
+                )}
+                {chip.kind === 'top'
+                  ? t('mostOrderedCard')
+                  : specialCards.offers_title.trim() || t('todaysOffersCard')}
+              </button>
+            ),
+          )}
         </div>
       </header>
 
@@ -327,7 +387,13 @@ export default function SelfOrderPage() {
         {visibleProducts.map((product) => (
           <article
             key={product.id}
-            className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+            className={`flex flex-col overflow-hidden rounded-2xl border bg-card ${
+              specialKind === 'top'
+                ? 'border-amber-300 ring-1 ring-amber-200'
+                : specialKind === 'offers'
+                  ? 'border-rose-300 ring-1 ring-rose-200'
+                  : 'border-border'
+            }`}
           >
             {product.has_image ? (
               // eslint-disable-next-line @next/next/no-img-element
