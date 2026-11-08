@@ -3668,6 +3668,23 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       for (const [key, value] of defaults) insert.run(key, value, now());
     },
   },
+  {
+    version: 126,
+    name: 'tables_list_order',
+    up: () => {
+      // Shared drag-and-drop ordering for the tables LIST view (owner
+      // decision, 2026-11-08): one order for every user, stored on the
+      // table row. NULL keeps the legacy number order until the owner
+      // arranges the list for the first time.
+      const tableColumns = getRawDatabase()
+        .prepare('PRAGMA table_info(tables)')
+        .all()
+        .map((c: any) => c.name);
+      if (!tableColumns.includes('list_order')) {
+        getRawDatabase().exec('ALTER TABLE tables ADD COLUMN list_order INTEGER DEFAULT NULL');
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {

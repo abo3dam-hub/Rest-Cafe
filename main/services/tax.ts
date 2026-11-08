@@ -341,7 +341,8 @@ export function previewCategoryRate(
   const ruleById = new Map(pack.rules.map((rule) => [rule.id, rule]));
   const percentRules = category.ruleIds.reduce<TaxRule[]>((acc, ruleId) => {
     const rule = ruleById.get(ruleId);
-    if (!rule || rule.type !== 'percent' || !rule.categoryIds.includes(categoryId)) return acc;
+    if (!rule || rule.type !== 'percent' || rule.feeBaseOnly || !rule.categoryIds.includes(categoryId))
+      return acc;
     const conditions = rule.conditions;
     if (conditions) {
       if (conditions.businessTypes && !conditions.businessTypes.includes(businessType)) return acc;

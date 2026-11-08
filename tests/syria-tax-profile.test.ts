@@ -403,6 +403,53 @@ async function main() {
     const offOrder = await createOrder([{ product_id: 'syria-p1', quantity: 1 }]);
     assertEqualOrThrow(offOrder.data.order.tax_amount, 0, 'no fee while taxes are off');
     assertOrThrow(offOrder.status === 201, 'orders still work with taxes off');
+
+    console.log('\n16. A leftover active manual pack blocks activation until deactivated (follow-up 45)');
+    const manual = await api(baseUrl, '/api/tax-packs/manual-config', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: {
+        inclusive: false,
+        categories: [
+          {
+            tempId: 'standard',
+            label: 'Standard',
+            components: [{ label: 'رسم انفاق استهلاكي', type: 'percent', value: '10' }],
+          },
+        ],
+        defaultProductCategoryTempId: 'standard',
+        packagingCategoryTempId: 'standard',
+        deliveryCategoryTempId: 'standard',
+        serviceChargeCategoryTempId: 'standard',
+      },
+    });
+    assertEqualOrThrow(manual.status, 200, 'manual config saved (the leftover state)');
+    const blocked = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3' },
+    });
+    assertEqualOrThrow(blocked.status, 409, 'activation is refused while the manual pack is active');
+    assertEqualOrThrow(blocked.data.code, 'active_pack_conflict', 'conflict carries its code');
+    assertEqualOrThrow(blocked.data.active_pack_id, 'manual-sy', 'conflict names the blocking pack');
+    const deactivate = await api(baseUrl, '/api/tax-packs/manual-sy/deactivate', {
+      method: 'POST',
+      headers: owner.authHeader,
+    });
+    assertEqualOrThrow(deactivate.status, 200, 'the blocking pack can be deactivated');
+    assertEqualOrThrow(deactivate.data.changed, true, 'deactivation reports the change');
+    const unblocked = await api(baseUrl, '/api/tax-packs/syria-profile', {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { profile: 'consumption', classification: 'rated_2_3' },
+    });
+    assertEqualOrThrow(unblocked.status, 200, 'activation succeeds right after deactivation');
+    const unblockedOrder = await createOrder([{ product_id: 'syria-p1', quantity: 1 }]);
+    assertEqualOrThrow(
+      unblockedOrder.data.order.tax_amount,
+      525,
+      'orders charge the Syria fee after the switch (500 fee + 25 admin on 10,000)',
+    );
   } finally {
     server.close();
     closeDatabase();

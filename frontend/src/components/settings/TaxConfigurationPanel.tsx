@@ -127,7 +127,13 @@ type Calculation = {
 
 // Manual tax builder: category groups rate components that apply together.
 // See buildManualPack in main/routes/tax-packs.ts for server mirror.
-type ManualComponent = { key: string; label: string; type: 'percent' | 'fixed'; value: string };
+type ManualComponent = {
+  key: string;
+  label: string;
+  type: 'percent' | 'fixed' | 'percent_of_fee';
+  value: string;
+  baseKey?: string;
+};
 type ManualCategory = { tempId: string; label: string; components: ManualComponent[] };
 // Add-ons are taxed with parent item subtotal, never as standalone lines.
 type ManualDefaults = {
@@ -147,6 +153,8 @@ type ManualPackDefinition = {
     type: 'percent' | 'fixed';
     rate?: string;
     amount?: string;
+    baseRuleIds?: string[];
+    feeBaseOnly?: boolean;
   }>;
 };
 
@@ -305,6 +313,8 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   const [syriaRate, setSyriaRate] = useState('0');
   const [syriaLocalAdminRate, setSyriaLocalAdminRate] = useState('5');
   const [syriaSaving, setSyriaSaving] = useState(false);
+  const [syriaConflictPackId, setSyriaConflictPackId] = useState<string | null>(null);
+  const [syriaConflictBusy, setSyriaConflictBusy] = useState(false);
   const applyManualDefinition = useCallback(async (country: string) => {
     const response = await api.get(`/tax-packs/manual-${country.toLowerCase()}`);
     const definition = response.data?.active_version?.definition as
@@ -323,8 +333,13 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
           return {
             key: ruleId || manualId('component'),
             label: rule?.label || '',
-            type: (rule?.type === 'fixed' ? 'fixed' : 'percent') as 'percent' | 'fixed',
+            type: (rule?.feeBaseOnly
+              ? 'percent_of_fee'
+              : rule?.type === 'fixed'
+                ? 'fixed'
+                : 'percent') as ManualComponent['type'],
             value: rule ? (rule.type === 'fixed' ? rule.amount || '0' : rule.rate || '0') : '0',
+            baseKey: rule?.feeBaseOnly ? rule.baseRuleIds?.[0] : undefined,
           };
         }),
       }));
@@ -494,6 +509,10 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         ? 'manual'
         : 'official';
   const manualBuilderVisible = manualBuilderOpen || taxMode === 'manual';
+  // Fee-list presentation (owner decision, 2026-11-08): a single fee group
+  // IS the invoice fee list — no category machinery is shown. A legacy pack
+  // with several groups keeps the detailed editor so nothing is stranded.
+  const feeListMode = manualCategories.length === 1;
   const primaryManualCategory =
     manualCategories.find((category) => category.tempId === manualDefaults.product) ||
     manualCategories[0];
@@ -501,14 +520,26 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
     if (!primaryManualCategory) return null;
     let percent = 0;
     let fixed = 0;
+    let total = 0;
+    const amountByKey = new Map<string, number>();
     for (const component of primaryManualCategory.components) {
       const value = Number(component.value);
       if (!Number.isFinite(value)) continue;
-      if (component.type === 'percent') percent += value;
-      else fixed += value;
+      let amount = 0;
+      if (component.type === 'percent') {
+        percent += value;
+        amount = 100000 * (value / 100);
+      } else if (component.type === 'percent_of_fee') {
+        amount = ((amountByKey.get(component.baseKey || '') || 0) * value) / 100;
+      } else {
+        fixed += value;
+        amount = value;
+      }
+      amountByKey.set(component.key, amount);
+      total += amount;
     }
-    if (percent === 0 && fixed === 0) return null;
-    return Math.round(100000 * (percent / 100) + fixed).toLocaleString('en-US');
+    if (percent === 0 && fixed === 0 && total === 0) return null;
+    return Math.round(total).toLocaleString('en-US');
   })();
   const manualDefaultsAllSame =
     manualDefaults.packaging === manualDefaults.product &&
@@ -663,6 +694,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       return;
     }
     setSyriaSaving(true);
+    setSyriaConflictPackId(null);
     try {
       await api.post('/tax-packs/syria-profile', {
         profile: syriaProfile,
@@ -675,10 +707,39 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
       toast.success(t(syriaProfile === 'sales' ? 'syriaSalesApplied' : 'syriaApplied'));
       await refreshAll();
     } catch (error) {
-      toast.error(apiMessage(error, t('syriaApplyFailed')));
+      const response = (
+        error as {
+          response?: { status?: number; data?: { code?: string; active_pack_id?: string } };
+        }
+      ).response;
+      if (
+        response?.status === 409 &&
+        response.data?.code === 'active_pack_conflict' &&
+        response.data?.active_pack_id
+      ) {
+        setSyriaConflictPackId(response.data.active_pack_id);
+        toast.error(t('syriaConflictTitle'));
+      } else {
+        toast.error(apiMessage(error, t('syriaApplyFailed')));
+      }
     } finally {
       setSyriaSaving(false);
     }
+  }
+
+  async function deactivateSyriaConflictAndRetry() {
+    if (!isOwner || !syriaConflictPackId) return;
+    setSyriaConflictBusy(true);
+    try {
+      await api.post(`/tax-packs/${syriaConflictPackId}/deactivate`);
+    } catch (error) {
+      toast.error(apiMessage(error, t('syriaDeactivateFailed')));
+      setSyriaConflictBusy(false);
+      return;
+    }
+    setSyriaConflictPackId(null);
+    setSyriaConflictBusy(false);
+    await saveSyriaProfile();
   }
 
   async function calculate() {
@@ -767,7 +828,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
   async function saveManualConfig(override = false) {
     if (!isOwner) return;
     for (const category of manualCategories) {
-      if (!category.label.trim()) {
+      if (!category.label.trim() && !feeListMode) {
         toast.error(t('categoryNameRequired'));
         return;
       }
@@ -775,11 +836,22 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         toast.error(t('categoryNeedsComponent', { label: category.label }));
         return;
       }
-      for (const component of category.components) {
+      for (const [componentIndex, component] of category.components.entries()) {
         const value = Number(component.value);
-        if (!Number.isFinite(value) || value < 0 || (component.type === 'percent' && value > 100)) {
+        if (
+          !Number.isFinite(value) ||
+          value < 0 ||
+          ((component.type === 'percent' || component.type === 'percent_of_fee') && value > 100)
+        ) {
           toast.error(t('componentNeedsValidRate', { label: component.label || category.label }));
           return;
+        }
+        if (component.type === 'percent_of_fee') {
+          const baseIndex = category.components.findIndex((c) => c.key === component.baseKey);
+          if (baseIndex === -1 || baseIndex >= componentIndex) {
+            toast.error(t('componentNeedsValidRate', { label: component.label || category.label }));
+            return;
+          }
         }
       }
     }
@@ -789,11 +861,16 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
         inclusive: manualInclusive,
         categories: manualCategories.map((category) => ({
           tempId: category.tempId,
-          label: category.label.trim(),
+          label: category.label.trim() || 'Standard',
           components: category.components.map((component) => ({
             label: component.label.trim(),
             type: component.type,
             value: component.value,
+            ...(component.type === 'percent_of_fee'
+              ? {
+                  baseIndex: category.components.findIndex((c) => c.key === component.baseKey),
+                }
+              : {}),
           })),
         })),
         defaultProductCategoryTempId: manualDefaults.product,
@@ -961,59 +1038,84 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
             <p className="mt-2 text-sm text-muted-foreground">{t('syriaSalesHint')}</p>
           )}
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {syriaProfile === 'consumption' && (
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-foreground">
-                  {t('syriaClassification')}
+          {/* The Syria preset presented as the fee list it is (owner
+              decision, 2026-11-08): one row per invoice fee, each row
+              naming the fee and how it is calculated. */}
+          <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-border bg-muted/50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                  {syriaProfile === 'sales' ? t('syriaSalesOption') : t('modeSyria')}
+                </p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  {t('kindPercentOfBill')}
                 </span>
-                <select
-                  value={syriaClassification}
-                  disabled={!isOwner}
-                  onChange={(event) => {
-                    setSyriaClassification(event.target.value);
-                    setSyriaRate(SYRIA_CLASS_RATES[event.target.value] ?? '0');
-                  }}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
-                >
-                  <option value="unrated">{t('syriaClassUnrated')}</option>
-                  <option value="rated_2_3">{t('syriaClassRated23')}</option>
-                  <option value="rated_4_5">{t('syriaClassRated45')}</option>
-                  <option value="nightclub">{t('syriaClassNightclub')}</option>
-                </select>
-              </label>
-            )}
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-foreground">
-                {t('syriaRate')}
-              </span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={syriaRate}
-                disabled={!isOwner}
-                onChange={(event) => setSyriaRate(event.target.value)}
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
-              />
-            </label>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {syriaProfile === 'consumption' && (
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-foreground">
+                      {t('syriaClassification')}
+                    </span>
+                    <select
+                      value={syriaClassification}
+                      disabled={!isOwner}
+                      onChange={(event) => {
+                        setSyriaClassification(event.target.value);
+                        setSyriaRate(SYRIA_CLASS_RATES[event.target.value] ?? '0');
+                      }}
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+                    >
+                      <option value="unrated">{t('syriaClassUnrated')}</option>
+                      <option value="rated_2_3">{t('syriaClassRated23')}</option>
+                      <option value="rated_4_5">{t('syriaClassRated45')}</option>
+                      <option value="nightclub">{t('syriaClassNightclub')}</option>
+                    </select>
+                  </label>
+                )}
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-foreground">
+                    {t('syriaRate')}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={syriaRate}
+                    disabled={!isOwner}
+                    onChange={(event) => setSyriaRate(event.target.value)}
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+                  />
+                </label>
+              </div>
+            </div>
             {syriaProfile === 'consumption' && (
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-foreground">
-                  {t('syriaLocalAdminRate')}
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={syriaLocalAdminRate}
-                  disabled={!isOwner}
-                  onChange={(event) => setSyriaLocalAdminRate(event.target.value)}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
-                />
-              </label>
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {t('syriaLocalAdminName')}
+                  </p>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    {t('kindPercentOfFee')}
+                  </span>
+                </div>
+                <label className="mt-3 block sm:max-w-xs">
+                  <span className="mb-1 block text-sm font-medium text-foreground">
+                    {t('syriaLocalAdminRate')}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={syriaLocalAdminRate}
+                    disabled={!isOwner}
+                    onChange={(event) => setSyriaLocalAdminRate(event.target.value)}
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm disabled:bg-muted"
+                  />
+                </label>
+              </div>
             )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{t('syriaRateHint')}</p>
@@ -1029,6 +1131,28 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
               {syriaSaving ? t('saving') : t('syriaApply')}
             </Button>
           </div>
+
+          {syriaConflictPackId && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-semibold text-amber-900">{t('syriaConflictTitle')}</p>
+              <p className="mt-1 text-sm text-amber-800">{t('syriaConflictMessage')}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void deactivateSyriaConflictAndRetry()}
+                  disabled={!isOwner || syriaConflictBusy || syriaSaving}
+                >
+                  {t('syriaDeactivateAndContinue')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSyriaConflictPackId(null)}
+                  disabled={syriaConflictBusy}
+                >
+                  {t('syriaConflictDismiss')}
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -1050,35 +1174,42 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t('manualBuilderHint')}
+            {feeListMode ? t('manualFeeListHint') : t('manualBuilderHint')}
           </p>
+          {!feeListMode && (
+            <p className="mt-1 text-xs text-muted-foreground">{t('feeListMultiCategoryNote')}</p>
+          )}
 
           <div className="mt-4 space-y-3">
             {manualCategories.map((category) => (
               <div key={category.tempId} className="rounded-lg border border-border bg-muted p-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={category.label}
-                    onChange={(event) =>
-                      updateManualCategoryLabel(category.tempId, event.target.value)
-                    }
-                    disabled={!isOwner}
-                    placeholder={t('categoryNamePlaceholder')}
-                    className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium disabled:bg-muted"
-                  />
-                  {isOwner && manualCategories.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeManualCategory(category.tempId)}
-                      className="p-2 text-gray-400 hover:text-red-600"
-                      title={t('removeCategory')}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
+                {feeListMode ? (
+                  <p className="text-sm font-semibold text-foreground">{t('feeListTitle')}</p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={category.label}
+                      onChange={(event) =>
+                        updateManualCategoryLabel(category.tempId, event.target.value)
+                      }
+                      disabled={!isOwner}
+                      placeholder={t('categoryNamePlaceholder')}
+                      className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium disabled:bg-muted"
+                    />
+                    {isOwner && manualCategories.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeManualCategory(category.tempId)}
+                        className="p-2 text-gray-400 hover:text-red-600"
+                        title={t('removeCategory')}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="mt-2 space-y-2">
-                  {category.components.map((component) => (
+                  {category.components.map((component, componentIndex) => (
                     <div key={component.key} className="flex items-center gap-2 ps-4">
                       <input
                         value={component.label}
@@ -1093,17 +1224,40 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                       />
                       <select
                         value={component.type}
-                        onChange={(event) =>
-                          updateManualComponent(category.tempId, component.key, {
-                            type: event.target.value as 'percent' | 'fixed',
-                          })
-                        }
+                        onChange={(event) => {
+                          const nextType = event.target.value as ManualComponent['type'];
+                          const patch: Partial<ManualComponent> = { type: nextType };
+                          if (nextType === 'percent_of_fee' && !component.baseKey) {
+                            patch.baseKey = category.components[0]?.key;
+                          }
+                          updateManualComponent(category.tempId, component.key, patch);
+                        }}
                         disabled={!isOwner}
                         className="rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted"
                       >
-                        <option value="percent">%</option>
+                        <option value="percent">{t('kindPercentOfBill')}</option>
+                        <option value="percent_of_fee">{t('kindPercentOfAnotherFee')}</option>
                         <option value="fixed">{t('fixed')}</option>
                       </select>
+                      {component.type === 'percent_of_fee' && (
+                        <select
+                          value={component.baseKey || ''}
+                          onChange={(event) =>
+                            updateManualComponent(category.tempId, component.key, {
+                              baseKey: event.target.value,
+                            })
+                          }
+                          disabled={!isOwner}
+                          aria-label={t('feeBaseLabel')}
+                          className="rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted"
+                        >
+                          {category.components.slice(0, componentIndex).map((base) => (
+                            <option key={base.key} value={base.key}>
+                              {base.label || t('untitledCategory')}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <input
                         type="number"
                         min="0"
@@ -1135,13 +1289,13 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                       onClick={() => addManualComponent(category.tempId)}
                       className="ms-4 flex items-center gap-1 text-xs font-medium text-brand"
                     >
-                      <Plus size={12} /> {t('addComponent')}
+                      <Plus size={12} /> {feeListMode ? t('addFee') : t('addComponent')}
                     </button>
                   )}
                 </div>
               </div>
             ))}
-            {isOwner && (
+            {isOwner && !feeListMode && (
               <button
                 type="button"
                 onClick={addManualCategory}
@@ -1178,45 +1332,53 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
           </div>
 
           <div className="mt-5 border-t border-border pt-4">
-            <p className="text-sm font-medium text-foreground">{t('manualPrimaryCategory')}</p>
-            <p className="text-xs text-muted-foreground mb-2">{t('manualPrimaryCategoryHint')}</p>
-            <select
-              value={manualDefaults.product}
-              onChange={(event) => {
-                const next = event.target.value;
-                setManualDefaults({
-                  product: next,
-                  packaging: next,
-                  delivery: next,
-                  service_charge: next,
-                });
-              }}
-              disabled={!isOwner}
-              className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted sm:max-w-xs"
-            >
-              {manualCategories.map((category) => (
-                <option key={category.tempId} value={category.tempId}>
-                  {category.label || t('untitledCategory')}
-                </option>
-              ))}
-            </select>
+            {!feeListMode && (
+              <>
+                <p className="text-sm font-medium text-foreground">{t('manualPrimaryCategory')}</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  {t('manualPrimaryCategoryHint')}
+                </p>
+                <select
+                  value={manualDefaults.product}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setManualDefaults({
+                      product: next,
+                      packaging: next,
+                      delivery: next,
+                      service_charge: next,
+                    });
+                  }}
+                  disabled={!isOwner}
+                  className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm disabled:bg-muted sm:max-w-xs"
+                >
+                  {manualCategories.map((category) => (
+                    <option key={category.tempId} value={category.tempId}>
+                      {category.label || t('untitledCategory')}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             {manualExampleTax !== null && (
               <p className="mt-3 text-sm text-muted-foreground">
                 {t('manualExample', { tax: manualExampleTax })}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => setManualAdvancedOpen((value) => !value)}
-              className="mt-4 flex items-center gap-1 text-sm font-medium text-brand"
-            >
-              <ChevronDown
-                size={14}
-                className={manualAdvancedOpen ? 'rotate-180' : ''}
-              />
-              {t('manualAdvancedAssign')}
-            </button>
-            {!manualAdvancedOpen && (
+            {!feeListMode && (
+              <button
+                type="button"
+                onClick={() => setManualAdvancedOpen((value) => !value)}
+                className="mt-4 flex items-center gap-1 text-sm font-medium text-brand"
+              >
+                <ChevronDown
+                  size={14}
+                  className={manualAdvancedOpen ? 'rotate-180' : ''}
+                />
+                {t('manualAdvancedAssign')}
+              </button>
+            )}
+            {!feeListMode && !manualAdvancedOpen && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {manualDefaultsAllSame
                   ? t('manualDefaultsSummarySame', {
@@ -1225,7 +1387,7 @@ export function TaxConfigurationPanel({ isOwner }: { isOwner: boolean }) {
                   : t('manualDefaultsSummaryMixed')}
               </p>
             )}
-            {manualAdvancedOpen && (
+            {!feeListMode && manualAdvancedOpen && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-2">{t('defaultCategoryHint')}</p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

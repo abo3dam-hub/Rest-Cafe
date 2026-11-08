@@ -810,6 +810,19 @@ export default function FloorplanEditor({
       !edit &&
       shown === 'reserved' &&
       Boolean(reservedName || tb.reservation_at);
+    // The canvas clips overflow, so a hint centered on an edge table spills
+    // outside and gets cut. Anchor the hint to the tile's own edge when the
+    // table sits near a canvas side, and flip it below top-row tables.
+    const hintPos = posOf(tb);
+    const hintVerticalClass =
+      hintPos && hintPos.y <= 28 ? 'top-full mt-2' : 'bottom-full mb-2';
+    const hintHorizontalClass =
+      !hintPos || (hintPos.x > 22 && hintPos.x < 78)
+        ? 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2'
+        : hintPos.x <= 22
+          ? 'start-0'
+          : 'end-0';
+    const hintClass = `pointer-events-none absolute ${hintVerticalClass} ${hintHorizontalClass} z-50 w-60 rounded-xl bg-neutral-900 p-3 text-start text-white shadow-2xl`;
     const hintItems = activeOrder?.items ?? [];
     const hintCounts = {
       pending: hintItems.filter((i) => i.status === 'pending').length,
@@ -872,7 +885,7 @@ export default function FloorplanEditor({
           )}
         </div>
         {showHint && activeOrder && (
-          <div className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-2 w-60 -translate-x-1/2 rtl:translate-x-1/2 rounded-xl bg-neutral-900 p-3 text-start text-white shadow-2xl">
+          <div className={hintClass}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold">
                 {tb.name}
@@ -917,7 +930,7 @@ export default function FloorplanEditor({
           </div>
         )}
         {showReservedHint && (
-          <div className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-2 w-60 -translate-x-1/2 rtl:translate-x-1/2 rounded-xl bg-neutral-900 p-3 text-start text-white shadow-2xl">
+          <div className={hintClass}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold">
                 <Ltr>{tb.name}</Ltr>

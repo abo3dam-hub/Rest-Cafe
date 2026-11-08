@@ -31,6 +31,9 @@ export interface TaxRule {
   amount?: string;
   appliesPer?: 'unit' | 'line';
   baseRuleIds?: string[];
+  // Percent-of-fee rules (manual fee list): the percent applies to the
+  // referenced rule's amount ALONE, not to the line base plus that amount.
+  feeBaseOnly?: boolean;
   conditions?: TaxRuleConditions;
 }
 

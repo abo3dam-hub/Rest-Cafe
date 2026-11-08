@@ -765,19 +765,45 @@ export default function DashboardPage() {
       <CashCloseModal model={cashClose} />
 
       {loading ? (
-        <div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
-          role="status"
-          aria-live="polite"
-        >
+        // Static, layout-faithful skeleton (follow-up 45): the old
+        // animate-pulse blocks visibly blinked for ~1s and then the whole
+        // page popped in. These blocks mirror the real layout (tile row,
+        // two panels, one wide panel) without pulsing, so the swap to the
+        // loaded page is a single calm transition.
+        <div role="status" aria-live="polite">
           <span className="sr-only">{tCommon('loading')}</span>
-          {[0, 1, 2, 3].map((item) => (
-            <div
-              key={item}
-              aria-hidden="true"
-              className="h-36 animate-pulse rounded-2xl border border-border bg-card/70"
-            />
-          ))}
+          <div aria-hidden="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="h-36 rounded-2xl border border-border bg-card/70 p-5">
+                <div className="h-3 w-20 rounded bg-muted" />
+                <div className="mt-5 h-8 w-28 rounded bg-muted" />
+                <div className="mt-3 h-3 w-24 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+          <div aria-hidden="true" className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {[0, 1].map((item) => (
+              <div key={item} className="h-64 rounded-2xl border border-border bg-card/70 p-5">
+                <div className="h-3 w-32 rounded bg-muted" />
+                <div className="mt-5 space-y-3">
+                  {[0, 1, 2, 3].map((row) => (
+                    <div key={row} className="h-4 w-full rounded bg-muted" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div
+            aria-hidden="true"
+            className="mt-4 h-48 rounded-2xl border border-border bg-card/70 p-5"
+          >
+            <div className="h-3 w-40 rounded bg-muted" />
+            <div className="mt-5 space-y-3">
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="h-4 w-full rounded bg-muted" />
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <>

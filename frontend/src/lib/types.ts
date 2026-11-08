@@ -172,6 +172,7 @@ export interface Table {
   section: string | null;
   position_x: number | null;
   position_y: number | null;
+  list_order?: number | null;
   is_active: boolean;
   activeOrder?: Order | null;
   current_order?: Order | null;

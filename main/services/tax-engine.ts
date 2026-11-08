@@ -321,7 +321,7 @@ function calculateRawLine(input: TaxEngineInput, line: TaxEngineLine): RawLine {
       if (rule.rate === undefined) throw new Error(`Percent tax rule ${rule.id} requires rate`);
       const rate = decimal(rule.rate).div('100');
       if (rate.lt(0)) throw new Error(`Percent tax rule ${rule.id} rate cannot be negative`);
-      let coefficientBase = new TaxDecimal('1');
+      let coefficientBase = new TaxDecimal(rule.feeBaseOnly ? '0' : '1');
       let interceptBase = new TaxDecimal('0');
       for (const dependencyId of rule.baseRuleIds || []) {
         const dependency = selected.find((candidate) => candidate.id === dependencyId);
@@ -364,7 +364,7 @@ function calculateRawLine(input: TaxEngineInput, line: TaxEngineLine): RawLine {
   } else {
     for (const rule of percentages) {
       if (rule.rate === undefined) throw new Error(`Percent tax rule ${rule.id} requires rate`);
-      let base = taxableBase;
+      let base = rule.feeBaseOnly ? new TaxDecimal('0') : taxableBase;
       for (const dependencyId of rule.baseRuleIds || []) {
         const dependencyAmount = rawAmounts.get(dependencyId);
         if (!dependencyAmount) {

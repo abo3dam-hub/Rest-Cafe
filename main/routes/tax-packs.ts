@@ -1188,6 +1188,20 @@ function buildManualPack(body: any, country: string, currency: string): CountryP
           ? componentInput.label.trim()
           : label;
       const type: 'percent' | 'fixed' = componentInput?.type === 'fixed' ? 'fixed' : 'percent';
+      // Fee-list kind "percent of another fee": stored as a percent rule
+      // whose base is the referenced earlier fee's amount alone.
+      const feeBaseOnly = componentInput?.type === 'percent_of_fee';
+      let feeBaseRuleId: string | null = null;
+      if (feeBaseOnly) {
+        const baseIndex = Number(componentInput?.baseIndex);
+        if (!Number.isInteger(baseIndex) || baseIndex < 0 || baseIndex >= componentIndex) {
+          throw Object.assign(
+            new Error(`"${componentLabel}" must reference an earlier fee in the same list`),
+            { statusCode: 400 },
+          );
+        }
+        feeBaseRuleId = ruleIds[baseIndex];
+      }
       let value: Decimal;
       try {
         value = new Decimal(
@@ -1224,6 +1238,9 @@ function buildManualPack(body: any, country: string, currency: string): CountryP
         ...(type === 'percent'
           ? { rate: value.toString() }
           : { amount: value.toString(), appliesPer: 'line' }),
+        ...(feeBaseOnly && feeBaseRuleId
+          ? { baseRuleIds: [feeBaseRuleId], feeBaseOnly: true }
+          : {}),
       });
     });
 

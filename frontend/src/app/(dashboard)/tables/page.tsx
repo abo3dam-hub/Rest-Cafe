@@ -19,6 +19,9 @@ import {
   MoreHorizontal,
   Trash2,
   Eye,
+  Receipt,
+  Banknote,
+  GripVertical,
 } from 'lucide-react';
 import type { Table, Customer, Order, OrderItem, Bill } from '@/lib/types';
 import FloorplanEditor from '@/components/tables/FloorplanEditor';
@@ -391,6 +394,8 @@ export default function TablesPage() {
     return role === 'cashier' || role === 'server' ? 'plan' : 'list';
   });
   const [layoutMode, setLayoutMode] = useState(false);
+  const [dragTableId, setDragTableId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     capacity: '4',
@@ -453,6 +458,26 @@ export default function TablesPage() {
       toast.error(tTables('loadFailed'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Shared list-view ordering (follow-up 45): dropping a card computes the
+  // new global order from the current list, persists it, and refetches so
+  // every user sees the same arrangement.
+  const saveListOrder = async (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const ids = tables.map((t) => String(t.id));
+    const from = ids.indexOf(draggedId);
+    const to = ids.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, draggedId);
+    try {
+      await api.patch('/tables/list-order', { order: ids });
+      toast.success(tTables('listOrderSaved'));
+      await fetchTables();
+    } catch {
+      toast.error(tTables('tableUpdateFailed'));
     }
   };
 
@@ -1297,6 +1322,9 @@ export default function TablesPage() {
 
       {view === 'list' && visibleTables.length > 0 && (
         <div className="space-y-6">
+          {canManageTables && (
+            <p className="text-xs text-muted-foreground">{tTables('listDragHint')}</p>
+          )}
           {floorSections.map((section) => {
             const hideFloorInBadge = Boolean(section.title || floorFilter !== 'all');
             return (
@@ -1335,20 +1363,79 @@ export default function TablesPage() {
                         table.status === 'bill_requested');
                     const canReserveTable =
                       canManageTables && Boolean(table.is_active) && shownStatus === 'available';
+                    // Full cashier parity with the map view's table card
+                    // (follow-up 45): every action the map offers on a table
+                    // is offered here too, gated by the same permissions.
+                    const canOpenWorkspace =
+                      shownStatus === 'occupied' || shownStatus === 'bill_requested';
+                    const canPayThisTable = canTakePayments && shownStatus === 'bill_requested';
+                    const canRequestBillThisTable =
+                      canGenerateBills && shownStatus === 'occupied';
+                    const canUnrequestBillThisTable =
+                      canGenerateBills && shownStatus === 'bill_requested';
+                    const canMergeThisTable = canMoveThisTable;
+                    const canNewOrderThisTable =
+                      Boolean(table.is_active) &&
+                      (shownStatus === 'available' || shownStatus === 'reserved');
                     const showFooter =
-                      canViewTableOrder || canMoveThisTable || canMarkAvailable || canReserveTable;
+                      canViewTableOrder ||
+                      canMoveThisTable ||
+                      canMarkAvailable ||
+                      canReserveTable ||
+                      canOpenWorkspace ||
+                      canPayThisTable ||
+                      canRequestBillThisTable ||
+                      canUnrequestBillThisTable ||
+                      canNewOrderThisTable;
 
                     return (
                       <div
                         key={table.id}
                         data-testid={`table-card-${table.id}`}
+                        draggable={canManageTables}
+                        onDragStart={(event) => {
+                          if (!canManageTables) return;
+                          setDragTableId(String(table.id));
+                          event.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={() => {
+                          setDragTableId(null);
+                          setDropTargetId(null);
+                        }}
+                        onDragOver={(event) => {
+                          if (!canManageTables || !dragTableId) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'move';
+                          setDropTargetId(String(table.id));
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (dragTableId) void saveListOrder(dragTableId, String(table.id));
+                          setDragTableId(null);
+                          setDropTargetId(null);
+                        }}
                         className={`bg-card rounded-xl border border-border flex flex-col justify-between hover:shadow-md transition-shadow ${
                           hasOrders ? 'border-s-4 border-s-brand' : ''
-                        } ${!table.is_active ? 'opacity-60' : ''}`}
+                        } ${!table.is_active ? 'opacity-60' : ''} ${
+                          dragTableId === String(table.id) ? 'opacity-50' : ''
+                        } ${
+                          dropTargetId === String(table.id) && dragTableId !== String(table.id)
+                            ? 'ring-2 ring-brand'
+                            : ''
+                        }`}
                       >
                         {/* Zone 1: Header */}
                         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            {canManageTables && (
+                              <span
+                                className="cursor-grab text-muted-foreground active:cursor-grabbing"
+                                title={tTables('listDragHint')}
+                                aria-hidden="true"
+                              >
+                                <GripVertical size={14} />
+                              </span>
+                            )}
                             <h3 className="font-bold text-foreground truncate">{table.name}</h3>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               · {tTables('capacitySeats', { count: table.capacity })}
@@ -1540,6 +1627,60 @@ export default function TablesPage() {
                         {/* Zone 3: Footer */}
                         {showFooter && (
                           <div className="px-4 py-2.5 border-t border-border flex flex-wrap items-center gap-2">
+                            {canOpenWorkspace && (
+                              <button
+                                type="button"
+                                onClick={() => goWorkspace(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <Eye size={12} /> {tTables('openOrder')}
+                              </button>
+                            )}
+                            {canNewOrderThisTable && (
+                              <button
+                                type="button"
+                                onClick={() => goNewOrder(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <Plus size={12} /> {tTables('newOrder')}
+                              </button>
+                            )}
+                            {canRequestBillThisTable && (
+                              <button
+                                type="button"
+                                onClick={() => void handleRequestBill(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <Receipt size={12} /> {tTables('requestBill')}
+                              </button>
+                            )}
+                            {canUnrequestBillThisTable && (
+                              <button
+                                type="button"
+                                onClick={() => void handleUnrequestBill(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <Receipt size={12} /> {tTables('unrequestBill')}
+                              </button>
+                            )}
+                            {canPayThisTable && (
+                              <button
+                                type="button"
+                                onClick={() => setCheckoutTable(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <Banknote size={12} /> {tTables('payAndLeave')}
+                              </button>
+                            )}
+                            {canMergeThisTable && (
+                              <button
+                                type="button"
+                                onClick={() => setMergeSource(table)}
+                                className="text-xs text-brand hover:text-brand-hover font-medium inline-flex items-center gap-1"
+                              >
+                                <ArrowRightLeft size={12} /> {tTables('mergeWith')}
+                              </button>
+                            )}
                             {canViewTableOrder && (
                               <button
                                 type="button"

@@ -8,13 +8,13 @@ import {
   CheckCircle2,
   ChefHat,
   Circle,
+  Eye,
   Flame,
   LayoutGrid,
   LogOut,
   Minus,
   Plus,
   RefreshCw,
-  Send,
   ShoppingCart,
   Smartphone,
   SquarePen,
@@ -74,6 +74,7 @@ type Order = {
   order_number: string;
   table_id?: string | null;
   status: string;
+  created_at?: string;
   items?: OrderItem[];
   customer?: { id: string; name: string; phone?: string } | null;
 };
@@ -230,6 +231,20 @@ export default function ServerStandalonePage() {
   const phoneDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const phoneAbortRef = useRef<AbortController | null>(null);
   const [sending, setSending] = useState(false);
+  // Waiter journey steps (owner-approved flow, 2026-11-08): tables only →
+  // customer-facing item list → big review → success back to tables. The
+  // cashier POS keeps its own flow; this stepper is the waiter's path and
+  // never lands on a print screen.
+  const [flowStep, setFlowStep] = useState<'tables' | 'order' | 'review' | 'success'>('tables');
+  const [sentInfo, setSentInfo] = useState<{ orderNumber: string; tableLabel: string } | null>(
+    null,
+  );
+  const [reviewPreview, setReviewPreview] = useState<{
+    key: string;
+    tax_breakdown: { title: string; rate: number; amount: number }[];
+    total: number;
+  } | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
   // Synchronous re-entry guard: `sending` state updates too late to stop a second click fired before the first render.
   const sendInFlightRef = useRef(false);
   // Nonce and frozen target snapshot for the pending send attempt, paired with a signature of what defines it.
@@ -560,6 +575,7 @@ export default function ServerStandalonePage() {
       if (orderLookupFailedRef.current) {
         loadOrder(tableId).catch(() => toast.error(t('couldNotLoadData')));
       }
+      if (tableId) setFlowStep('order');
       return;
     }
     selectedTableIdRef.current = tableId;
@@ -577,6 +593,7 @@ export default function ServerStandalonePage() {
     setCustomerMatch(null);
     setCustomerSearched(false);
     setSelectedTableId(tableId);
+    if (tableId) setFlowStep('order');
   }
 
   function handleRefresh() {
@@ -947,7 +964,11 @@ export default function ServerStandalonePage() {
         loadAll({ allowWhileSending: true }),
         loadOrder(snapshot.tableId, { allowWhileSending: true }),
       ]).catch(() => {});
-      toast.success(t('orderSent'));
+      setSentInfo({
+        orderNumber: String((rawOrder as { order_number?: unknown }).order_number ?? orderId),
+        tableLabel: snapshot.tableName ? String(snapshot.tableName) : '',
+      });
+      setFlowStep('success');
       // rawOrder only has table_id/customer_id; the KOT/slip renderers need the nested table/customer for display.
       const enrichedOrder = {
         ...rawOrder,
@@ -969,6 +990,66 @@ export default function ServerStandalonePage() {
       setSending(false);
     }
   }
+
+  // Fee preview for the review step of a FIRST order, so the customer sees
+  // the full total (fees included) before the waiter completes — the same
+  // numbers the backend will charge. Add-on rounds show the additions
+  // subtotal only (the earlier items were already quoted). A failed preview
+  // never blocks completion: the review falls back to the subtotal.
+  const reviewPreviewKey =
+    flowStep === 'review' && !currentOrder && draft.length > 0
+      ? JSON.stringify(
+          draft.map((line) => [
+            line.product.id,
+            line.variant?.id ?? null,
+            line.quantity,
+            line.addons.map((addon) => [addon.price, addon.quantity || 1]),
+            line.price_override?.price ?? null,
+          ]),
+        )
+      : null;
+  useEffect(() => {
+    if (!reviewPreviewKey || !api) return;
+    let cancelled = false;
+    api
+      .post('/api/tax/preview', {
+        items: draft.map((line) => ({
+          product_id: line.product.id,
+          variant_id: line.variant?.id ?? null,
+          quantity: line.quantity,
+          addons: line.addons.map((addon) => ({
+            price: Number(addon.price),
+            quantity: Number(addon.quantity) || 1,
+          })),
+          discount_amount: 0,
+          ...(line.price_override ? { price_override: { price: line.price_override.price } } : {}),
+        })),
+        customer_id: null,
+        packaging_charge: 0,
+      })
+      .then(({ data }) => {
+        if (!cancelled) {
+          setReviewPreview({
+            key: reviewPreviewKey,
+            tax_breakdown: data.summary?.tax_breakdown || [],
+            total: Number(data.summary?.total ?? NaN),
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewPreviewKey, api]);
+  const activeReviewPreview =
+    reviewPreview && reviewPreview.key === reviewPreviewKey ? reviewPreview : null;
+
+  // One-minute tick so "open for X min" on the tables step stays honest.
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const activeTable = tables.find((table) => table.id === selectedTableId) || null;
   const canMoveTable = tenantCan(user as unknown as Tenant, 'tables.orders.move');
@@ -1234,7 +1315,10 @@ export default function ServerStandalonePage() {
         </span>
       </div>
       <button
-        onClick={sendDraft}
+        onClick={() => {
+          setMobileCartOpen(false);
+          setFlowStep('review');
+        }}
         disabled={
           !selectedTableId ||
           orderLoadedTableId !== selectedTableId ||
@@ -1243,8 +1327,8 @@ export default function ServerStandalonePage() {
         }
         className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand font-semibold text-white disabled:opacity-50"
       >
-        <Send size={17} />
-        {sending ? t('sending') : currentOrder ? t('addToOrder') : t('sendToKitchen')}
+        <Eye size={17} />
+        {t('reviewOrder')}
       </button>
     </>
   );
@@ -1284,42 +1368,267 @@ export default function ServerStandalonePage() {
         </div>
       </header>
 
-      {tablesLoaded && tables.length === 0 ? (
+      {flowStep === 'success' ? (
+        <main className="mx-auto flex min-h-[70vh] w-full max-w-xl flex-col items-center justify-center gap-3 px-6 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-400">
+            <CheckCircle2 size={44} />
+          </span>
+          <h2 className="text-2xl font-bold">{t('orderSentTitle')}</h2>
+          {sentInfo && (
+            <p className="text-base text-muted-foreground">
+              {t('sentOrderSummary', {
+                number: sentInfo.orderNumber,
+                table: sentInfo.tableLabel,
+              })}
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">{t('orderSentKitchen')}</p>
+          <button
+            onClick={() => {
+              setSentInfo(null);
+              setSelectedTableId('');
+              selectedTableIdRef.current = '';
+              setCurrentOrder(null);
+              setFlowStep('tables');
+              void loadAll().catch(() => {});
+            }}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand px-6 font-semibold text-white"
+          >
+            <LayoutGrid size={18} />
+            {t('backToTables')}
+          </button>
+        </main>
+      ) : flowStep === 'review' ? (
+        <main className="mx-auto w-full max-w-2xl min-w-0 p-3">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h2 className="text-lg font-bold">{t('reviewOrder')}</h2>
+            {activeTable && (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {t('tableLabel', { name: activeTable.name ?? String(activeTable.number) })}
+              </p>
+            )}
+
+            <div className="mt-4 space-y-3">
+              {draft.map((line) => {
+                const lineTotal =
+                  ((Number(line.variant?.price ?? line.product.price) || 0) +
+                    line.addons.reduce(
+                      (sum, addon) => sum + Number(addon.price || 0) * (addon.quantity || 1),
+                      0,
+                    )) *
+                  line.quantity;
+                return (
+                  <div key={line.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-base font-semibold">
+                          {line.variant
+                            ? `${line.product.name} (${line.variant.name})`
+                            : line.product.name}
+                        </span>
+                        {line.addons.length > 0 && (
+                          <div className="mt-0.5 space-y-0.5">
+                            {line.addons.map((addon) => (
+                              <p key={addon.id} className="text-xs text-muted-foreground">
+                                + {addon.name}
+                                {(addon.quantity || 1) > 1 ? ` x${addon.quantity}` : ''}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        disabled={sending}
+                        onClick={() => removeDraftLine(line.id)}
+                        aria-label={tCommon('removeItem')}
+                        className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-red-500 disabled:opacity-50"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <input
+                      value={line.special_instructions}
+                      disabled={sending}
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current.map((candidate) =>
+                            candidate.id === line.id
+                              ? { ...candidate, special_instructions: event.target.value }
+                              : candidate,
+                          ),
+                        )
+                      }
+                      placeholder={t('itemNotePlaceholder')}
+                      maxLength={200}
+                      className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand focus:outline-none disabled:opacity-50"
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={sending}
+                          onClick={() => changeQty(line.id, -1)}
+                          className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-card disabled:opacity-50"
+                        >
+                          <Minus size={16} />
+                        </button>
+                        <span className="w-8 text-center text-base font-bold">
+                          <Ltr>{line.quantity}</Ltr>
+                        </span>
+                        <button
+                          disabled={sending}
+                          onClick={() => changeQty(line.id, 1)}
+                          className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-card disabled:opacity-50"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      <span className="text-base font-bold">
+                        <Ltr>{money(lineTotal, regional)}</Ltr>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {currentOrder?.items && currentOrder.items.length > 0 && (
+              <div className="mt-5 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                  {t('previouslyOrdered')}
+                </p>
+                <div className="space-y-2 opacity-70">
+                  {currentOrder.items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 text-sm">
+                      {itemStatusIcon(item.status, t)}
+                      <span className="min-w-0 flex-1 truncate">
+                        <Ltr>{item.quantity}</Ltr> x{' '}
+                        {formatItemHeading(item.product_name, item.variant_selection)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 space-y-1.5 border-t border-border pt-3 text-sm">
+              {currentOrder ? (
+                <div className="flex items-center justify-between text-base font-bold">
+                  <span>{t('additionsTotal')}</span>
+                  <span>
+                    <Ltr>{money(draftTotal, regional)}</Ltr>
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t('itemsSubtotal')}</span>
+                    <span>
+                      <Ltr>{money(draftTotal, regional)}</Ltr>
+                    </span>
+                  </div>
+                  {(activeReviewPreview?.tax_breakdown || []).map((row, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        {row.title}
+                        {row.rate ? ` ${row.rate}%` : ''}
+                      </span>
+                      <span>
+                        <Ltr>{money(row.amount, regional)}</Ltr>
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
+                    <span>{t('grandTotal')}</span>
+                    <span>
+                      <Ltr>
+                        {money(
+                          activeReviewPreview && Number.isFinite(activeReviewPreview.total)
+                            ? activeReviewPreview.total
+                            : draftTotal,
+                          regional,
+                        )}
+                      </Ltr>
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setFlowStep('order')}
+                disabled={sending}
+                className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border font-semibold disabled:opacity-50"
+              >
+                {t('backToItems')}
+              </button>
+              <button
+                onClick={sendDraft}
+                disabled={draft.length === 0 || sending}
+                className="flex h-12 items-center justify-center gap-2 rounded-lg bg-brand font-semibold text-white disabled:opacity-50"
+              >
+                <CheckCircle2 size={17} />
+                {sending ? t('sending') : t('completeOrder')}
+              </button>
+            </div>
+          </div>
+        </main>
+      ) : tablesLoaded && tables.length === 0 ? (
         <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 px-6 text-center">
           <LayoutGrid size={44} className="text-muted-foreground" />
           <h2 className="text-lg font-semibold">{t('noTablesTitle')}</h2>
           <p className="max-w-sm text-sm text-muted-foreground">{t('noTablesHint')}</p>
         </div>
+      ) : flowStep === 'tables' ? (
+        <main className="mx-auto w-full max-w-6xl min-w-0 p-3">
+          {user && (
+            <p className="mb-3 text-sm font-medium text-muted-foreground">
+              {t('waiterLabel', { name: user.name })}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {tables.map((table) => {
+              const order = table.activeOrder || table.current_order;
+              const openedAt = order?.created_at ? Date.parse(order.created_at) : NaN;
+              const minutes = Number.isFinite(openedAt)
+                ? Math.max(0, Math.floor((nowTs - openedAt) / 60000))
+                : null;
+              return (
+                <button
+                  key={table.id}
+                  disabled={sending}
+                  onClick={() => selectTable(table.id)}
+                  className="min-h-24 rounded-xl border border-border bg-card px-3 py-3 text-start disabled:opacity-50"
+                >
+                  <span className="block truncate text-lg font-bold">
+                    {table.name || table.number}
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    {order ? t('openOrder') : tTables('statusAvailable')}
+                  </span>
+                  {order && minutes !== null && (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {t('openForMinutes', { minutes })}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </main>
       ) : (
-        <main className="mx-auto grid max-w-6xl min-w-0 gap-3 p-3 lg:grid-cols-[220px_1fr_340px]">
-          <section className="min-w-0 rounded-lg border border-border bg-card p-3">
-            <h2 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-              {t('tables')}
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              {tables.map((table) => {
-                const selected = table.id === selectedTableId;
-                const order = table.activeOrder || table.current_order;
-                return (
-                  <button
-                    key={table.id}
-                    disabled={sending}
-                    onClick={() => selectTable(table.id)}
-                    className={`min-h-14 rounded-lg border px-2 py-2 text-start disabled:opacity-50 ${selected ? 'border-brand bg-brand/10' : 'border-border bg-card'}`}
-                  >
-                    <span className="block truncate text-sm font-semibold">
-                      {table.name || table.number}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {order ? t('openOrder') : tTables('statusAvailable')}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
+        <main className="mx-auto grid max-w-6xl min-w-0 gap-3 p-3 lg:grid-cols-[1fr_340px]">
           <section className="flex h-[calc(100dvh-5rem)] min-h-96 min-w-0 flex-col rounded-lg border border-border bg-card p-3">
+            <div className="mb-2">
+              <button
+                onClick={() => setFlowStep('tables')}
+                disabled={sending}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                <LayoutGrid size={15} />
+                {t('allTables')}
+              </button>
+            </div>
             <ProductGrid
               categories={categories}
               products={products}
@@ -1361,6 +1670,7 @@ export default function ServerStandalonePage() {
         </main>
       )}
 
+      {flowStep === 'order' && (
       <Drawer open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
         <DrawerTrigger asChild>
           <button
@@ -1379,6 +1689,7 @@ export default function ServerStandalonePage() {
           <div className="max-h-[80vh] overflow-y-auto px-3 pb-3">{ticketPanelBody}</div>
         </DrawerContent>
       </Drawer>
+      )}
 
       {addonModalProduct && (
         <AddonModal

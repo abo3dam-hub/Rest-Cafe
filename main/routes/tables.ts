@@ -137,7 +137,9 @@ router.get('/', requirePermission('tables.view'), (req: Request, res: Response) 
       query += ' AND is_active = 1';
     }
 
-    query += ' ORDER BY number';
+    // Shared list-view order (v126): arranged tables first in their stored
+    // order, unarranged tables keep the legacy number order after them.
+    query += ' ORDER BY (list_order IS NULL) ASC, list_order ASC, number ASC';
 
     const rows = db.prepare(query).all(...params);
     const includeReservationCustomer = hasPermission(
@@ -370,6 +372,46 @@ router.patch('/positions', requirePermission('tables.manage'), (req: Request, re
     });
 
     res.json({ success: true, count: updates.length });
+  } catch (error) {
+    console.error('[API] Internal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Persists the shared drag-and-drop order of the tables LIST view: the
+// payload is the full ordered id list as the owner arranged it; each table
+// stores its index. One order for every user (owner decision, 2026-11-08).
+router.patch('/list-order', requirePermission('tables.manage'), (req: Request, res: Response) => {
+  try {
+    const raw = req.body?.order;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return res.status(400).json({ error: 'Order array is required' });
+    }
+    const ids: string[] = [];
+    for (const item of raw) {
+      if (typeof item !== 'string' || !item.trim()) {
+        return res.status(400).json({ error: 'Invalid table ID in order payload' });
+      }
+      ids.push(item.trim());
+    }
+    if (new Set(ids).size !== ids.length) {
+      return res.status(400).json({ error: 'Duplicate table ID in order payload' });
+    }
+    const db = getDatabase();
+    const rows = db
+      .prepare(`SELECT id FROM tables WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .all(...ids) as Array<{ id: string }>;
+    const found = new Set(rows.map((r) => r.id));
+    const missing = ids.find((id) => !found.has(id));
+    if (missing) {
+      return res.status(404).json({ error: `Table not found: ${missing}` });
+    }
+    withTxn(() => {
+      const stmt = db.prepare('UPDATE tables SET list_order = ?, updated_at = ? WHERE id = ?');
+      const currentTime = now();
+      ids.forEach((id, index) => stmt.run(index, currentTime, id));
+    });
+    res.json({ success: true, count: ids.length });
   } catch (error) {
     console.error('[API] Internal error:', error);
     res.status(500).json({ error: 'Internal server error' });
