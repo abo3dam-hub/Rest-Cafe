@@ -61,6 +61,54 @@ test('formatCurrencyForTenant: missing country defaults to IN', () => {
   assert.match(out, /₹/);
 });
 
+test('formatCurrencyForTenant: stored symbol wins over the CLDR narrow symbol (SYP)', () => {
+  // Without a stored symbol, CLDR renders SYP with the narrow symbol £ — the
+  // exact on-screen bug behind follow-up 49. The owner's stored unit must win.
+  const plain = formatCurrencyForTenant(80000, '', 'SYP');
+  assert.match(plain, /£/);
+  assert.equal(
+    formatCurrencyForTenant(80000, '', 'SYP', {
+      currencySymbol: 'SYP',
+      currencyPosition: 'suffix',
+    }),
+    '80,000 SYP',
+  );
+  assert.equal(
+    formatCurrencyForTenant(80000, '', 'SYP', {
+      currencySymbol: 'SYP',
+      currencyPosition: 'prefix',
+    }),
+    'SYP 80,000',
+  );
+  // Default position (unset) is suffix — the owner's stored-symbol convention.
+  assert.equal(formatCurrencyForTenant(80000, '', 'SYP', { currencySymbol: 'SYP' }), '80,000 SYP');
+});
+
+test('formatCurrencyForTenant: stored symbol keeps sign and fraction digits', () => {
+  assert.equal(
+    formatCurrencyForTenant(-1500, '', 'SYP', {
+      currencySymbol: 'SYP',
+      currencyPosition: 'suffix',
+    }),
+    '-1,500 SYP',
+  );
+  assert.equal(
+    formatCurrencyForTenant(1234.5, 'US', 'USD', {
+      currencySymbol: 'USD',
+      currencyPosition: 'suffix',
+    }),
+    '1,234.50 USD',
+  );
+});
+
+test('formatCurrencyForTenant: empty stored symbol falls back to CLDR rendering', () => {
+  const out = formatCurrencyForTenant(80000, '', 'SYP', {
+    currencySymbol: '  ',
+    currencyPosition: 'suffix',
+  });
+  assert.match(out, /£/);
+});
+
 test('formatCurrencyForTenant: arbitrary currency code avoids Intl placeholder', () => {
   const out = formatCurrencyForTenant(100, 'US', 'XXX');
   assert.match(out, /XXX/);

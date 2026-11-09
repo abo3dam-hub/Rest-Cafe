@@ -162,6 +162,10 @@ function money(value: number | string, regional: ServerAppInfo | null) {
     Number(value || 0),
     regional?.country || '',
     regional?.currency || '',
+    {
+      currencySymbol: regional?.currency_symbol,
+      currencyPosition: regional?.currency_position,
+    },
   );
 }
 
@@ -1806,6 +1810,8 @@ export default function ServerStandalonePage() {
           product={addonModalProduct}
           currency={regional?.currency || ''}
           country={regional?.country}
+          currencySymbol={regional?.currency_symbol}
+          currencyPosition={regional?.currency_position}
           initialQuantity={addonModalQuantity}
           initialVariant={addonModalVariant}
           onAdd={(addedProduct, quantity, addons, instructions, variant) => {
@@ -1827,6 +1833,8 @@ export default function ServerStandalonePage() {
           product={editingDraftLine.product}
           currency={regional?.currency || ''}
           country={regional?.country}
+          currencySymbol={regional?.currency_symbol}
+          currencyPosition={regional?.currency_position}
           mode="edit"
           initialQuantity={editingDraftLine.quantity}
           initialAddons={editingDraftLine.addons}

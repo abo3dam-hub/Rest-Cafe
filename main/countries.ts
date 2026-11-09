@@ -444,6 +444,11 @@ export interface LocalePreferences {
   currencyDisplay?: CurrencyDisplay;
   digits?: DigitMode;
   calendar?: CalendarMode;
+  // Owner-stored currency unit (settings currency_symbol). When set, it wins
+  // over the CLDR symbol on tenant surfaces — CLDR's narrow symbol for some
+  // currencies (e.g. SYP) is a different currency's sign entirely.
+  currencySymbol?: string;
+  currencyPosition?: 'prefix' | 'suffix';
 }
 
 const IRAN_CURRENCY = 'IRR';
@@ -453,6 +458,8 @@ const normalizePreferences = (prefs?: LocalePreferences): Required<LocalePrefere
   currencyDisplay: prefs?.currencyDisplay ?? 'rial',
   digits: prefs?.digits ?? 'locale',
   calendar: prefs?.calendar ?? 'locale',
+  currencySymbol: prefs?.currencySymbol ?? '',
+  currencyPosition: prefs?.currencyPosition ?? 'suffix',
 });
 
 export const formatCurrency = (amount: number, currency: string, locale = 'en-US'): string => {
@@ -489,6 +496,23 @@ export const formatMoney = (
   }
 
   if (!currency) return formatNumber(amount, locale, numberingSystem);
+
+  // Stored-symbol display: the owner's currency unit replaces the CLDR symbol
+  // (whose narrow form can be a foreign sign, e.g. £ for SYP). Number shape —
+  // grouping, fraction digits, digit mode — stays exactly as Intl renders it.
+  const storedSymbol = typeof prefs?.currencySymbol === 'string' ? prefs.currencySymbol.trim() : '';
+  if (storedSymbol) {
+    const fractionDigits = currency === IRAN_CURRENCY ? 0 : getCurrencyFractionDigits(currency);
+    const num = cachedNumberFormat(locale, {
+      numberingSystem,
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(Math.abs(amount));
+    const body =
+      prefs?.currencyPosition === 'prefix' ? `${storedSymbol} ${num}` : `${num} ${storedSymbol}`;
+    return amount < 0 ? `-${body}` : body;
+  }
+
   try {
     // Rial display is whole-unit text even though IRR arithmetic retains 2 digits.
     const fractionDigits = currency === IRAN_CURRENCY ? 0 : getCurrencyFractionDigits(currency);

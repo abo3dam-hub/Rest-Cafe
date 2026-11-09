@@ -18,6 +18,8 @@ interface Props {
   currency: string;
   /** Overrides the signed-in tenant's currency formatting (e.g. for standalone pages with no auth store). */
   country?: string;
+  currencySymbol?: string;
+  currencyPosition?: 'prefix' | 'suffix';
   onAdd: (
     product: Product,
     quantity: number,
@@ -89,6 +91,8 @@ export default function AddonModal({
   product,
   currency,
   country,
+  currencySymbol,
+  currencyPosition,
   onAdd,
   onClose,
   initialQuantity = 1,
@@ -100,7 +104,10 @@ export default function AddonModal({
 }: Props) {
   const t = useTranslations('pos');
   const tenantFmt = useFormatCurrency();
-  const fmt = country ? (n: number) => formatCurrencyForTenant(n, country, currency) : tenantFmt;
+  const fmt = country
+    ? (n: number) =>
+        formatCurrencyForTenant(n, country, currency, { currencySymbol, currencyPosition })
+    : tenantFmt;
   const [selected, setSelected] = useState<Record<string | number, Addon[]>>(() =>
     groupInitialAddons(initialAddons),
   );

@@ -43,9 +43,10 @@ derived values: the currency unit printed on bills (see Stored overrides).
 configured country, `resolveRegionalSnapshot` resolves against that profile rather than failing, so
 an unconfigured store still produces a snapshot with the Syrian defaults.
 
-**Per-store override of the printed currency unit.** Position, fraction digits, and separators come
-from the country profile and the currency. The currency *symbol printed on bills* is the exception:
-the owner's stored `settings.currency_symbol` wins over the derived symbol on printed receipts.
+**Per-store override of the rendered currency unit.** Position, fraction digits, and separators come
+from the country profile and the currency. The currency *symbol rendered with amounts* is the
+exception: the owner's stored `settings.currency_symbol` wins over the derived symbol on printed
+receipts and in tenant-aware on-screen formatting alike.
 
 **No 409 for missing regional setup.** Because the generic profile always resolves, consumers do
 not surface a `RegionalNotConfiguredError` for an unconfigured store; operations proceed with the
@@ -68,9 +69,12 @@ propagates the error.
 `settings.timezone` selects a zone within the resolved country; it cannot substitute a country or a
 currency. An invalid or unparseable value is ignored in favour of the country profile's zone.
 
-`settings.currency_symbol` is the second stored override, and it applies to printed bills only: when
-set, it replaces the derived currency symbol on thermal and web-printed receipts. It changes the
-printed unit label, never the currency itself, its fraction digits, or any stored amount.
+`settings.currency_symbol` is the second stored override. When set, it replaces the derived
+currency symbol everywhere the tenant's money is rendered: on thermal and web-printed receipts,
+and on screen wherever amounts are formatted through the tenant-aware formatter
+(`formatCurrencyForTenant` with the stored symbol passed as a locale preference). It changes the
+displayed unit label, never the currency itself, its fraction digits, or any stored amount. When
+it is blank, rendering falls back to the derived CLDR symbol.
 
 A currency cannot be changed after setup. The only path is the owner-only, Master-PIN-gated reset
 at `POST /api/db-tools/currency-reset`, which is destructive by design; see
