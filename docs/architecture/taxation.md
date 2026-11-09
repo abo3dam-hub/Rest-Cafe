@@ -286,12 +286,47 @@ pattern cannot introduce catastrophic backtracking.
 Check 7 reads a status stored on the local version row. There is no remote revocation feed: nothing
 is fetched that could mark a version revoked.
 
+## Syria profiles and the invoice fee list
+
+Rest&Cafe's owner-facing tax surface is not the pack editor. The Settings tax panel presents
+**one invoice-level fee list**: each fee is a name plus one of three kinds — a percentage of
+the bill, a percentage of an earlier fee in the same list, or a fixed amount. Categories and
+packs remain the machinery under the surface; the owner never edits them directly.
+
+Two Syria profiles are built in code by `buildSyriaProfilePack()` in
+`main/routes/tax-packs.ts`, as one-question activations over the standard pack machinery (a
+single category covering the whole bill, one percent rule, exclusive — added on top):
+
+- **Consumption** (`syria-consumption`): رسم الإنفاق الاستهلاكي, rated by the establishment's
+  classification — unrated 0%, 2–3 stars 5%, 4–5 stars 10%, nightclub 20%.
+- **Sales** (`syria-sales`): the announced 5% sales tax, offered as an owner-selectable
+  profile ahead of its entry into force.
+
+On top of the consumption fee, the rollup in `main/services/tax.ts` adds a
+local-administration fee (رسم الإدارة المحلية): a percentage **of the consumption fee
+itself** — 5% by default, owner-editable via the `syria_local_admin_rate` setting — never a
+percentage of the bill. Syria fees are computed at document level on the whole bill and
+rounded up (`ceiling`) to whole units. A fee that is a percentage of another fee is a
+`percent` rule with `feeBaseOnly` set: its base is the referenced fee's amount alone, not
+the bill plus that fee (see the manual configuration below).
+
+**Discounts come after the fees.** Under the Syria fee model the order discount is resolved
+after the fee rollup: a percentage discount is taken on the post-fee total, and the discount
+never reduces the fee base. `resolveSyriaDiscountAmount()` in `main/services/tax.ts` is the
+implementation; the older ratio-scaling path above applies to non-Syria configurations.
+
+Activating a Syria profile over a still-active manual pack is refused with a conflict the
+panel explains, offering to deactivate the current configuration and continue; a store is
+never left with two active configurations silently competing.
+
 ## Manual tax configuration
 
 Manual entry in settings is not a second calculation path. `buildManualPack()` in
 `main/routes/tax-packs.ts` synthesizes a `CountryPack` with `publisher: 'local'`, installs it
 through the same path a catalog entry takes, and it is then calculated by the same
-`TaxEngine.calculate()`.
+`TaxEngine.calculate()`. The fee list's "percentage of another fee" kind is expressed as a
+`percent` rule with `feeBaseOnly` set and a `baseRuleIds` reference to an earlier fee in the
+same list; a self- or later-reference is refused.
 
 The synthesized pack id is `manual-<country>`, its jurisdiction is `*`, it adds a hidden zero-rate
 `unclassified` category, and it uses line-scope `half_up` rounding at 2 decimal places with a

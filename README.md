@@ -62,7 +62,7 @@ the desktop app locally:
   <tr>
     <td width="50%" valign="top">
       <h3>High-Speed Counter POS</h3>
-      <p>Fast, touch-optimized checkout built for busy café rushes. Filter menu categories with a tap, pin the staples (water, coffee, arguileh) to the front, shrink the item cards to fit more on screen, mark an item sold out in one tap, and take cash payments with zero lag.</p>
+      <p>Fast, touch-optimized checkout built for busy café rushes. Filter menu categories with a tap, reorder categories and items by dragging them into the order the house actually works, pin the staples (water, coffee, arguileh) to the front, shrink the item cards to fit more on screen, mark an item sold out in one tap, and take cash payments with zero lag. Two hand-filled cards — «الأكثر طلباً» (most ordered) and «عروض اليوم» (today's offers) — sit among the category chips whenever the owner has put something in them, and stay hidden while they are empty.</p>
       <p><a href="docs/README.md">Documentation &rarr;</a></p>
     </td>
     <td width="50%">
@@ -100,7 +100,7 @@ the desktop app locally:
   <tr>
     <td width="50%" valign="top">
       <h3>Visual Tables &amp; Floor Plan</h3>
-      <p>See your entire dining area at a glance. Track occupied and open tables, see when each party was seated, take reservations with a customer name and arrival time, and view checks instantly.</p>
+      <p>See your entire dining area at a glance. Track occupied and open tables, filter the hall by status (all / occupied / available / reserved), drag tables into your own order, merge tables, see when each party was seated, take reservations with a customer name and arrival time, and view checks instantly. The list view offers the same actions as the floor plan.</p>
     </td>
     <td width="50%">
       <picture>
@@ -112,7 +112,7 @@ the desktop app locally:
   <tr>
     <td width="50%" valign="top">
       <h3>Handheld Waiter App</h3>
-      <p>Take orders right at the table from any smartphone or tablet. Servers select menu items, apply modifiers, and fire tickets directly to the kitchen without walking back to the counter.</p>
+      <p>Take orders right at the table from any smartphone or tablet. The table list refreshes on its own and shows each occupied table's kitchen progress. The waiter builds the order on a customer-facing menu with prices and a running total, reviews it with the customer — quantities editable, a free-text note per item — and only then fires it to the kitchen display and kitchen printer, without walking back to the counter.</p>
     </td>
     <td width="50%">
       <picture>
@@ -148,7 +148,7 @@ the desktop app locally:
   <tr>
     <td width="50%" valign="top">
       <h3>Thermal Receipt &amp; Kitchen Printing</h3>
-      <p>Print clean customer receipts and kitchen order slips on standard 58mm or 80mm thermal receipt printers over USB or local network, complete with itemized tax summaries.</p>
+      <p>Print clean customer receipts and kitchen order slips on standard 58mm or 80mm thermal receipt printers over USB or local network, complete with itemized fee summaries. The customer bill carries the store's licence number (الترخيص), tax number, and classification (التصنيف) as independent, individually toggleable fields, and its closing time is the moment the bill was first requested.</p>
       <p><a href="docs/printers.md">Printer configuration guide &rarr;</a></p>
     </td>
     <td width="50%">
@@ -164,8 +164,9 @@ the desktop app locally:
 
 - **Offline-first architecture:** Local SQLite storage with auto-migrating schema and fail-closed safety.
 - **Granular roles & permissions:** Owner, Manager, Cashier, Server, and Chef roles with context-aware access policies.
-- **Multi-language support:** 24 localized languages with full bidirectional RTL rendering (Arabic, Persian, Urdu), and a self-hosted Arabic typeface (IBM Plex Sans Arabic) so Arabic never depends on whatever font the PC happens to have.
-- **Manual tax rules:** One generic local tax pack; rates are owner-configured and tax can be off or manual.
+- **Arabic-first, two UI languages:** Arabic and English are the selectable interface languages, with full bidirectional RTL rendering and a self-hosted Arabic typeface (IBM Plex Sans Arabic) so Arabic never depends on whatever font the PC happens to have. The other bundled translation catalogues stay registered for print labels and previously saved preferences.
+- **Invoice fee list:** Taxes are off or manual. The owner edits one invoice-level fee list — each fee is a percentage of the bill, a percentage of an earlier fee, or a fixed amount — and a pre-filled Syrian profile (consumption fee plus local administration at 5% of that fee) is one activation away. Discounts are calculated after the fees, on the post-fee total.
+- **Interface links:** A Settings tab lists the live LAN address of every interface (POS, kitchen display, waiter app, customer self-ordering) with copy, open, and QR actions, so staff stop guessing addresses when the network changes them.
 - **Automated database backups:** Pre-migration automatic snapshots and manual exports, stored locally.
 - **Customer CRM:** Customer directory and purchase histories.
 - **Cash drawer management:** Cash pulse on checkout and end-of-shift cash drawer reconciliations.
@@ -175,7 +176,7 @@ the desktop app locally:
 
 ## Project status
 
-Rest&Cafe is in active development for its first restaurant deployment. Core customer data and upgrade safety are treated carefully, including explicit database migrations and recovery mechanisms. The default visual identity (name and logo, both changeable in Settings) is Al Malaki Pizza & Café, the first deployment.
+Rest&Cafe is in on-device trial at its first restaurant deployment: the core POS, the Syrian fee model, and the waiter flow are complete, and the remaining verification is physical — real-printer output, touch, and Windows behaviour on the deployment machine. Core customer data and upgrade safety are treated carefully, including explicit database migrations and recovery mechanisms. The default visual identity (name and logo, both changeable in Settings) is Al Malaki Pizza & Café, the first deployment.
 
 ## Offline-first by design
 
@@ -186,6 +187,10 @@ Core POS operation and local data are offline-first. Order entry, billing, KDS c
 - **Optional network features:** None outbound. The app serves the POS, the kitchen display, and the Server App on the local network only. Cloud sync, telemetry, WhatsApp, and Google Drive were removed from this fork in code.
 
 ## Languages and regional support
+
+In this fork the interface language picker offers **Arabic and English**. The remaining
+translation catalogues are still bundled — they serve print labels and previously saved
+preferences — but they are not selectable as an interface language. The full catalogue list:
 
 Rest&Cafe includes UI translations for:
 
@@ -217,17 +222,26 @@ Rest&Cafe includes UI translations for:
 UI language is independent of store country and regional settings, and tax calculation rules remain a separate concern. For details on contributing translations or adding languages, see the [Internationalization and translation guide](docs/architecture/internationalization.md).
 
 Rest&Cafe has **no country profiles**. A store's regional identity is its own plain
-settings: an ISO 4217 currency, a merchant-editable currency unit (the text printed after
-amounts — `SP` by default), and a timezone. Product defaults are `SYP`, unit `SP`, and
-`Asia/Damascus`; fraction digits follow ISO 4217 (SYP renders whole amounts: `10`, never
-`10.00`) and digits always render Latin.
+settings: a currency, a merchant-editable currency unit (the text printed after
+amounts — `SP` by default), and a timezone. The currency picker offers `SYP` and `USD`
+only. Product defaults are `SYP`, unit `SP`, and `Asia/Damascus`; fraction digits follow
+ISO 4217 (SYP renders whole amounts: `10`, never `10.00`), digits always render Latin,
+and dates always render `DD/MM/YYYY`.
 
 ## Tax support
 
-Taxes are manual and owner-controlled. The owner enables taxes in Settings and defines
-categories and rates in the manual tax configuration; the generic calculation engine
-applies them at checkout and on receipts. This fork ships no country tax packs and never
-downloads one — the only bundled pack is the empty generic framework.
+Taxes are off or manual, and owner-controlled. The tax screen is a single invoice-level
+fee list: each fee has a name and is either a percentage of the bill, a percentage of an
+earlier fee in the same list, or a fixed amount. The Syrian profile is the same list
+pre-filled — a consumption fee (رسم الإنفاق الاستهلاكي) whose rate follows the
+establishment's classification (unrated 0%, 2–3 stars 5%, 4–5 stars 10%, nightclub 20%),
+plus a local-administration fee (رسم الإدارة المحلية) of 5% of the consumption fee itself
+(owner-editable) — and the announced 5% sales tax is offered as an owner-selectable
+alternative profile. Syria fees are computed on the whole bill and rounded up to whole
+units; a discount is calculated afterwards, on the post-fee total, and never reduces the
+fee base. The generic calculation engine applies the active configuration at checkout
+and on receipts. The only bundled country pack is the empty generic framework; the
+categories-and-packs machinery stays under the hood.
 
 > **Notice:** Rest&Cafe is software, not legal or tax advice. Operators remain
 > responsible for verifying the requirements that apply to their business.

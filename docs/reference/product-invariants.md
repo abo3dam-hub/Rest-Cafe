@@ -290,6 +290,49 @@ silent disagreement the rule exists to prevent.
 
 ---
 
+## Syria fees are document-level, and discounts come after them (Rest&Cafe)
+
+**Rule:** The Syria fee model is two document-level fees on the whole bill, never per-item
+tax categories. The consumption fee (رسم الإنفاق الاستهلاكي) follows the establishment's
+classification — unrated 0%, 2–3 stars 5%, 4–5 stars 10%, nightclub 20% — and the
+local-administration fee (رسم الإدارة المحلية) is a percentage **of the consumption fee
+itself** (5% by default, owner-editable via `syria_local_admin_rate`), never of the bill.
+Both round up (`ceiling`) to whole units. A discount is calculated **after** the fees, on
+the post-fee total, and never reduces the fee base. There is no reconstruction fee
+(رسم إعادة الإعمار) anywhere in the product. The owner-facing tax surface is one
+invoice-level fee list — each fee a percentage of the bill, a percentage of an earlier fee,
+or a fixed amount — with the Syria profile as the same list pre-filled; the announced 5%
+sales tax is an owner-selectable alternative profile, not an automatic switch.
+
+**Reason:** This is how the Syrian bills the model was verified against actually compute
+(Latakya restaurant bills, 2026-10/11): the local-administration amount equals 5% of the
+consumption fee rounded up, and a cashier who discounts a bill does not hand back tax the
+state still charges on the full amount.
+
+**What this rules out:** per-item Syria tax categories, a local-administration fee computed
+on the bill or the subtotal, a discount that shrinks the fee base, and any reconstruction
+fee line, rate, or setting.
+
+**Enforced by:** `buildSyriaProfilePack()` in `main/routes/tax-packs.ts` (one whole-bill
+category, one percent rule per profile); the rollup in `main/services/tax.ts`
+(local-administration at rollup level, `resolveSyriaDiscountAmount()` for the post-fee
+discount, `feeBaseOnly` percent rules for a fee on a fee).
+
+**How to verify:**
+
+```sh
+npm run test:syria-tax-profile
+npm run test:manual-fee-of-fee
+npm run test:restaurant-full-house
+npm run test:restaurant-day-cycle
+```
+
+**Change policy:** locked by owner decision (2026-11-06). Any change to the fee order, the
+local-administration base, or the rounding is a product decision, and every suite that pins
+Syria money — full-house and day-cycle first — must be re-run in the same change.
+
+---
+
 ## Customer self-ordering stays inside the staff order pipeline (Rest&Cafe)
 
 **Rule:** Customers order from a per-table QR code served by the Server App

@@ -82,6 +82,24 @@ The contact block also records
 `addressSource`, so a printed slip records whether the address came from the order or from the
 customer's standing record.
 
+### The customer bill
+
+The built-in customer bill follows the receipt layout the owner approved for this fork.
+Header fields print two per line in fixed slots — store name, logo, address, phone, table
+number, licence number (الترخيص), tax number, classification (التصنيف), waiter name, and
+the store footer message — each shown only when it has a value and its own show/hide toggle
+is on; الترخيص and the tax number are independent fields with independent toggles. A pair
+that does not fit stacks instead of truncating. The items table is ordered
+الصنف – إفرادي – العدد – المبلغ, and the totals run subtotal → fees → (post-fee total, only
+when a discount exists) → discount → grand total, matching the discount-after-fees rule in
+[Taxation](taxation.md#syria-profiles-and-the-invoice-fee-list). The printed closing time
+is the order's `bill_requested_at` stamp — the moment the bill was first requested;
+reprints do not move it, and undoing the request or adding items clears it for a fresh
+stamp. The built-in customer bill carries no payment block (merchant templates may render
+payments explicitly), and every surface closes with the footer
+«Rest&Cafe System Powered by Ali.J». Customer name and phone belong on the delivery slip,
+not the dine-in bill.
+
 ### Labels are semantic
 
 A label is a `SemanticLabel`: an optional `conceptId`, a `primary` string, and an optional

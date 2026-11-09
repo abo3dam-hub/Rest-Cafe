@@ -546,7 +546,9 @@ a financial document, not a cosmetic bug.
 registry. It holds 24 entries, and
 [`frontend/src/lib/i18n/messages/`](../../frontend/src/lib/i18n/messages) holds one JSON file per
 entry. Each registry entry carries the BCP-47 locale tag, the native name, the text direction, the
-`selectable` flag, and a dynamic chunk loader.
+`selectable` flag, and a dynamic chunk loader. In this fork only Arabic and English carry
+`selectable: true`; the other 22 catalogues stay registered for print labels and previously
+saved preferences, and new UI keys are added to `ar.json` and `en.json` only.
 
 [`loader.ts`](../../frontend/src/lib/i18n/loader.ts) imports English statically and seeds the cache
 with it, then loads every other locale through its dynamic import. In-flight requests are

@@ -62,6 +62,9 @@ conditions? }`.
 - `appliesPer` is `unit` or `line`. A `fixed` rule must declare it.
 - `baseRuleIds` makes a `percent` rule compound, applying to the base rules' result instead of the
   line gross. A `fixed` rule may not declare it.
+- `feeBaseOnly` (optional, on a `percent` rule with `baseRuleIds`) narrows the compound base to
+  the referenced rules' fee amounts alone, excluding the line gross. This is how the tax
+  panel's "percentage of another fee" kind is expressed.
 - `categoryIds` names the categories the rule applies to.
 
 `TaxRuleConditions` is `{ businessTypes?, customerStateRelation?, customerExempt? }`.
@@ -78,7 +81,12 @@ fetched, installed, or updated packs from a remote catalog do not exist, and no 
 country packs are bundled.
 
 The only other packs are the ones the owner creates in Settings through the manual tax
-configuration (below). A locally built pack still passes the same activation validation
+configuration (below), and the two Syria profiles built in code by
+`buildSyriaProfilePack()` in `main/routes/tax-packs.ts` (`syria-consumption` and
+`syria-sales`: a single whole-bill category and one percent rule each; the consumption
+profile's rate follows the establishment classification, and a local-administration fee of
+5% of the consumption fee is added at rollup level in `main/services/tax.ts`). A locally
+built pack still passes the same activation validation
 (`validationChecklist` in `main/routes/tax-packs.ts`) before it can become active, and the
 engine calculates from it exactly like any other pack.
 

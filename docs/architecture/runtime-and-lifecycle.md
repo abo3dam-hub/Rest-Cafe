@@ -27,7 +27,11 @@ booting Electron.
 `initialize()` runs once, from `app.whenReady()`. Every step checks the shutdown flag before
 continuing, so a quit during startup unwinds instead of half-starting:
 
-1. `initDatabase()`, then the idempotency retention prune (expired keyed
+1. `initDatabase()` — opened through `openDatabaseWithRetry()` in
+   `main/db-open-retry.ts`, which retries transient open failures (`SQLITE_BUSY`,
+   `SQLITE_IOERR`, `SQLITE_LOCKED`, "disk I/O error", "database is locked") with backoff and
+   a database close between attempts, because a relaunch can race the previous process's
+   file handles on Windows — then the idempotency retention prune (expired keyed
    order/payment/refund records are deleted; a failure is logged and never blocks startup).
 2. `applyAutostartSetting()` — the stored autostart preference is honoured in the Windows
    login items; a safe no-op off Windows.
@@ -102,6 +106,16 @@ Playwright and CI runs survive the restart.
 A window whose document URL has become `chrome-error://` is treated as a failed load.
 `recoverFailedWindow` allows one in-place rebuild while the runtime is healthy. A second failure, or
 a runtime that is not healthy, requests a relaunch rather than looping.
+
+A renderer that never confirms readiness is handled separately: when the window-readiness
+watchdog in `main/window-readiness.ts` reaches its fail-safe without a readiness
+confirmation, `main/index.ts` reloads the document — at most twice per window, and only
+while the window is alive and still unready — instead of leaving a blank window on screen.
+The window itself opens on a warm background colour (`main/window-options.ts`) rather than
+raw white, so a slow first paint does not read as a hang. The startup cache cleanup in
+`main/startup-cache.ts` advances its version marker even when a GPU cache directory cannot
+be deleted (locked by a surviving child process, for example), so a locked cache is not
+fought again on every launch; the failure is still logged and counted.
 
 ## Shutdown order
 

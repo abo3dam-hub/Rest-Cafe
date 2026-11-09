@@ -97,6 +97,9 @@ Common rules, enforced in the handlers:
 - Order and bill discounts scale item taxes by the discounted share of the subtotal while keeping
   stored `order_items` taxes un-order-discounted; see
   [Taxation](taxation.md#where-the-amount-came-from).
+- Under the Syria fee model the discount is resolved **after** the fee rollup instead: a
+  percentage discount is taken on the post-fee total, and the discount never reduces the fee
+  base. See [Taxation](taxation.md#syria-profiles-and-the-invoice-fee-list).
 - Applying a discount to an order that has an unpaid bill re-syncs the bill's totals and balance.
   A zero `discount_value` clears an order discount, and a zero `value` clears a bill discount,
   subject to the bill endpoint's discount-mode checks. The item endpoint requires a positive
