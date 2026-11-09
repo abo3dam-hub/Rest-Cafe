@@ -12,7 +12,7 @@ import {
 } from '../services/authorization';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
-import { isValidEmail } from './auth';
+import { resolveAccountIdentifier } from './auth';
 import { ROLE_ACCESS, ROLE_KEYS, OPERATIONAL_ROLES, hasRole } from '../../shared/role-permissions';
 
 const router = Router();
@@ -264,9 +264,12 @@ router.post('/', requireStaffWrite, authRateLimit(), (req: Request, res: Respons
       captureStaffValidation('fc.backend.staff.create.validation', 'required_fields');
       return res.status(400).json({ error: 'name, email, password, and role are required' });
     }
-    if (!isValidEmail(normalizedEmail)) {
+    // A plain username is a valid identifier too (stored as
+    // `<username>@restcafe.local`); full emails keep working as before.
+    const resolvedEmail = resolveAccountIdentifier(normalizedEmail);
+    if (!resolvedEmail) {
       captureStaffValidation('fc.backend.staff.create.validation', 'email_invalid');
-      return res.status(400).json({ error: 'Enter a valid email address' });
+      return res.status(400).json({ error: 'Enter a valid email address or username' });
     }
     if (!validatePassword(password)) {
       captureStaffValidation('fc.backend.staff.create.validation', 'password_policy');
@@ -321,7 +324,7 @@ router.post('/', requireStaffWrite, authRateLimit(), (req: Request, res: Respons
 
     const db = getDatabase();
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(resolvedEmail);
     if (existing) {
       const failure = serializeOperationFailure({
         capture_point: 'fc.backend.staff.duplicate_email',
@@ -360,7 +363,7 @@ router.post('/', requireStaffWrite, authRateLimit(), (req: Request, res: Respons
       `).run(
         id,
         name,
-        normalizedEmail,
+        resolvedEmail,
         hashedPassword,
         role,
         hashedPin,
@@ -399,6 +402,9 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
     const { name, email, password, role, pin, is_active } = req.body;
     const emailProvided = email !== undefined;
     const normalizedEmail = emailProvided ? normalizeStaffEmail(email) : undefined;
+    // Username identifiers resolve to their stored `<username>@restcafe.local`
+    // form before any comparison or write.
+    const resolvedEmail = normalizedEmail ? resolveAccountIdentifier(normalizedEmail) : undefined;
     const db = getDatabase();
 
     if (is_active !== undefined) {
@@ -446,14 +452,14 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
       captureStaffValidation('fc.backend.staff.update.validation', 'email_missing');
       return res.status(400).json({ error: 'email is required' });
     }
-    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+    if (normalizedEmail && !resolvedEmail) {
       captureStaffValidation('fc.backend.staff.update.validation', 'email_invalid');
-      return res.status(400).json({ error: 'Enter a valid email address' });
+      return res.status(400).json({ error: 'Enter a valid email address or username' });
     }
-    if (normalizedEmail && normalizedEmail !== member.email) {
+    if (resolvedEmail && resolvedEmail !== member.email) {
       const existing = db
         .prepare('SELECT id FROM users WHERE email = ? AND id != ?')
-        .get(normalizedEmail, req.params.id);
+        .get(resolvedEmail, req.params.id);
       if (existing) {
         const failure = serializeOperationFailure({
           capture_point: 'fc.backend.staff.update.duplicate_email',
@@ -529,7 +535,7 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
       `)
         .run(
           name || null,
-          normalizedEmail || null,
+          resolvedEmail || null,
           hashedPassword,
           role || null,
           hashedPin,
@@ -546,7 +552,7 @@ router.put('/:id', requireStaffWrite, authRateLimit(), (req: Request, res: Respo
         ownerEmailSynced = syncRegisteredOwnerEmail(
           db,
           member.role === 'owner' ? member.email : undefined,
-          targetRole === 'owner' ? normalizedEmail || member.email : undefined,
+          targetRole === 'owner' ? resolvedEmail || member.email : undefined,
         );
       }
       return updateResult;

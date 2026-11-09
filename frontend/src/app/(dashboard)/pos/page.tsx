@@ -99,8 +99,15 @@ export default function POSPage() {
     setShowSoldOutModal,
     handleToggleSoldOut,
     handleReactivateAllSoldOut,
+    handleReorderProducts,
+    handleReorderCategories,
     catalogRetrying,
   } = usePosCatalog({ isRestaurant });
+  // Reorder mode (owner decision, 2026-11-09): owner/manager/cashier arrange
+  // the shared catalog order from the POS itself; the waiter app never gets it.
+  const [reorderMode, setReorderMode] = useState(false);
+  const canReorder =
+    tenantCan(currentTenant, 'catalog.manage') || tenantCan(currentTenant, 'pos.use');
   const online = usePosConnectivity();
   const { orderAlert, showPrimeBanner, handlePrimeBanner } = usePosOrderAlert();
   // Retries failed KOT and receipt prints from the frontend queue (F-009).
@@ -524,6 +531,10 @@ export default function POSPage() {
             soldOutCount={soldOutProducts.length}
             onOpenSoldOutList={() => setShowSoldOutModal(true)}
             onToggleSoldOut={tenantCan(currentTenant, 'pos.use') ? handleToggleSoldOut : undefined}
+            reorderMode={reorderMode}
+            onToggleReorderMode={canReorder ? () => setReorderMode((v) => !v) : undefined}
+            onReorderProducts={handleReorderProducts}
+            onReorderCategories={handleReorderCategories}
             soundControl={
               <button
                 type="button"

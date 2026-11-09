@@ -98,7 +98,12 @@ reprints do not move it, and undoing the request or adding items clears it for a
 stamp. The built-in customer bill carries no payment block (merchant templates may render
 payments explicitly), and every surface closes with the footer
 «Rest&Cafe System Powered by Ali.J». Customer name and phone belong on the delivery slip,
-not the dine-in bill.
+not the dine-in bill. Fee breakdown lines print the rate in parentheses — «رسم الإنفاق
+الاستهلاكي (5%)» — never in an `@5%` form. No surface prints a "tax included" line: fees in
+this product are always added on top of the bill, never included in prices. Amounts print
+with the owner's stored currency unit (`settings.currency_symbol`, `SYP` for the default
+store) on every surface, backend and frontend alike — a derived CLDR symbol never
+overrides it.
 
 ### Labels are semantic
 

@@ -2290,41 +2290,47 @@ router.patch(
   },
 );
 
-router.patch('/list-order', requirePermission('catalog.manage'), (req: Request, res: Response) => {
-  try {
-    const ids = (req.body ?? {}).ids;
-    if (
-      !Array.isArray(ids) ||
-      ids.length === 0 ||
-      ids.some((id) => typeof id !== 'string' || !id)
-    ) {
-      return res.status(400).json({ error: 'ids must be a non-empty array of product ids' });
+// Shared catalog order: the submitted sequence gets fresh spaced values
+// (10, 20, 30, ...) — never a permutation of the stored ones, because real
+// catalogs carry tied sort_order values (imports and creates default to 0),
+// where permuting changes nothing. Cashier included via pos.use (owner
+// decision, 2026-11-09); product edit rights stay behind catalog.manage.
+router.patch(
+  '/list-order',
+  requireAnyPermission('catalog.manage', 'pos.use'),
+  (req: Request, res: Response) => {
+    try {
+      const ids = (req.body ?? {}).ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.some((id) => typeof id !== 'string' || !id)
+      ) {
+        return res.status(400).json({ error: 'ids must be a non-empty array of product ids' });
+      }
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length !== ids.length) {
+        return res.status(400).json({ error: 'ids must not contain duplicates' });
+      }
+      const db = getDatabase();
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const rows = db
+        .prepare(`SELECT id FROM products WHERE id IN (${placeholders}) AND deleted_at IS NULL`)
+        .all(...uniqueIds) as { id: string }[];
+      if (rows.length !== uniqueIds.length) {
+        return res.status(404).json({ error: 'One or more products were not found' });
+      }
+      const update = db.prepare('UPDATE products SET sort_order = ?, updated_at = ? WHERE id = ?');
+      withTxn(() => {
+        uniqueIds.forEach((id, index) => update.run((index + 1) * 10, now(), id));
+      });
+      res.json({ updated: uniqueIds.length });
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
-    const uniqueIds = [...new Set(ids)];
-    if (uniqueIds.length !== ids.length) {
-      return res.status(400).json({ error: 'ids must not contain duplicates' });
-    }
-    const db = getDatabase();
-    const placeholders = uniqueIds.map(() => '?').join(',');
-    const rows = db
-      .prepare(
-        `SELECT id, sort_order FROM products WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
-      )
-      .all(...uniqueIds) as { id: string; sort_order: number }[];
-    if (rows.length !== uniqueIds.length) {
-      return res.status(404).json({ error: 'One or more products were not found' });
-    }
-    const sortOrders = rows.map((row) => row.sort_order).sort((a, b) => a - b);
-    const update = db.prepare('UPDATE products SET sort_order = ?, updated_at = ? WHERE id = ?');
-    withTxn(() => {
-      uniqueIds.forEach((id, index) => update.run(sortOrders[index], now(), id));
-    });
-    res.json({ updated: uniqueIds.length });
-  } catch (error) {
-    console.error('[API] Internal error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  },
+);
 
 router.patch('/:id/pin', requirePermission('catalog.manage'), (req: Request, res: Response) => {
   try {

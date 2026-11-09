@@ -1058,7 +1058,12 @@ async function main() {
     const invalidStaffEmail = await api(baseUrl, '/api/staff', {
       method: 'POST',
       headers: owner.authHeader,
-      body: { name: 'Invalid email staff', email: 'bad', password: 'TestPass123', role: 'cashier' },
+      body: {
+        name: 'Invalid email staff',
+        email: 'bad identifier!',
+        password: 'TestPass123',
+        role: 'cashier',
+      },
     });
     assert.equal(invalidStaffEmail.status, 400, 'invalid staff email validation remains a 400');
     const managerCreateOwner = await api(baseUrl, '/api/staff', {

@@ -187,8 +187,8 @@ export default function RecoverAccessPage() {
                   <Label htmlFor="recover-email">{t('email')}</Label>
                   <Input
                     id="recover-email"
-                    type="email"
-                    autoComplete="email"
+                    type="text"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t('emailPlaceholder')}

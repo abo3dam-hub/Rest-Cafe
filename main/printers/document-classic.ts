@@ -376,10 +376,7 @@ function pairedFactLines(
       };
     }
     return {
-      lines: [
-        leftText,
-        ' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText,
-      ],
+      lines: [leftText, ' '.repeat(Math.max(0, cols - displayCellWidth(rightText))) + rightText],
       sources: [left, right],
     };
   }
@@ -804,12 +801,16 @@ export function renderBillDocumentToClassicLines(
               ? normalize(labelOf(block.guests.label) + ': ' + String(block.guests.count))
               : null,
             block.openedAt
-              ? normalize(labelOf(block.openedAt.label) + ': ' + timeOf(block.openedAt.timestamp.text))
+              ? normalize(
+                  labelOf(block.openedAt.label) + ': ' + timeOf(block.openedAt.timestamp.text),
+                )
               : null,
           ],
           [
             block.closedAt
-              ? normalize(labelOf(block.closedAt.label) + ': ' + timeOf(block.closedAt.timestamp.text))
+              ? normalize(
+                  labelOf(block.closedAt.label) + ': ' + timeOf(block.closedAt.timestamp.text),
+                )
               : null,
             block.cashier
               ? normalize(labelOf(block.cashier.label) + ': ' + block.cashier.name.text)
@@ -868,7 +869,14 @@ export function renderBillDocumentToClassicLines(
         );
         const nameLen = itemNameWidth(cols, amtLen, rateLen);
         segment.main.push(
-          classicItemHeader(block, nameLen, rateLen, amtLen, options.language, options.capabilities),
+          classicItemHeader(
+            block,
+            nameLen,
+            rateLen,
+            amtLen,
+            options.language,
+            options.capabilities,
+          ),
         );
         segment.sourceLines.main.push(
           [
@@ -1011,7 +1019,7 @@ export function renderBillDocumentToClassicLines(
       case 'tax-breakdown': {
         const segment = segmentOf('tax-breakdown');
         for (const line of block.lines) {
-          const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
+          const rateSuffix = line.rate === null ? '' : ` (${line.rate}%)`;
           const rawLabel = labelOf(line.label) + rateSuffix;
           const label = truncate(rawLabel, cols - 12, options.language, options.capabilities);
           const value = formatCurrency(

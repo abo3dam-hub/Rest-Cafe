@@ -193,7 +193,7 @@ function safePrinterTextForLanguage(
 
 export function buildTaxBillBytes(
   bill: Bill,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'> &
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country' | 'currency_symbol'> &
     Partial<Pick<Tenant, 'timezone'>>,
   opts: TaxBillOptions = {},
   warnings?: PrintWarning[],
@@ -226,7 +226,9 @@ export function buildTaxBillBytes(
   const truncate = (text: string, max: number): string =>
     truncateForLanguage(text, max, language, opts.capabilities);
   const currencyCode = resolveTenantCurrency(tenant.currency, tenant.country);
-  const rawCurrency = getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
+  const rawCurrency =
+    tenant.currency_symbol?.trim() ||
+    getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
   const currency = resolveEncoderCurrency(
     rawCurrency,
     currencyCode,
@@ -239,9 +241,6 @@ export function buildTaxBillBytes(
   const taxIdLabel = getCountryByCode(tenant.country)?.taxIdLabel || 'Tax ID';
   const order = bill.order;
   const taxComponents = resolveTaxComponents(bill);
-  const hasTax =
-    Number(bill.tax_amount) !== 0 ||
-    taxComponents.some((component) => Number(component.amount) !== 0);
 
   const enc = new ReceiptPrinterEncoder({ columns: cols });
   const safeFinancialRows = (left: string, right: string): string[] => {
@@ -629,18 +628,8 @@ export function buildTaxBillBytes(
       undefined,
       language,
     ).newline();
-    if (hasTax) {
-      safePrinterText(
-        enc,
-        labelFor('receipt.taxIncluded'),
-        warnings,
-        false,
-        arabicShaping,
-        undefined,
-        undefined,
-        language,
-      ).newline();
-    }
+    // No "tax included" footer line: fees in this product are added on top
+    // of the bill, never included (owner decision, 2026-11-09).
   }
   printPoweredByFooter(enc, cols);
 

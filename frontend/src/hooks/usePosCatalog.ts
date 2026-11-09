@@ -37,6 +37,8 @@ export interface UsePosCatalogResult {
   setShowSoldOutModal: Dispatch<SetStateAction<boolean>>;
   handleToggleSoldOut: (product: Product) => Promise<void>;
   handleReactivateAllSoldOut: () => Promise<void>;
+  handleReorderProducts: (orderedIds: string[]) => Promise<void>;
+  handleReorderCategories: (orderedIds: string[]) => Promise<void>;
   /** True while a failed catalog load is being retried with backoff. */
   catalogRetrying: boolean;
 }
@@ -113,6 +115,42 @@ export function usePosCatalog({ isRestaurant }: UsePosCatalogOptions): UsePosCat
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
+
+  // POS reorder mode: persist the shared catalog order and mirror it locally
+  // in the submitted sequence (the backend renumbers with spaced values).
+  const reorderByIds = <T extends { id: string }>(items: T[], orderedIds: string[]): T[] => {
+    const byId = new Map(items.map((item) => [String(item.id), item]));
+    let cursor = 0;
+    return items.map((item) =>
+      orderedIds.includes(String(item.id)) ? byId.get(orderedIds[cursor++])! : item,
+    );
+  };
+
+  const handleReorderProducts = useCallback(
+    async (orderedIds: string[]) => {
+      setProducts((prev) => reorderByIds(prev, orderedIds));
+      try {
+        await api.patch('/products/list-order', { ids: orderedIds });
+        toast.success(t('reorderSaved'));
+      } catch {
+        toast.error(t('reorderSaveFailed'));
+      }
+    },
+    [t],
+  );
+
+  const handleReorderCategories = useCallback(
+    async (orderedIds: string[]) => {
+      setCategories((prev) => reorderByIds(prev, orderedIds));
+      try {
+        await api.patch('/categories/list-order', { ids: orderedIds });
+        toast.success(t('reorderSaved'));
+      } catch {
+        toast.error(t('reorderSaveFailed'));
+      }
+    },
+    [t],
+  );
 
   const refreshTables = async () => {
     if (!isRestaurant) return;
@@ -211,6 +249,8 @@ export function usePosCatalog({ isRestaurant }: UsePosCatalogOptions): UsePosCat
     setShowSoldOutModal,
     handleToggleSoldOut,
     handleReactivateAllSoldOut,
+    handleReorderProducts,
+    handleReorderCategories,
     catalogRetrying,
   };
 }

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import expressRateLimit from 'express-rate-limit';
 import { getDatabase, now, generateShortId, withTxn } from '../db';
-import { requirePermission } from '../services/authorization';
+import { requireAnyPermission, requirePermission } from '../services/authorization';
 import { operationDiagnostics } from '../services/operation-diagnostics';
 import { serializeOperationFailure } from '../lib/operation-failure';
 
@@ -297,10 +297,13 @@ router.get('/', requirePermission('catalog.view'), (req: Request, res: Response)
   }
 });
 
+// Shared catalog order — same contract as products list-order: fresh spaced
+// values (10, 20, 30, ...) in the submitted sequence, never a permutation of
+// stored values (real catalogs tie at 0). Cashier included via pos.use.
 router.patch(
   '/list-order',
   categoryWriteRateLimit,
-  requirePermission('catalog.manage'),
+  requireAnyPermission('catalog.manage', 'pos.use'),
   (req: Request, res: Response) => {
     try {
       const ids = (req.body ?? {}).ids;
@@ -318,19 +321,16 @@ router.patch(
       const db = getDatabase();
       const placeholders = uniqueIds.map(() => '?').join(',');
       const rows = db
-        .prepare(
-          `SELECT id, sort_order FROM categories WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
-        )
-        .all(...uniqueIds) as { id: string; sort_order: number }[];
+        .prepare(`SELECT id FROM categories WHERE id IN (${placeholders}) AND deleted_at IS NULL`)
+        .all(...uniqueIds) as { id: string }[];
       if (rows.length !== uniqueIds.length) {
         return res.status(404).json({ error: 'One or more categories were not found' });
       }
-      const sortOrders = rows.map((row) => row.sort_order).sort((a, b) => a - b);
       const update = db.prepare(
         'UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?',
       );
       withTxn(() => {
-        uniqueIds.forEach((id, index) => update.run(sortOrders[index], now(), id));
+        uniqueIds.forEach((id, index) => update.run((index + 1) * 10, now(), id));
       });
       res.json({ updated: uniqueIds.length });
     } catch (error) {

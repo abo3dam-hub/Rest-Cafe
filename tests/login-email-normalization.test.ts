@@ -131,6 +131,40 @@ async function run() {
     .send({ email: 'INACTIVE-CHEF@FLOCAFE.LOCAL', password: 'ChefPass1234!' });
   assertEqual(res7.status, 401, 'Main API: Inactive user with uppercase email returns 401');
 
+  // ── Username accounts (owner decision, 2026-11-09) ──────────────────────
+  // A username account is stored as `<username>@restcafe.local`; sign-in
+  // accepts the plain username, any case, or the stored form interchangeably.
+  db.prepare(`
+    INSERT INTO users (id, name, email, password, role, is_active, created_at, updated_at)
+    VALUES ('norm-user-2', 'Username Cashier', 'cashier1@restcafe.local', ?, 'cashier', 1, ?, ?)
+  `).run(bcrypt.hashSync('Pass1234!', 10), now(), now());
+
+  const resU1 = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'cashier1', password: 'Pass1234!' });
+  assertEqual(resU1.status, 200, 'Username: plain username login succeeds');
+  assert(!!resU1.body.access_token, 'Username: login returns access token');
+
+  const resU2 = await request(app)
+    .post('/api/auth/login')
+    .send({ email: '  Cashier1 ', password: 'Pass1234!' });
+  assertEqual(resU2.status, 200, 'Username: mixed-case padded username login succeeds');
+
+  const resU3 = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'cashier1@restcafe.local', password: 'Pass1234!' });
+  assertEqual(resU3.status, 200, 'Username: stored email form login succeeds');
+
+  const resU4 = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'cashier1', password: 'WrongPass1!' });
+  assertEqual(resU4.status, 401, 'Username: wrong password returns 401');
+
+  const resU5 = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'كاشير', password: 'Pass1234!' });
+  assertEqual(resU5.status, 400, 'Username: non-Latin identifier is rejected as malformed');
+
   // ── Standalone KDS Login Tests ──────────────────────────────
   process.env.KDS_PORT = '0';
   const { startKdsServer, stopKdsServer, getKdsPort } = require('../main/kds-server');

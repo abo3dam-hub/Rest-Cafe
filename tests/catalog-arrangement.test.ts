@@ -12,8 +12,13 @@
  * A) Migration v127 adds the special-card flags to products
  * B) Product list exposes the flags; PATCH toggles each independently
  * C) Special-card settings round-trip (defaults, save, validation)
- * D) Product/category list-order permutes existing sort_order values
+ * D) Product/category list-order assigns fresh spaced sort_order values
+ *    (10, 20, 30, ...) in the submitted sequence — round-3 fix (2026-11-09):
+ *    permuting the stored values was a silent no-op on real catalogs, where
+ *    every row carries sort_order 0 (CSV import / create default).
  * E) Tables payload carries the per-table kitchen summary (quantity sums)
+ * F) Real-catalog shape: all sort_order = 0 — the first reorder save repairs
+ *    the arrangement; the cashier may reorder (pos.use), a chef may not.
  *
  * Usage: node tests/run-electron-node-test.cjs tests/catalog-arrangement.test.ts
  */
@@ -154,7 +159,7 @@ async function main() {
     const badTitle = await send('PUT', '/api/settings/special-cards', { offers_title: 5 });
     assertEqualOrThrow(badTitle.status, 400, 'C: non-string title rejected');
 
-    // ── D) List ordering permutes existing sort values ─────────────────────
+    // ── D) List ordering assigns fresh spaced values ───────────────────────
     const productOrder = await send('PATCH', '/api/products/list-order', {
       ids: ['prod-c', 'prod-a'],
     });
@@ -162,9 +167,9 @@ async function main() {
     assertEqualOrThrow(productOrder.data.updated, 2, 'D: two products updated');
     const productSort = (id: string) =>
       db.prepare('SELECT sort_order FROM products WHERE id = ?').get(id).sort_order;
-    assertEqualOrThrow(productSort('prod-c'), 5, 'D: prod-c takes the first existing value');
+    assertEqualOrThrow(productSort('prod-c'), 10, 'D: first submitted product gets 10');
     assertEqualOrThrow(productSort('prod-b'), 15, 'D: unlisted product keeps its value');
-    assertEqualOrThrow(productSort('prod-a'), 25, 'D: prod-a takes the last existing value');
+    assertEqualOrThrow(productSort('prod-a'), 20, 'D: second submitted product gets 20');
     const orderedProducts = await get('/api/products');
     const relative = orderedProducts.data.products
       .map((p: any) => p.id)
@@ -182,17 +187,17 @@ async function main() {
       ids: ['prod-a', 'prod-nope'],
     });
     assertEqualOrThrow(missingProduct.status, 404, 'D: unknown product id rejected');
-    assertEqualOrThrow(productSort('prod-a'), 25, 'D: rejected reorder changes nothing');
+    assertEqualOrThrow(productSort('prod-a'), 20, 'D: rejected reorder changes nothing');
 
     const categoryOrder = await send('PATCH', '/api/categories/list-order', {
-      ids: ['cat-c', 'cat-a'],
+      ids: ['cat-c', 'cat-b', 'cat-a'],
     });
     assertEqualOrThrow(categoryOrder.status, 200, 'D: category reorder accepted');
     const categorySort = (id: string) =>
       db.prepare('SELECT sort_order FROM categories WHERE id = ?').get(id).sort_order;
-    assertEqualOrThrow(categorySort('cat-c'), 10, 'D: cat-c takes the first existing value');
-    assertEqualOrThrow(categorySort('cat-b'), 20, 'D: unlisted category keeps its value');
-    assertEqualOrThrow(categorySort('cat-a'), 30, 'D: cat-a takes the last existing value');
+    assertEqualOrThrow(categorySort('cat-c'), 10, 'D: first submitted category gets 10');
+    assertEqualOrThrow(categorySort('cat-b'), 20, 'D: second submitted category gets 20');
+    assertEqualOrThrow(categorySort('cat-a'), 30, 'D: third submitted category gets 30');
     const orderedCategories = await get('/api/categories');
     const relativeCategories = orderedCategories.data.categories
       .map((c: any) => c.id)
@@ -202,6 +207,63 @@ async function main() {
       JSON.stringify(['cat-c', 'cat-b', 'cat-a']),
       'D: category list follows the arranged order',
     );
+
+    // ── F) Real-catalog shape: every sort_order is 0 ───────────────────────
+    // CSV import and UI creation both land rows at sort_order 0; the old
+    // permutation endpoint reported success and changed nothing there.
+    seedCategory(db, 'cat-x', 'Category X');
+    seedCategory(db, 'cat-y', 'Category Y');
+    seedProduct(db, 'prod-x1', 'cat-x', 'X One', 100);
+    seedProduct(db, 'prod-x2', 'cat-x', 'X Two', 200);
+    db.prepare("UPDATE categories SET sort_order = 0 WHERE id IN ('cat-x', 'cat-y')").run();
+    db.prepare("UPDATE products SET sort_order = 0 WHERE id IN ('prod-x1', 'prod-x2')").run();
+
+    const jwt = require('jsonwebtoken');
+    const { getJWTSecret } = require('../main/routes/auth');
+    const seedActor = (id: string, role: string) => {
+      db.prepare(
+        `INSERT OR IGNORE INTO users (id, name, email, password, role, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, 'unused', ?, 1, datetime('now'), datetime('now'))`,
+      ).run(id, id, `${id}@test.local`, role);
+      const token = jwt.sign({ userId: id, email: `${id}@test.local`, role }, getJWTSecret(), {
+        expiresIn: '1h',
+      });
+      return { Authorization: `Bearer ${token}` };
+    };
+    const cashierHeader = seedActor('actor-cashier', 'cashier');
+    const chefHeader = seedActor('actor-chef', 'chef');
+
+    const cashierReorder = await api(baseUrl, '/api/products/list-order', {
+      method: 'PATCH',
+      headers: cashierHeader,
+      body: { ids: ['prod-x2', 'prod-x1'] },
+    });
+    assertEqualOrThrow(cashierReorder.status, 200, 'F: cashier may reorder products (pos.use)');
+    assertEqualOrThrow(productSort('prod-x2'), 10, 'F: tied rows renumbered — first gets 10');
+    assertEqualOrThrow(productSort('prod-x1'), 20, 'F: tied rows renumbered — second gets 20');
+    const afterRepair = await get('/api/products');
+    const xRelative = afterRepair.data.products
+      .map((p: any) => p.id)
+      .filter((id: string) => ['prod-x1', 'prod-x2'].includes(id));
+    assertEqualOrThrow(
+      JSON.stringify(xRelative),
+      JSON.stringify(['prod-x2', 'prod-x1']),
+      'F: product list follows the repaired order',
+    );
+
+    const categoryRepair = await send('PATCH', '/api/categories/list-order', {
+      ids: ['cat-y', 'cat-x'],
+    });
+    assertEqualOrThrow(categoryRepair.status, 200, 'F: category repair accepted');
+    assertEqualOrThrow(categorySort('cat-y'), 10, 'F: tied categories renumbered — first gets 10');
+    assertEqualOrThrow(categorySort('cat-x'), 20, 'F: tied categories renumbered — second gets 20');
+
+    const chefReorder = await api(baseUrl, '/api/products/list-order', {
+      method: 'PATCH',
+      headers: chefHeader,
+      body: { ids: ['prod-x1', 'prod-x2'] },
+    });
+    assertEqualOrThrow(chefReorder.status, 403, 'F: chef (no pos.use / catalog.manage) is refused');
 
     // ── E) Kitchen summary on the tables payload ───────────────────────────
     const orderRes = await send('POST', '/api/orders', {

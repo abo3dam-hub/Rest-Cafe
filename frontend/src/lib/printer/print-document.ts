@@ -272,6 +272,8 @@ export interface FrontendTenantPrefs {
   currency?: string | null;
   country?: string | null;
   timezone?: string | null;
+  /** Owner's stored currency unit (Settings); wins over the CLDR symbol. */
+  currency_symbol?: string | null;
 }
 
 export function buildBillPrintContext(opts: {
@@ -290,7 +292,9 @@ export function buildBillPrintContext(opts: {
     baseDirection: baseDirectionFor(opts.languages),
     locale: LANGUAGES[opts.languages[0] as Language]?.locale ?? country?.locale ?? 'en-US',
     currency,
-    currencySymbol: getCurrencySymbol(currency, country?.locale ?? 'en-US'),
+    currencySymbol:
+      opts.tenant.currency_symbol?.trim() ||
+      getCurrencySymbol(currency, country?.locale ?? 'en-US'),
     trimDecimals: opts.trimDecimals === true,
     ...(opts.tenant.timezone ? { timezone: String(opts.tenant.timezone) } : {}),
     resolveLabel: printLabelResolver,

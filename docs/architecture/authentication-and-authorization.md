@@ -85,6 +85,18 @@ secret must go through it or pre-rotation tokens would keep validating.
 **Issuance.** `jwt.sign` runs on login and on the token-refresh paths. A token without the remember
 option expires in 24 hours; with it, in 10 days.
 
+**Account identifiers.** An account identifier is either a full email address or a plain
+username (Latin letters and digits, with `.`, `_`, `-`; owner decision, 2026-11-09). The
+product is local-only and never sends mail, so the identifier is a sign-in name, not a
+mailbox. A username is stored in `users.email` as `<username>@restcafe.local` — the shape
+demo staff accounts already used — so there is no separate username column and no
+migration. `resolveAccountIdentifier()` in `main/routes/auth.ts` is the single resolver:
+login, first-run setup, staff create/update, and Master-PIN recovery all pass the entered
+identifier through it, so the plain username and its stored form are interchangeable
+everywhere, and the two forms collide on the uniqueness check. Display surfaces show
+username accounts without the `@restcafe.local` suffix. Existing email accounts are
+untouched.
+
 **Verification.** `requireAuth` in
 [`main/server.ts`](../../main/server.ts) guards paths under `/api`. It passes through `/api/health`,
 everything under `/api/auth` (which verifies its own tokens), product image GETs, and a fixed list

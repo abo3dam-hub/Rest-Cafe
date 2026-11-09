@@ -190,8 +190,8 @@ function LoginContent() {
                 <Label htmlFor="email">{t('email')}</Label>
                 <Input
                   id="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('emailPlaceholder')}

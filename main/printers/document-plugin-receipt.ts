@@ -369,7 +369,7 @@ function renderEscposLineTemplateV1(
   if (biz.show_tax_breakdown !== false && taxComponents.length > 0) {
     for (const tax of taxComponents) {
       if (tax.amount === 0) continue;
-      const rawLabel = tax.rate === null ? tax.title : `${tax.title} @${tax.rate}%`;
+      const rawLabel = tax.rate === null ? tax.title : `${tax.title} (${tax.rate}%)`;
       pushFinancialLines([
         pluginSummaryRow(
           rawLabel,

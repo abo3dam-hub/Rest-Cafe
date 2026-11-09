@@ -64,6 +64,15 @@ function isValidOwnerEmail(email: string): boolean {
   return EMAIL_PATTERN.test(email);
 }
 
+// Username accounts (2026-11-09): the owner identifier may be a plain
+// username (Latin letters/digits) instead of an email address.
+const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,63}$/;
+
+function isValidOwnerIdentifier(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return EMAIL_PATTERN.test(v) || USERNAME_PATTERN.test(v);
+}
+
 function hasSuspectEmailDomain(email: string): boolean {
   if (!isValidOwnerEmail(email)) return false;
   const domain = email.split('@').pop()?.toLowerCase() || '';
@@ -104,7 +113,7 @@ export default function SetupPage() {
   const passwordsMatch = !passwordsEntered || form.password === form.confirmPassword;
   const ownerEmail = form.email.trim().toLowerCase();
   const ownerEmailEntered = ownerEmail.length > 0;
-  const ownerEmailInvalid = ownerEmailEntered && !isValidOwnerEmail(ownerEmail);
+  const ownerEmailInvalid = ownerEmailEntered && !isValidOwnerIdentifier(ownerEmail);
   const ownerEmailWarning =
     ownerEmailEntered && !ownerEmailInvalid && hasSuspectEmailDomain(ownerEmail);
 
@@ -181,7 +190,7 @@ export default function SetupPage() {
       toast.error(t('errorNameRequired'));
       return false;
     }
-    if (!isValidOwnerEmail(form.email.trim())) {
+    if (!isValidOwnerIdentifier(form.email.trim())) {
       toast.error(t('errorInvalidEmail'));
       return false;
     }
@@ -543,8 +552,8 @@ export default function SetupPage() {
                     <Label htmlFor="email">{t('ownerEmail')}</Label>
                     <Input
                       id="email"
-                      type="email"
-                      autoComplete="email"
+                      type="text"
+                      autoComplete="username"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder={t('ownerEmailPlaceholder')}
@@ -678,13 +687,10 @@ export default function SetupPage() {
                     </span>
                   </p>
 
-
                   <Button
                     type="submit"
                     disabled={
-                      ownerEmailInvalid ||
-                      !passwordsMatch ||
-                      !isPasswordValid(form.password)
+                      ownerEmailInvalid || !passwordsMatch || !isPasswordValid(form.password)
                     }
                     className="w-full"
                     size="lg"

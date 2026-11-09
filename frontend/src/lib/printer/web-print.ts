@@ -49,6 +49,8 @@ export type ReceiptTenant = Pick<
   | 'currency_display'
   | 'number_digits'
   | 'calendar'
+  | 'currency_symbol'
+  | 'currency_position'
 >;
 
 /** Encodes HTML entity characters so database-sourced values can't inject markup/scripts into the bill print window. */
@@ -367,8 +369,6 @@ export function generateBillHtml(
   const fmtQuantity = (value: number) =>
     formatNumberForTenant(Number(value) || 0, tenant.country, { digits: tenant.number_digits });
 
-  const hasTax = totals?.tax != null || (breakdown != null && breakdown.lines.length > 0);
-
   return `<!DOCTYPE html>
 <html lang="${localeTag}" dir="${dir}">
 <head>
@@ -480,7 +480,8 @@ export function generateBillHtml(
         breakdown && breakdown.lines.length > 0
           ? breakdown.lines
               .map(
-                (line) => `<tr><td>${escapeHtml(line.rate === null ? line.label.primary : `${line.label.primary} @${line.rate}%`)}</td><td class="text-end num">${fmtAmount(line.amount)}</td></tr>`,
+                (line) =>
+                  `<tr><td>${escapeHtml(line.rate === null ? line.label.primary : `${line.label.primary} (${line.rate}%)`)}</td><td class="text-end num">${fmtAmount(line.amount)}</td></tr>`,
               )
               .join('')
           : ''
@@ -503,7 +504,6 @@ export function generateBillHtml(
     <!-- Footer -->
     <div class="footer">
       ${messages?.footerNote ? `<p>${escapeHtml(messages.footerNote.text)}</p>` : `<p>${escapeHtml(L.thankYou)}</p>`}
-      ${hasTax ? `<p>${escapeHtml(L.taxIncluded)}</p>` : ''}
       <p class="powered-by">${escapeHtml(RECEIPT_BRANDING_NAME)}</p>
     </div>
   </div>
@@ -620,6 +620,24 @@ function formatAmount(value: number, tenant: ReceiptTenant, trimDecimals = false
     (tenant.currency === 'IRR' || (!tenant.currency && tenant.country === 'IR')) &&
     (tenant.currency_display === 'toman' || tenant.currency_display === 'toman_short');
 
+  // The owner's stored currency unit wins over any derived symbol (same rule
+  // as the backend print path) — CLDR's narrow symbol for SYP is "£", which
+  // must never reach a Syrian bill (owner decision, 2026-11-09).
+  const storedSymbol = tenant.currency_symbol?.trim();
+  if (storedSymbol && !isToman) {
+    const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
+    const numberingSystem = tenant.number_digits === 'latin' ? 'latn' : undefined;
+    const digits = trimDecimals && !hasDecimals ? 0 : fractionDigits;
+    const num = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      ...(numberingSystem ? { numberingSystem } : {}),
+    }).format(numeric);
+    return tenant.currency_position === 'prefix'
+      ? `${storedSymbol} ${num}`
+      : `${num} ${storedSymbol}`;
+  }
+
   // trimDecimals hides trailing .00 only when there is no fractional part.
   if (trimDecimals && !hasDecimals && !isToman) {
     const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
@@ -672,4 +690,3 @@ function formatReceiptTimeOnly(iso: string, tenant: ReceiptTenant, locale?: stri
     return iso;
   }
 }
-

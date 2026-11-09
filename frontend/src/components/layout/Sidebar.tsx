@@ -35,6 +35,7 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { useThemeModeToggle } from '@/hooks/useThemeModeToggle';
 import type { PermissionId } from '@shared/permissions';
 import { tenantCan } from '@/lib/permissions';
+import { displayAccountIdentifier } from '@/lib/account-identifier';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -287,11 +288,11 @@ export default function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   className="rounded-xl border-0 bg-sidebar-accent/60 hover:bg-sidebar-accent hover:shadow-xs data-[state=open]:bg-sidebar-accent/90 transition-all h-9 px-3 font-normal group-data-[collapsible=icon]:h-8! group-data-[collapsible=icon]:p-2! group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:rounded-lg"
-                  tooltip={user?.name || user?.email || t('user')}
+                  tooltip={user?.name || displayAccountIdentifier(user?.email) || t('user')}
                 >
                   <UserCircle className="size-4 shrink-0 text-sidebar-primary" />
                   <span className="font-medium text-sm truncate group-data-[collapsible=icon]:hidden text-sidebar-foreground">
-                    {user?.name || user?.email || t('user')}
+                    {user?.name || displayAccountIdentifier(user?.email) || t('user')}
                   </span>
                   <ChevronUp className="ms-auto size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </SidebarMenuButton>

@@ -21,6 +21,7 @@ import { useTranslations } from 'use-intl';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { tenantCan } from '@/lib/permissions';
+import { displayAccountIdentifier } from '@/lib/account-identifier';
 import { usePrinterStore } from '@/hooks/usePrinter';
 import type { CashSession } from '@/hooks/useCashSession';
 import { printerService } from '@/lib/printer/PrinterService';
@@ -240,7 +241,7 @@ export default function StatusBar() {
   }
 
   // Cashier info
-  const staffName = user?.name || user?.email || tNav('user');
+  const staffName = user?.name || displayAccountIdentifier(user?.email) || tNav('user');
   const roleKey = currentTenant?.role;
   const roleLabel = roleKey
     ? roleKey === 'owner'

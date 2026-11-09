@@ -838,8 +838,7 @@ console.log('\n✅ Test 1b2: Arabic shaping capability gate');
   );
   assert(
     'formatReceipt with arabicShaping prints the Persian item name',
-    receipt.toString('utf8').includes('چای زعفرانی') &&
-      receipt.toString('utf8').includes('مخصوص'),
+    receipt.toString('utf8').includes('چای زعفرانی') && receipt.toString('utf8').includes('مخصوص'),
   );
   assert(
     'formatReceipt with arabicShaping prints Persian addons',
@@ -1240,6 +1239,111 @@ console.log('\n✅ Test 1c: Unsupported financial receipt text refuses before tr
   }
 }
 
+console.log(
+  '\n✅ Test 1c2: Syria bill shape — stored SYP symbol, (rate%) fee lines, no tax-included line',
+);
+{
+  // Owner decisions (2026-11-09): fee lines print as «Name (5%)» on every
+  // surface; the stored currency symbol (SYP) wins everywhere — the CLDR
+  // narrow symbol for SYP is £ and must never reach a bill; and no surface
+  // prints a "tax included" line (fees here are added on top).
+  const { receiptEncoder, taxBillEncoder } = loadFrontendPrinterModules();
+  const syriaBill = {
+    ...fixtureBill,
+    subtotal: 10000,
+    tax_amount: 500,
+    discount_amount: 0,
+    total: 10500,
+    tax_breakdown: JSON.stringify([{ title: 'Consumption Fee', rate: 5, amount: 500 }]),
+    payment_details: JSON.stringify([{ method: 'Cash', amount: 10500 }]),
+  };
+  const syriaTenant = {
+    business_name: 'Cafe',
+    currency: 'SYP',
+    country: '',
+    currency_symbol: 'SYP',
+  };
+  const syriaBusiness = {
+    ...fixtureBusiness,
+    country: '',
+    currency: 'SYP',
+    currency_symbol: 'SYP',
+    show_tax_breakdown: true,
+  };
+
+  for (const template of ['classic', 'compact'] as const) {
+    const text = escPosToText(
+      formatReceipt(fixtureOrder, syriaBill, syriaBusiness, template, 48, true),
+    );
+    assert(
+      `backend ${template}: fee line uses the (rate%) format`,
+      text.includes('Consumption Fee (5%)'),
+    );
+    assert(`backend ${template}: fee line never uses the @ format`, !text.includes('Fee @'));
+    assert(`backend ${template}: stored SYP symbol prints`, text.includes('SYP'));
+    assert(`backend ${template}: no £ symbol`, !text.includes('£'));
+  }
+
+  const classicWarnings: any[] = [];
+  const classicText = Buffer.from(
+    receiptEncoder.buildClassicReceiptBytes(
+      syriaBill as any,
+      syriaTenant as any,
+      { paperWidth: 80, languages: ['en'] as any, showTaxBreakdown: true },
+      classicWarnings,
+    ),
+  ).toString();
+  assert(
+    'WebUSB classic: fee line uses the (rate%) format',
+    classicText.includes('Consumption Fee (5%)'),
+  );
+  assert('WebUSB classic: fee line never uses the @ format', !classicText.includes('Fee @'));
+  assert('WebUSB classic: stored SYP symbol prints', classicText.includes('SYP'));
+  assert('WebUSB classic: no £ symbol', !classicText.includes('£'));
+
+  const taxWarnings: any[] = [];
+  const taxText = Buffer.from(
+    taxBillEncoder.buildTaxBillBytes(
+      syriaBill as any,
+      syriaTenant as any,
+      { paperWidth: 80, language: 'en' },
+      taxWarnings,
+    ),
+  ).toString();
+  assert('WebUSB tax bill: stored SYP symbol prints', taxText.includes('SYP'));
+  assert('WebUSB tax bill: no £ symbol', !taxText.includes('£'));
+  assert(
+    'WebUSB tax bill: no tax-included footer line',
+    !taxText.includes('Tax included where applicable'),
+  );
+
+  const detailedWarnings: any[] = [];
+  // The detailed encoder consumes the frontend Bill shape (parsed arrays).
+  const syriaBillFrontend = {
+    ...syriaBill,
+    order: {
+      ...fixtureOrder,
+      items: fixtureOrder.items.map((item: any) => ({ ...item, name: item.product_name })),
+    },
+    tax_breakdown: [{ title: 'Consumption Fee', rate: 5, amount: 500 }],
+    payment_details: [{ method: 'Cash', amount: 10500 }],
+  };
+  const detailedText = Buffer.from(
+    receiptEncoder.buildDetailedReceiptBytes(
+      syriaBillFrontend as any,
+      syriaTenant as any,
+      { paperWidth: 80, languages: ['en'] as any },
+      detailedWarnings,
+    ),
+  ).toString();
+  assert(
+    'WebUSB detailed: no rates-inclusive line',
+    !detailedText.includes('Rates inclusive of all applicable taxes'),
+  );
+  assert('WebUSB detailed: stored SYP symbol prints', detailedText.includes('SYP'));
+  assert('WebUSB detailed: no £ symbol', !detailedText.includes('£'));
+}
+
 console.log('\n✅ Test 1d: ESC/POS output can be previewed without a printer');
 {
   const buf = buildEscPos([
@@ -1280,7 +1384,10 @@ console.log('\n✅ Test 2: Compact receipt (80mm, 48 cols)');
   assert('omits Cash payment (v3)', !text.includes('Cash') && !text.includes('₹500.00'));
   assert('omits UPI payment (v3)', !text.includes('UPI') && !text.includes('₹450.00'));
   assert('renders tax registration number', text.includes('TAXID-0001'));
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
+  assert(
+    'renders non-configurable Rest&Cafe footer',
+    text.includes('Rest&Cafe System Powered by Ali.J'),
+  );
   const rowLines = visiblePreview(buf, 48).split('\n');
   const longRowIndex = rowLines.findIndex((l) => l.includes('Very Long Product Name'));
   assert(
@@ -1460,7 +1567,10 @@ console.log('\n✅ Test 4: Classic receipt template');
 
   assert('renders business name', text.includes('Flo Test Cafe'));
   assert('renders item and total', text.includes('Cheeseburger') && text.includes('₹950.00'));
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
+  assert(
+    'renders non-configurable Rest&Cafe footer',
+    text.includes('Rest&Cafe System Powered by Ali.J'),
+  );
   assert('ends with cut', bytesContain(buf, [GS, 0x56, 0x00]));
 
   console.log('\n   — Rendered classic —');
@@ -1477,7 +1587,10 @@ console.log('\n✅ Test 5: Tax-specific labels fall back to the default template
     'legacy detailed label does not render the GST-style tax invoice',
     !text.includes('TAX INVOICE'),
   );
-  assert('renders non-configurable Rest&Cafe footer', text.includes('Rest&Cafe System Powered by Ali.J'));
+  assert(
+    'renders non-configurable Rest&Cafe footer',
+    text.includes('Rest&Cafe System Powered by Ali.J'),
+  );
 
   console.log('\n   — Rendered detailed fallback —');
   console.log(visiblePreview(buf, 48));
@@ -1580,8 +1693,8 @@ console.log('\n✅ Test 5c: Built-in receipt resolves mixed legacy + categorized
     'utf8',
   );
 
-  assert('renders categorized VAT component and rate', text.includes('VAT @7%'));
-  assert('renders legacy Local Levy component and rate', text.includes('Local Levy @1%'));
+  assert('renders categorized VAT component and rate', text.includes('VAT (7%)'));
+  assert('renders legacy Local Levy component and rate', text.includes('Local Levy (1%)'));
   assert('does not render categorized item legacy copy', !text.includes('Legacy Tax'));
   assert('uses country tax identifier label', text.includes('Tax ID: TAXID-0001'));
 }

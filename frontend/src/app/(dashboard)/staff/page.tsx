@@ -15,6 +15,7 @@ import { validatePassword } from '@shared/password-policy';
 import { ROLE_ACCESS, ROLE_KEYS, hasRole } from '@shared/role-permissions';
 import { ROLE_LABEL_KEYS } from '@/lib/i18n-enums';
 import { tenantCan } from '@/lib/permissions';
+import { displayAccountIdentifier } from '@/lib/account-identifier';
 
 const VALID_ROLES = ROLE_KEYS;
 
@@ -128,7 +129,7 @@ export default function StaffPage() {
     setEditingStaff(s);
     setForm({
       name: s.name,
-      email: s.email || '',
+      email: displayAccountIdentifier(s.email || ''),
       password: '',
       confirmPassword: '',
       role: s.role,
@@ -264,7 +265,9 @@ export default function StaffPage() {
             <div className="flex justify-between items-start mb-3">
               <div>
                 <p className="font-bold text-foreground">{s.name}</p>
-                <p className="text-xs text-muted-foreground">{s.email || '—'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {displayAccountIdentifier(s.email || '') || '—'}
+                </p>
                 {Boolean(s.has_pin) && <p className="text-xs text-green-600 mt-1">{t('pinSet')}</p>}
               </div>
               <span
@@ -347,12 +350,12 @@ export default function StaffPage() {
                 required
               />
               <input
-                type="email"
+                type="text"
                 placeholder={tAuth('email')}
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-brand"
-                autoComplete="email"
+                autoComplete="username"
                 dir="ltr"
                 required
               />

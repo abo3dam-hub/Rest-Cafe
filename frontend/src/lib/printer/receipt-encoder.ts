@@ -370,7 +370,7 @@ function getSafeLatnLocale(locale: string | undefined): string {
 /** Build semantic document and resolved blocks for one thermal receipt. */
 function buildReceiptEnvironment(
   bill: Bill,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'> &
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country' | 'currency_symbol'> &
     Partial<Pick<Tenant, 'timezone'>>,
   opts: ReceiptOptions,
   cols: number,
@@ -559,7 +559,7 @@ function fitLabeledValue(label: string, value: string, cols: number): string[] {
 // Classic template
 export function buildClassicReceiptBytes(
   bill: Bill,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'> &
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country' | 'currency_symbol'> &
     Partial<Pick<Tenant, 'timezone'>>,
   opts: ReceiptOptions = {},
   warnings?: PrintWarning[],
@@ -567,7 +567,9 @@ export function buildClassicReceiptBytes(
   const { paperWidth = 58, showFooter = true, useUnicode = false, arabicShaping = false } = opts;
   const cols = opts.columns ?? CHARS[paperWidth];
   const currencyCode = resolveTenantCurrency(tenant.currency, tenant.country);
-  const rawCurrency = getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
+  const rawCurrency =
+    tenant.currency_symbol?.trim() ||
+    getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
   const currency = resolveEncoderCurrency(rawCurrency, currencyCode, useUnicode, opts.capabilities);
   const fractionDigits = getCurrencyFractionDigits(currencyCode);
   const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
@@ -848,7 +850,7 @@ export function buildClassicReceiptBytes(
     // Fee breakdown lines (the Syria fees print here, inside the totals).
     if (breakdown && breakdown.lines.length > 0) {
       for (const line of breakdown.lines) {
-        const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
+        const rateSuffix = line.rate === null ? '' : ` (${line.rate}%)`;
         safePrinterText(
           enc,
           padRow(
@@ -981,7 +983,13 @@ export function buildClassicReceiptBytes(
         enc,
         padRow(
           labelOf(totals.postFeeTotal.label),
-          formatAmount(totals.postFeeTotal.amount, currency, locale, opts.trimDecimals === true, fractionDigits),
+          formatAmount(
+            totals.postFeeTotal.amount,
+            currency,
+            locale,
+            opts.trimDecimals === true,
+            fractionDigits,
+          ),
           cols,
         ),
         warnings,
@@ -1093,7 +1101,7 @@ export function buildClassicReceiptBytes(
 // Compact template
 export function buildCompactReceiptBytes(
   bill: Bill,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'> &
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country' | 'currency_symbol'> &
     Partial<Pick<Tenant, 'timezone'>>,
   opts: ReceiptOptions = {},
   warnings?: PrintWarning[],
@@ -1101,7 +1109,9 @@ export function buildCompactReceiptBytes(
   const { paperWidth = 58, useUnicode = false, arabicShaping = false } = opts;
   const cols = opts.columns ?? CHARS[paperWidth];
   const currencyCode = resolveTenantCurrency(tenant.currency, tenant.country);
-  const rawCurrency = getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
+  const rawCurrency =
+    tenant.currency_symbol?.trim() ||
+    getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
   const currency = resolveEncoderCurrency(rawCurrency, currencyCode, useUnicode, opts.capabilities);
   const fractionDigits = getCurrencyFractionDigits(currencyCode);
   const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
@@ -1445,7 +1455,7 @@ export function buildCompactReceiptBytes(
   }
   if (breakdown && breakdown.lines.length > 0) {
     for (const line of breakdown.lines) {
-      const rateSuffix = line.rate === null ? '' : ` @${line.rate}%`;
+      const rateSuffix = line.rate === null ? '' : ` (${line.rate}%)`;
       safePrinterText(
         enc,
         padRow(
@@ -1549,7 +1559,7 @@ export function buildCompactReceiptBytes(
 // Legacy detailed tax encoder for print tests; retains raw-bill rendering.
 export function buildDetailedReceiptBytes(
   bill: Bill,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'> &
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country' | 'currency_symbol'> &
     Partial<Pick<Tenant, 'timezone'>>,
   opts: ReceiptOptions = {},
   warnings?: PrintWarning[],
@@ -1580,7 +1590,9 @@ export function buildDetailedReceiptBytes(
   const truncate = (text: string, max: number): string =>
     truncateForLanguage(text, max, primaryLang, opts.capabilities);
   const currencyCode = resolveTenantCurrency(tenant.currency, tenant.country);
-  const rawCurrency = getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
+  const rawCurrency =
+    tenant.currency_symbol?.trim() ||
+    getCurrencySymbol(currencyCode, getCountryByCode(tenant.country)?.locale);
   const currency = resolveEncoderCurrency(rawCurrency, currencyCode, useUnicode, opts.capabilities);
   const fractionDigits = getCurrencyFractionDigits(currencyCode);
   const locale = getCountryByCode(tenant.country)?.locale ?? 'en-US';
@@ -1827,14 +1839,9 @@ export function buildDetailedReceiptBytes(
     }
   }
 
+  // No "rates inclusive of taxes" line: fees here are added on top of the
+  // bill, never included (owner decision, 2026-11-09).
   enc.newline();
-  enc
-    .size('small')
-    .align('center')
-    .text('Rates inclusive of all applicable taxes')
-    .newline()
-    .size('normal')
-    .align('left');
 
   if (footerNote) {
     safePrinterText(enc, truncate(footerNote, cols), warnings, false, arabicShaping).newline();

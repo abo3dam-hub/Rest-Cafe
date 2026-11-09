@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -8,6 +8,8 @@ import {
   PackageCheck,
   Star,
   BadgePercent,
+  GripVertical,
+  ListOrdered,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Category, Product, ProductVariant } from '@/lib/types';
@@ -47,12 +49,19 @@ function CategoryChip({
   isSelected,
   onSelect,
   specialKind,
+  dragProps,
 }: {
   categoryName: string;
   categoryColor: string | null;
   isSelected: boolean;
   onSelect: () => void;
   specialKind?: SpecialCardKind;
+  dragProps?: {
+    draggable: boolean;
+    onDragStart: () => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDrop: () => void;
+  };
 }) {
   const colorClasses = getCategoryColorClasses(categoryColor);
   const specialClasses =
@@ -69,7 +78,18 @@ function CategoryChip({
     <button
       onClick={onSelect}
       title={categoryName}
-      className={`max-w-56 truncate px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+      draggable={dragProps?.draggable}
+      onDragStart={dragProps?.onDragStart}
+      onDragOver={dragProps?.onDragOver}
+      onDrop={
+        dragProps
+          ? (e) => {
+              e.preventDefault();
+              dragProps.onDrop();
+            }
+          : undefined
+      }
+      className={`max-w-56 truncate px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${dragProps ? 'cursor-grab ' : ''}${
         specialClasses ??
         (isSelected
           ? colorClasses
@@ -100,6 +120,7 @@ function CategoryRow({
   allLabel,
   resetKey,
   specialLabels,
+  categoryDrag,
 }: {
   className: string;
   collapse: boolean;
@@ -109,6 +130,11 @@ function CategoryRow({
   allLabel: string;
   resetKey: string | null;
   specialLabels: Record<SpecialCardKind, string>;
+  /** POS reorder mode: real category chips become draggable (special chips never are). */
+  categoryDrag?: {
+    onStart: (id: string) => void;
+    onDrop: (id: string) => void;
+  } | null;
 }) {
   const allChip = (
     <button
@@ -133,6 +159,16 @@ function CategoryRow({
           categoryColor={chip.category.color}
           isSelected={selectedCategory === chip.key}
           onSelect={() => setSelectedCategory(chip.key)}
+          dragProps={
+            categoryDrag
+              ? {
+                  draggable: true,
+                  onDragStart: () => categoryDrag.onStart(chip.key),
+                  onDragOver: (e: React.DragEvent) => e.preventDefault(),
+                  onDrop: () => categoryDrag.onDrop(chip.key),
+                }
+              : undefined
+          }
         />
       ) : (
         <CategoryChip
@@ -355,6 +391,11 @@ interface Props {
   onOpenSoldOutList?: () => void;
   /** Extra control rendered at the end of the toolbar row (cashier sound toggle). */
   soundControl?: ReactNode;
+  /** POS reorder mode (cashier POS only): drag categories/products instead of selling. */
+  reorderMode?: boolean;
+  onToggleReorderMode?: () => void;
+  onReorderProducts?: (orderedIds: string[]) => void;
+  onReorderCategories?: (orderedIds: string[]) => void;
 }
 
 export default function ProductGrid({
@@ -384,7 +425,22 @@ export default function ProductGrid({
   soldOutCount = 0,
   onOpenSoldOutList,
   soundControl,
+  reorderMode = false,
+  onToggleReorderMode,
+  onReorderProducts,
+  onReorderCategories,
 }: Props) {
+  const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
+  const moveIdInList = (ids: string[], draggedId: string, targetId: string): string[] => {
+    const from = ids.indexOf(draggedId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return ids;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  };
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cart = useCartStore();
   const { showProductImages: showProductImagesSetting } = usePosSettingsStore();
@@ -439,23 +495,50 @@ export default function ProductGrid({
         ? 'offers'
         : null;
 
-  const filtered = sortedProducts
-    .filter((p) => {
-      const matchCat =
-        specialKind === 'top'
-          ? p.in_top_card === true || p.in_top_card === 1
-          : specialKind === 'offers'
-            ? p.in_offers_card === true || p.in_offers_card === 1
-            : !selectedCategory || p.category_id === selectedCategory;
-      const matchSearch = !activeQuery || p.name.toLowerCase().includes(activeQuery.toLowerCase());
-      return matchCat && matchSearch;
-    })
-    // Pinned staples always lead the grid (stable within the saved sort).
-    .sort(
-      (a, b) =>
-        Number(b.is_pinned === true || b.is_pinned === 1) -
-        Number(a.is_pinned === true || a.is_pinned === 1),
+  const filteredBase = sortedProducts.filter((p) => {
+    const matchCat =
+      specialKind === 'top'
+        ? p.in_top_card === true || p.in_top_card === 1
+        : specialKind === 'offers'
+          ? p.in_offers_card === true || p.in_offers_card === 1
+          : !selectedCategory || p.category_id === selectedCategory;
+    const matchSearch = !activeQuery || p.name.toLowerCase().includes(activeQuery.toLowerCase());
+    return matchCat && matchSearch;
+  });
+  // In reorder mode the saved order is shown as-is (pinned-first would fight
+  // the arrangement the user is making); selling mode keeps pinned leading.
+  const filtered = reorderMode
+    ? filteredBase
+    : [...filteredBase].sort(
+        (a, b) =>
+          Number(b.is_pinned === true || b.is_pinned === 1) -
+          Number(a.is_pinned === true || a.is_pinned === 1),
+      );
+  // Dragging is only offered on an unfiltered, non-special view: arranging a
+  // search subset or a special-card membership list would renumber items the
+  // user cannot see in context.
+  const productDragActive =
+    reorderMode && !!onReorderProducts && !activeQuery && specialKind === null;
+  const handleProductDrop = (targetId: string) => {
+    if (!draggedProductId || !onReorderProducts) return;
+    const orderedIds = moveIdInList(
+      filtered.map((p) => String(p.id)),
+      draggedProductId,
+      targetId,
     );
+    setDraggedProductId(null);
+    onReorderProducts(orderedIds);
+  };
+  const handleCategoryDrop = (targetId: string) => {
+    if (!draggedCategoryId || !onReorderCategories) return;
+    const orderedIds = moveIdInList(
+      sortedCategories.map((c) => String(c.id)),
+      draggedCategoryId,
+      targetId,
+    );
+    setDraggedCategoryId(null);
+    onReorderCategories(orderedIds);
+  };
 
   const effectiveShowImages = showProductImages && density !== 'small';
 
@@ -483,7 +566,7 @@ export default function ProductGrid({
               ) {
                 return;
               }
-              if (e.key !== 'Enter' || disabled) return;
+              if (e.key !== 'Enter' || disabled || reorderMode) return;
               // Typed or pasted barcode, or multiplier search (e.g. 3*latte)
               const trimmed = search.trim();
               if (!trimmed) return;
@@ -547,10 +630,18 @@ export default function ProductGrid({
                 : String(cart.customer.id)
               : null
           }
+          categoryDrag={
+            reorderMode && onReorderCategories
+              ? {
+                  onStart: (id: string) => setDraggedCategoryId(id),
+                  onDrop: (id: string) => handleCategoryDrop(id),
+                }
+              : null
+          }
         />
       </div>
 
-      {(soldOutCount > 0 || onDensityChange || soundControl) && (
+      {(soldOutCount > 0 || onDensityChange || soundControl || onToggleReorderMode) && (
         <div className="shrink-0 mb-2 flex items-center gap-2 flex-wrap">
           {soldOutCount > 0 && (
             <button
@@ -562,7 +653,28 @@ export default function ProductGrid({
               {t('soldOutEnded')}: {soldOutCount}
             </button>
           )}
+          {reorderMode && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 text-brand border border-brand/30 px-3 py-1 text-xs font-bold">
+              <ListOrdered size={14} />
+              {t('reorderModeHint')}
+            </span>
+          )}
           <div className="ms-auto inline-flex items-center gap-1">
+            {onToggleReorderMode && (
+              <button
+                type="button"
+                onClick={onToggleReorderMode}
+                aria-pressed={reorderMode}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                  reorderMode
+                    ? 'bg-brand text-white border-brand'
+                    : 'bg-card text-foreground border-border hover:bg-muted'
+                }`}
+              >
+                <ListOrdered size={13} />
+                {reorderMode ? t('reorderDone') : t('reorderMode')}
+              </button>
+            )}
             {soundControl}
             {onDensityChange && (
               <>
@@ -609,13 +721,36 @@ export default function ProductGrid({
             const pinned = product.is_pinned === true || product.is_pinned === 1;
 
             return (
-              <div key={product.id} className="relative">
+              <div
+                key={product.id}
+                className={`relative ${productDragActive ? 'cursor-grab' : ''} ${
+                  reorderMode ? 'rounded-xl ring-1 ring-dashed ring-brand/40' : ''
+                }`}
+                draggable={productDragActive}
+                onDragStart={
+                  productDragActive ? () => setDraggedProductId(String(product.id)) : undefined
+                }
+                onDragOver={productDragActive ? (e) => e.preventDefault() : undefined}
+                onDrop={
+                  productDragActive
+                    ? (e) => {
+                        e.preventDefault();
+                        handleProductDrop(String(product.id));
+                      }
+                    : undefined
+                }
+              >
+                {reorderMode && (
+                  <span className="absolute bottom-1.5 start-1.5 z-20 text-muted-foreground pointer-events-none">
+                    <GripVertical size={14} />
+                  </span>
+                )}
                 <button
                   data-testid="pos-product-card"
                   type="button"
                   disabled={disabled}
                   onClick={() => {
-                    if (disabled) return;
+                    if (disabled || reorderMode) return;
                     if (soldOut) {
                       toast.error(t('soldOutEnded'));
                       return;
@@ -732,7 +867,7 @@ export default function ProductGrid({
                     </span>
                   )}
                 </button>
-                {onToggleSoldOut && (
+                {onToggleSoldOut && !reorderMode && (
                   <span
                     role="button"
                     tabIndex={-1}

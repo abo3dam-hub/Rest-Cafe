@@ -163,6 +163,32 @@ export function isValidEmail(email: string): boolean {
   return email.length <= MAX_EMAIL_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// Username accounts (owner decision, 2026-11-09): the product is local-only
+// and never sends mail, so a plain username is a valid account identifier.
+// The stored form is `<username>@restcafe.local` — the shape demo staff
+// accounts already use — so there is no schema change and existing email
+// accounts keep working untouched.
+export const USERNAME_DOMAIN = 'restcafe.local';
+const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,63}$/;
+
+export function isValidUsername(username: string): boolean {
+  return USERNAME_PATTERN.test(username);
+}
+
+/** Resolve a login/setup/staff identifier to its stored email form, or null when invalid. */
+export function resolveAccountIdentifier(raw: unknown): string | null {
+  const value = normalizeEmail(raw);
+  if (!value) return null;
+  if (value.includes('@')) return isValidEmail(value) ? value : null;
+  return isValidUsername(value) ? `${value}@${USERNAME_DOMAIN}` : null;
+}
+
+/** Display form of a stored identifier: username accounts show without the local domain. */
+export function displayAccountIdentifier(stored: string): string {
+  const suffix = `@${USERNAME_DOMAIN}`;
+  return stored.endsWith(suffix) ? stored.slice(0, -suffix.length) : stored;
+}
+
 function upsertSettings(
   db: ReturnType<typeof getDatabase>,
   entries: Record<string, unknown>,
@@ -235,11 +261,11 @@ router.post(
         });
       }
 
-      const email = normalizeEmail(req.body?.email);
+      const email = resolveAccountIdentifier(req.body?.email) ?? '';
       const { password, rememberMe } = req.body || {};
 
       if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password required' });
+        return res.status(400).json({ error: 'Username and password required' });
       }
 
       const db = getDatabase();
@@ -595,11 +621,11 @@ router.post('/recover-password', authRateLimit(), (req: Request, res: Response) 
       });
     }
 
-    const email = normalizeEmail(req.body?.email);
+    const email = resolveAccountIdentifier(req.body?.email) ?? '';
     const { master_pin, new_password } = req.body || {};
 
-    if (!email || !isValidEmail(email)) {
-      return res.status(400).json({ error: 'A valid email is required' });
+    if (!email) {
+      return res.status(400).json({ error: 'A valid email or username is required' });
     }
     if (!new_password || !validatePassword(new_password)) {
       return res.status(400).json({
@@ -625,8 +651,8 @@ router.post('/recover-password', authRateLimit(), (req: Request, res: Response) 
     if (!user) {
       return res.status(404).json({
         error: stranded
-          ? 'No active account found with that email on this install'
-          : 'No active owner account found with that email on this install',
+          ? 'No active account found with that identifier on this install'
+          : 'No active owner account found with that identifier on this install',
       });
     }
 
@@ -735,7 +761,7 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
     } = req.body;
     // Rest&Cafe collects no analytics or telemetry: the setup wizard's
     // analytics choice is accepted in the payload and ignored.
-    const email = normalizeEmail(req.body.email);
+    const email = resolveAccountIdentifier(req.body.email) ?? '';
     // Rest&Cafe has no country profiles: regional settings are plain
     // settings with generic defaults (SYP / Asia/Damascus), all editable
     // later in Settings. A country in the payload is ignored.
@@ -783,8 +809,8 @@ router.post('/setup/initialize', (req: Request, res: Response) => {
       });
     }
 
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: 'A valid email is required' });
+    if (!email) {
+      return res.status(400).json({ error: 'A valid email or username is required' });
     }
 
     if (terms_accepted !== true) {

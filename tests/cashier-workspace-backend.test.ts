@@ -4,8 +4,9 @@
  * Owner design (2026-10-26):
  *  A) POST /orders/:id/request-bill stamps orders.bill_requested_at (first
  *     stamp wins) and flips the table to 'bill_requested'; unrequest-bill
- *     returns the table to 'occupied' without erasing the stamp. Migration
- *     v118 provides the column.
+ *     returns the table to 'occupied' and CLEARS the stamp — the follow-up 43
+ *     closing-time rule superseded the original keep-as-history semantics.
+ *     Migration v118 provides the column.
  *  B) Request-bill rejects closed orders and non-dine-in orders.
  *  C) POST /orders/:id/merge moves live items into the target order with
  *     totals recomputed by the same path add-items uses; terminal items stay
@@ -95,7 +96,10 @@ async function main() {
   try {
     // ── A) Bill request lifecycle ─────────────────────────────────────────
     console.log('\n─── A) Bill request lifecycle ───');
-    const cols = db.prepare('PRAGMA table_info(orders)').all().map((c: any) => c.name);
+    const cols = db
+      .prepare('PRAGMA table_info(orders)')
+      .all()
+      .map((c: any) => c.name);
     assertOrThrow(cols.includes('bill_requested_at'), 'A: migration v118 added bill_requested_at');
 
     const aOrder = await createDineIn('tbl-a', [{ product_id: 'prod-1', quantity: 2 }]);
@@ -131,8 +135,8 @@ async function main() {
     assertEqualOrThrow(tableStatus('tbl-a'), 'occupied', 'A: table returns to occupied');
     assertEqualOrThrow(
       orderRow(aOrder.id).bill_requested_at,
-      firstStamp,
-      'A: stamp is kept as history after unrequest',
+      null,
+      'A: stamp is cleared after unrequest (follow-up 43 closing-time rule)',
     );
 
     // ── B) Bill request rejections ────────────────────────────────────────
@@ -174,11 +178,11 @@ async function main() {
     const srcItems = db
       .prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id')
       .all(src.id) as any[];
-    const cancelItem = await api(
-      baseUrl,
-      `/api/orders/${src.id}/items/${srcItems[1].id}/cancel`,
-      { method: 'PATCH', headers: H, body: {} },
-    );
+    const cancelItem = await api(baseUrl, `/api/orders/${src.id}/items/${srcItems[1].id}/cancel`, {
+      method: 'PATCH',
+      headers: H,
+      body: {},
+    });
     assertEqualOrThrow(cancelItem.status, 200, 'C: source line cancelled');
     assertEqualOrThrow(orderRow(src.id).total, 20000, 'C: source total after cancel is 20000');
     // A live line is mid-preparation in the kitchen — merge must not touch it.
@@ -206,10 +210,14 @@ async function main() {
     assertEqualOrThrow(mergedTarget.total, 70000, 'C: target total is the sum (70000)');
     const tgtItems = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(tgt.id);
     assertEqualOrThrow(tgtItems.length, 2, 'C: target holds its line plus the moved line');
-    const movedRow = db.prepare('SELECT * FROM order_items WHERE id = ?').get(srcItems[0].id) as any;
+    const movedRow = db
+      .prepare('SELECT * FROM order_items WHERE id = ?')
+      .get(srcItems[0].id) as any;
     assertEqualOrThrow(movedRow.order_id, tgt.id, 'C: moved line now belongs to target');
     assertEqualOrThrow(movedRow.status, 'preparing', 'C: kitchen state of moved line untouched');
-    const leftBehind = db.prepare('SELECT * FROM order_items WHERE id = ?').get(srcItems[1].id) as any;
+    const leftBehind = db
+      .prepare('SELECT * FROM order_items WHERE id = ?')
+      .get(srcItems[1].id) as any;
     assertEqualOrThrow(leftBehind.order_id, src.id, 'C: cancelled line stays with the source');
     const mergedSource = orderRow(src.id);
     assertEqualOrThrow(mergedSource.status, 'cancelled', 'C: source closes as cancelled');
@@ -246,7 +254,11 @@ async function main() {
       body: { target_order_id: cOrder.id },
     });
     assertEqualOrThrow(intoClosed.status, 409, 'D: merging into a closed order is rejected');
-    assertEqualOrThrow(intoClosed.data.code, 'merge_order_not_active', 'D: not-active code returned');
+    assertEqualOrThrow(
+      intoClosed.data.code,
+      'merge_order_not_active',
+      'D: not-active code returned',
+    );
 
     // Recorded payment on the source bill blocks the merge.
     const genD = await api(baseUrl, '/api/bills/generate', {

@@ -1161,7 +1161,7 @@ export default function ServerStandalonePage() {
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              type="email"
+              type="text"
               dir="ltr"
               placeholder={t('emailPlaceholder')}
               required

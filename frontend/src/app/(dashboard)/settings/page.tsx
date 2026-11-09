@@ -89,6 +89,7 @@ import type { HealthCheckReport } from '@/types/electron';
 import { useTranslations } from 'use-intl';
 import { Ltr } from '@/components/layout/Ltr';
 import { tenantCan } from '@/lib/permissions';
+import { displayAccountIdentifier } from '@/lib/account-identifier';
 
 // Must match RESTORE_CONFIRMATION in main/routes/database.ts.
 const RESTORE_CONFIRMATION = 'RESTORE BACKUP';
@@ -4380,7 +4381,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">{t('email')}</p>
                     <p className="font-medium text-foreground">
-                      <Ltr>{user?.email}</Ltr>
+                      <Ltr>{displayAccountIdentifier(user?.email)}</Ltr>
                     </p>
                   </div>
                   <div>
