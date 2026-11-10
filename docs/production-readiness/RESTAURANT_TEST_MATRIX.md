@@ -1,6 +1,12 @@
 # Rest&Cafe — Production Test Matrix
 
 - **Audited HEAD:** `4743bfd3a9ad92cc754451d57077096a3c17f303` (upstream `main`).
+- **Corrections after the audit:** rows C06–C08, F06, F08–F11, P07 and E04
+  were corrected on 2026-11-10 during printing finalization Phase C, and
+  row F04 plus this note in a follow-up correction the same day. The
+  audited HEAD above remains the baseline of the original 2026-11-01
+  audit; corrected rows describe the behaviour the current code and
+  suites pin, not the code at that HEAD.
 - **Companion report:** `RESTAURANT_PRODUCTION_AUDIT.md` in this directory.
 - **Status meanings:** PASS — executed in this audit and passed. FAIL —
   executed and failed. NOT RUN — not executed; the reason is in the Actual
@@ -103,7 +109,7 @@
 | F01 | USB receipt printer prints a bill | USB printer configured as default | Pay a bill | Correct bill, Arabic shaped, Latin digits, totals present | NOT RUN — no printer hardware in this environment | `main/printers/thermal.ts`; `tests/bills-print-api.test.ts` (34/34, API-level) | NOT RUN | P0 |
 | F02 | Network ESC/POS printer prints a bill | Network printer at `ip:9100` | Pay a bill | Same as F01; chunked writes, 5 s socket timeout | NOT RUN — no printer hardware; cash-closures section 15 shows the path returns 502 when nothing listens | `main/printers/print-transport.ts:11-107` | NOT RUN | P0 |
 | F03 | Kitchen ticket printer prints a KOT | KOT printer configured (station routing) | Place an order | Ticket with new items only, correct station | NOT RUN — no printer hardware | `main/routes/printers.ts:1167-1231` | NOT RUN | P0 |
-| F04 | Arabic text rendering on a Latin printer | Printer without Arabic shaping | Print a bill with Arabic names | Lines rasterized (all shipped profiles rasterize) or refused closed on financial lines; non-financial lines may drop with a warning (audit F-017) | NOT RUN — no printer hardware; byte-level behaviour pinned by the oracle | `shared/print/thermal-capabilities.ts`; `tests/receipt-column-oracle.test.ts` | NOT RUN | P1 |
+| F04 | Arabic text rendering on a Latin printer | Printer without Arabic shaping | Print a bill with Arabic names | Lines rasterized on the branded profiles, and on a generic profile only for a printer that has passed raster validation (raster test print + owner confirmation); on an unvalidated generic profile, financial lines are refused closed instead of rasterized; non-financial lines may drop with a warning (audit F-017) | NOT RUN — no printer hardware; byte-level behaviour pinned by the oracle and the raster-printing suite | `shared/print/thermal-capabilities.ts`; `main/printers/profiles.ts`; `tests/receipt-column-oracle.test.ts`; `tests/raster-printing.test.ts` | NOT RUN | P1 |
 | F05 | RTL alignment and Latin digits | Arabic-locale tenant | Print bill and KOT | Amounts and times in Latin digits; RTL layout correct | NOT RUN — no paper; digit forcing verified in code | `main/printers/formatting-helpers.ts:255-274` | NOT RUN | P1 |
 | F06 | Long item names | Product with a 60-character name | Print bill and KOT | Receipt wraps; KOT wraps item names, addons, and instructions | PASS (in-process) — kot-line-wrap 22/22; no paper run | `tests/kot-line-wrap.test.ts`; `main/printers/document-kot.ts:408-448` | PASS | P2 |
 | F07 | Modifiers and add-ons | Items with priced and free addons | Print bill and KOT | Addons with prices on the bill; addons without prices on the KOT | NOT RUN — no paper | `main/printers/formatting-helpers.ts:142-180` | NOT RUN | P1 |
