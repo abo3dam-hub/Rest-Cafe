@@ -132,3 +132,7 @@ B1 (PF-01) landed on upstream main at `7d204cd` (PR #31 closed unmerged; Ted bat
 ## Status (2026-11-10): B2 landed, B3 NEXT
 
 B2 (PF-04) landed on upstream main at `d8d89dd` (PR #32 closed unmerged; Ted battery 36 commands, 35 exit 0, test:raster Electron half NOT RUN — Xvfb supplementary exit 0; oracle 13/13 byte-identical; registry 389/389, 128 migrations; kot-print-queue 146/146). Decision `20261110-055` accepts B2 and closes thread 054. B3 (PF-02, logo raster respects the capability gate) is NEXT — start with B3. Announce the branch in `agent-comms/open/` as usual. No installer until B4 lands.
+
+## Status (2026-11-10): B3 landed, B4 NEXT
+
+B3 (PF-02) landed on upstream main at `5ba440a` (PR #33 closed unmerged; Ted battery 36 commands, 35 exit 0, test:raster Electron half NOT RUN — Xvfb supplementary exit 0; oracle 13/13 byte-identical; registry 389/389, 128 migrations; print-document 46 checks, receipt-logo §6–§7 green). Decision `20261110-057` accepts B3 and closes thread 056. B4 (PF-03, remove `whole-receipt` from the four shipped profiles) is NEXT — start with B4. Announce the branch in `agent-comms/open/` as usual. No installer until B4 lands.
