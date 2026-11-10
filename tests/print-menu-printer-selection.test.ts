@@ -16,10 +16,12 @@ const os = require('node:os');
 const path = require('node:path');
 const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flo-print-menu-select-'));
 
-// Menu rendering constructs the shared Chromium raster surface, but only asks
-// it to render lines the printer charset cannot carry. This suite's fixture is
-// ASCII-only, so the surface is constructed and never drawn on; the raster
-// encoder itself is covered by the dedicated Electron raster suites.
+// Menu rendering constructs the shared Chromium raster surface for the
+// menu's Arabic lines (the heading and the item-count line), which only a
+// raster-capable printer can carry. The fixture printers are validated
+// generics, so those lines rasterize as before; the surface is stubbed here
+// and the raster encoder itself is covered by the dedicated Electron
+// raster suites.
 class RasterSurfaceStub {
   destroyed = false;
   webContents = {
@@ -96,8 +98,10 @@ async function main() {
   const db = initTestDb();
   const owner = seedOwnerUser(db);
 
-  // An ASCII-only regional profile keeps the rendered menu inside the printer
-  // charset, so a successful dispatch is what these assertions measure.
+  // A regional profile keeps the menu's prices and product names inside the
+  // printer charset; the menu's Arabic heading and totals rasterize on the
+  // validated fixture printers, so a successful dispatch is what these
+  // assertions measure.
   const setSetting = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
   );
@@ -119,6 +123,9 @@ async function main() {
 
   // WebUSB printers answer with their encoded bytes instead of opening a
   // socket, which keeps the printed-to printer observable without hardware.
+  // Generic printers rasterize only once validated (PF-01), and this
+  // suite's menu carries Arabic lines, so each fixture printer is
+  // validated through the owner-confirmation endpoint before printing.
   const createPrinter = async (name: string, isDefault: boolean): Promise<string> => {
     const res = await api(baseUrl, '/api/printers', {
       method: 'POST',
@@ -131,6 +138,16 @@ async function main() {
       },
     });
     assert.equal(res.status, 201, `${name} fixture is created (${JSON.stringify(res.data)})`);
+    const validated = await api(baseUrl, `/api/printers/${res.data.printer.id}/raster-validate`, {
+      method: 'POST',
+      headers: owner.authHeader,
+      body: { confirmed: true },
+    });
+    assert.equal(
+      validated.status,
+      200,
+      `${name} fixture is raster-validated (${JSON.stringify(validated.data)})`,
+    );
     return res.data.printer.id;
   };
 
