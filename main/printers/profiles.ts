@@ -97,11 +97,15 @@ export const SUPPORTED_PRINTER_PROFILES: SupportedPrinterProfile[] = [
     capabilities: {
       ...GENERIC_THERMAL_CAPABILITIES,
       encoding: { codePages: ['ascii'], preferredCodePage: 'ascii' },
+      // Conservative baseline: an unidentified printer must not be assumed
+      // to implement GS v 0 raster. Raster is gained per printer only after
+      // the owner validates it with a raster test print (see
+      // validatedGenericRaster / isRasterValidatedForPrinter below).
       raster: {
-        enabled: true,
-        widthDots: 576,
-        maxBandHeight: 200,
-        modes: ['mixed', 'whole-receipt'],
+        enabled: false,
+        widthDots: 0,
+        maxBandHeight: 0,
+        modes: [],
       },
     },
   },
@@ -119,11 +123,12 @@ export const SUPPORTED_PRINTER_PROFILES: SupportedPrinterProfile[] = [
     capabilities: {
       ...GENERIC_THERMAL_CAPABILITIES,
       encoding: { codePages: ['ascii'], preferredCodePage: 'ascii' },
+      // Conservative baseline, as generic-escpos-80 above.
       raster: {
-        enabled: true,
-        widthDots: 384,
-        maxBandHeight: 200,
-        modes: ['mixed', 'whole-receipt'],
+        enabled: false,
+        widthDots: 0,
+        maxBandHeight: 0,
+        modes: [],
       },
     },
   },
@@ -176,6 +181,69 @@ export function getPrinterCapabilities(
   );
 }
 
+export const GENERIC_PRINTER_PROFILE_IDS = ['generic-escpos-80', 'generic-escpos-58'] as const;
+
+export function isGenericPrinterProfile(
+  profile: SupportedPrinterProfile | null | undefined,
+): boolean {
+  return !!profile && (GENERIC_PRINTER_PROFILE_IDS as readonly string[]).includes(profile.id);
+}
+
+/**
+ * Raster a generic profile gains only after per-printer validation: the
+ * values the generic profiles declared before the validated opt-in, so a
+ * validated printer's printed bytes are identical to the old generic
+ * raster output.
+ */
+export function validatedGenericRaster(
+  profile: SupportedPrinterProfile,
+): ThermalPrinterCapabilities['raster'] {
+  return {
+    enabled: true,
+    widthDots: profile.id === 'generic-escpos-58' ? 384 : 576,
+    maxBandHeight: 200,
+    modes: ['mixed', 'whole-receipt'],
+  };
+}
+
+/**
+ * Whether the stored printer row carries a raster validation that still
+ * applies: the flag is set and it was validated for this exact printer —
+ * same stored name, same resolved profile, same paper width. Changing any
+ * of those resets validation at read time; no write path has to remember.
+ */
+export function isRasterValidatedForPrinter(
+  printer: any,
+  profile?: SupportedPrinterProfile,
+): boolean {
+  if (!printer || Number(printer.raster_validated) !== 1) return false;
+  const resolved = profile ?? resolvePrinterProfile(printer);
+  if (!isGenericPrinterProfile(resolved)) return false;
+  if (printer.raster_validated_profile_id !== resolved.id) return false;
+  const paperWidth = printer.paper_width || resolved.defaultPaperWidth;
+  if (printer.raster_validated_paper_width !== paperWidth) return false;
+  if (printer.raster_validated_printer_name !== printer.name) return false;
+  return true;
+}
+
+/**
+ * Capabilities a raster probe print uses: the printer's declared raster
+ * when it has one, otherwise the validated raster the probe is testing
+ * (generic profiles only). A probe never depends on a validation flag.
+ */
+export function rasterProbeCapabilities(
+  profile: SupportedPrinterProfile,
+  paperWidth: string | null | undefined,
+  arabicShapingOverride?: boolean,
+): ThermalPrinterCapabilities {
+  return capabilitiesForPrinter(
+    profile,
+    paperWidth,
+    arabicShapingOverride,
+    isGenericPrinterProfile(profile),
+  );
+}
+
 /** Maps paper_width string to canonical raster dot width, or null if unrecognized. */
 export function dotsForPaperWidth(paperWidth: string): number | null {
   const colsMatch = String(paperWidth || '').match(/^cols-(3[2-9]|4[0-8])$/);
@@ -191,13 +259,17 @@ export function dotsForPaperWidth(paperWidth: string): number | null {
   return 576;
 }
 
-/** Returns printer capabilities, capping raster widthDots if paper_width is narrower than hardware. */
+/** Returns printer capabilities, capping raster widthDots if paper_width is narrower than hardware. A validated generic printer gains the validated raster before capping. */
 export function capabilitiesForPrinter(
   profile: SupportedPrinterProfile,
   paperWidth: string | null | undefined,
   arabicShapingOverride?: boolean,
+  rasterValidated = false,
 ): ThermalPrinterCapabilities {
-  const capabilities = getPrinterCapabilities(profile, arabicShapingOverride);
+  let capabilities = getPrinterCapabilities(profile, arabicShapingOverride);
+  if (isGenericPrinterProfile(profile) && rasterValidated) {
+    capabilities = { ...capabilities, raster: validatedGenericRaster(profile) };
+  }
   if (!capabilities.raster.enabled || !capabilities.raster.widthDots) return capabilities;
   const configuredDots = dotsForPaperWidth(String(paperWidth || ''));
   if (configuredDots === null || configuredDots >= capabilities.raster.widthDots)
