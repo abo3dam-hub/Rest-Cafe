@@ -800,6 +800,105 @@ async function runTests() {
     db.prepare("UPDATE printers SET connection_type = 'network' WHERE is_default = 1").run();
     db.prepare('PRAGMA ignore_check_constraints = OFF').run();
 
+    const genericPrinterRes = await request(app).post('/api/printers').send({
+      name: 'Counter Generic Printer',
+      connection_type: 'network',
+      ip_address: '127.0.0.1',
+      port: 9100,
+      paper_width: 'cols-48',
+    });
+    assert(genericPrinterRes.status === 201, 'generic printer fixture is configured');
+    const genericId = genericPrinterRes.body.printer.id as string;
+    assert(
+      genericPrinterRes.body.printer.profile_id === 'generic-escpos-80',
+      'unmatched name resolves to the generic 80mm profile',
+    );
+    assert(
+      genericPrinterRes.body.printer.raster_validated === false,
+      'a generic printer starts unvalidated',
+    );
+    assert(
+      genericPrinterRes.body.printer.capabilities.raster.enabled === false,
+      'an unvalidated generic printer reports raster off',
+    );
+
+    const unconfirmedRes = await request(app)
+      .post(`/api/printers/${genericId}/raster-validate`)
+      .send({});
+    assert(
+      unconfirmedRes.status === 400 && unconfirmedRes.body.error === 'confirmed must be true',
+      'raster-validate requires an explicit confirmation',
+    );
+    const unknownValidateRes = await request(app)
+      .post('/api/printers/no-such-printer/raster-validate')
+      .send({ confirmed: true });
+    assert(unknownValidateRes.status === 404, 'raster-validate returns 404 for an unknown printer');
+
+    const validateRes = await request(app)
+      .post(`/api/printers/${genericId}/raster-validate`)
+      .send({ confirmed: true });
+    assert(
+      validateRes.status === 200,
+      `raster-validate returns 200 for a generic printer (got ${validateRes.status})`,
+    );
+    assert(
+      validateRes.body.printer.raster_validated === true,
+      'raster-validate persists the validated flag',
+    );
+    assert(
+      validateRes.body.printer.capabilities.raster.enabled === true &&
+        validateRes.body.printer.capabilities.raster.widthDots === 576,
+      'a validated generic printer reports raster on at the profile width',
+    );
+
+    const renamedRes = await request(app)
+      .put(`/api/printers/${genericId}`)
+      .send({ name: 'Renamed Generic Printer' });
+    assert(renamedRes.status === 200, 'renaming a validated printer succeeds');
+    assert(
+      renamedRes.body.printer.raster_validated === false &&
+        renamedRes.body.printer.capabilities.raster.enabled === false,
+      'renaming a printer resets its raster validation',
+    );
+    const revalidateRes = await request(app)
+      .post(`/api/printers/${genericId}/raster-validate`)
+      .send({ confirmed: true });
+    assert(revalidateRes.status === 200, 'a renamed printer can be validated again');
+    const repaperedRes = await request(app)
+      .put(`/api/printers/${genericId}`)
+      .send({ paper_width: 'cols-42' });
+    assert(repaperedRes.status === 200, 'changing a validated printer paper width succeeds');
+    assert(
+      repaperedRes.body.printer.raster_validated === false &&
+        repaperedRes.body.printer.capabilities.raster.enabled === false,
+      'changing paper width resets raster validation',
+    );
+
+    const brandedPrinterRes = await request(app).post('/api/printers').send({
+      name: 'Xprinter XP-V320M',
+      connection_type: 'network',
+      ip_address: '127.0.0.1',
+      port: 9100,
+      paper_width: 'cols-48',
+    });
+    assert(brandedPrinterRes.status === 201, 'branded printer fixture is configured');
+    assert(
+      brandedPrinterRes.body.printer.profile_id === 'xprinter-xp-v320m-v330m',
+      'Xprinter name resolves to the branded profile',
+    );
+    assert(
+      brandedPrinterRes.body.printer.capabilities.raster.enabled === true,
+      'a branded profile reports raster on without validation',
+    );
+    const brandedValidateRes = await request(app)
+      .post(`/api/printers/${brandedPrinterRes.body.printer.id}/raster-validate`)
+      .send({ confirmed: true });
+    assert(
+      brandedValidateRes.status === 409 &&
+        brandedValidateRes.body.error === 'raster_validation_not_applicable',
+      'raster-validate refuses a branded printer',
+    );
+
     const deviceA = makeWebUsbTestDevice('Printer A', 1);
     const deviceB = makeWebUsbTestDevice('Counter WebUSB Printer', 2);
     const devices = [deviceA.device, deviceB.device];
