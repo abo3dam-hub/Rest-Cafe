@@ -526,6 +526,7 @@ export const usePrinterStore = create<PrinterState>()(
                 }),
                 template: rasterBillTemplate,
                 profileId: webusbPrinter.profile_id,
+                printerId: webusbPrinter.id,
                 options: {
                   columns: billColumns,
                   language: languages[0],
@@ -885,6 +886,7 @@ export const usePrinterStore = create<PrinterState>()(
                       : {}),
                   }),
                   profileId: webusbPrinter.profile_id,
+                  printerId: webusbPrinter.id,
                   options: {
                     columns: kotColumns,
                     language: kotLanguage,
