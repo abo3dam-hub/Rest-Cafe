@@ -7,6 +7,7 @@ import {
   printViaNetwork,
   printViaUSB,
   buildTestPage,
+  buildRasterProbePage,
   printDeliverySlipDetailed,
   detectConnectedPrinters,
   prepareReceipt,
@@ -24,6 +25,9 @@ import {
   getSupportedPrinterProfiles,
   resolvePrinterProfile,
   capabilitiesForPrinter,
+  isGenericPrinterProfile,
+  isRasterValidatedForPrinter,
+  rasterProbeCapabilities,
 } from '../printers/profiles';
 import { hasPermission, requirePermission, requireAnyPermission } from '../services/authorization';
 import { getOpenSession } from '../services/shift-session-gate';
@@ -136,9 +140,12 @@ function getDeliverySlipBills(
 function printerShape(printer: any) {
   if (!printer) return printer;
   const profile = resolvePrinterProfile(printer);
+  const rasterValidated = isRasterValidatedForPrinter(printer, profile);
   const capabilities = capabilitiesForPrinter(
     profile,
     printer.paper_width || profile.defaultPaperWidth,
+    undefined,
+    rasterValidated,
   );
   return {
     id: printer.id,
@@ -153,6 +160,7 @@ function printerShape(printer: any) {
     updated_at: printer.updated_at,
     profile_id: profile.id,
     profile_name: `${profile.make} ${profile.model}`,
+    raster_validated: rasterValidated,
     capabilities,
   };
 }
@@ -463,17 +471,29 @@ router.post(
       if (!timezone) return res.status(409).json({ error: 'regional_not_configured' });
 
       const profile = resolvePrinterProfile(printer);
-      const capabilities = capabilitiesForPrinter(
-        profile,
-        printer.paper_width || profile.defaultPaperWidth,
-      );
-      const testData = buildTestPage(
-        printer.paper_width || profile.defaultPaperWidth,
-        profile.cutMode,
-        tenantLanguage(db),
-        timezone,
-        req.body?.rasterProbe === true ? capabilities : undefined,
-      );
+      const paperWidth = printer.paper_width || profile.defaultPaperWidth;
+      let testData: Buffer;
+      if (req.body?.rasterProbe === true) {
+        // The probe renders Arabic financial-style sample lines through
+        // GS v 0 so the owner can judge on paper whether this printer
+        // implements raster; a rendering failure refuses the probe.
+        try {
+          testData = await buildRasterProbePage(
+            paperWidth,
+            profile.cutMode,
+            tenantLanguage(db),
+            timezone,
+            rasterProbeCapabilities(profile, paperWidth),
+          );
+        } catch (error) {
+          return res.status(502).json({
+            error: 'Raster probe could not be rendered',
+            detail: error instanceof Error ? error.message : String(error),
+          });
+        }
+      } else {
+        testData = buildTestPage(paperWidth, profile.cutMode, tenantLanguage(db), timezone);
+      }
       let result: { ok: boolean; detail?: string } = { ok: false };
 
       switch (printer.connection_type) {
@@ -509,6 +529,40 @@ router.post(
       res.status(500).json({ error: 'Internal server error' });
     }
   }),
+);
+
+// POST /api/printers/:id/raster-validate — record the owner's confirmation
+// that a raster test print for this generic printer rendered its Arabic
+// lines correctly. Only a generic profile can be validated; branded
+// profiles already declare raster. The validation is scoped to the exact
+// printer (name, profile, paper width) at confirmation time.
+router.post(
+  '/:id/raster-validate',
+  requirePermission('printers.manage'),
+  (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      const printer = db.prepare('SELECT * FROM printers WHERE id = ?').get(req.params.id) as any;
+      if (!printer) return res.status(404).json({ error: 'Printer not found' });
+      if (req.body?.confirmed !== true)
+        return res.status(400).json({ error: 'confirmed must be true' });
+
+      const profile = resolvePrinterProfile(printer);
+      if (!isGenericPrinterProfile(profile))
+        return res.status(409).json({ error: 'raster_validation_not_applicable' });
+      const paperWidth = printer.paper_width || profile.defaultPaperWidth;
+      db.prepare(
+        `UPDATE printers SET raster_validated = 1, raster_validated_profile_id = ?,
+         raster_validated_paper_width = ?, raster_validated_printer_name = ?, updated_at = ?
+         WHERE id = ?`,
+      ).run(profile.id, paperWidth, printer.name, now(), req.params.id);
+      const updated = db.prepare('SELECT * FROM printers WHERE id = ?').get(req.params.id);
+      res.json({ printer: printerShape(updated) });
+    } catch (error) {
+      console.error('[API] Internal error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
 );
 
 // POST /api/printers/kick-drawer — send a cash drawer pulse to the default/active printer
