@@ -81,6 +81,29 @@ export function getBillPrintWarnings(
 }
 
 /**
+ * Withdraws pending receipt retries for a bill whose print was just
+ * confirmed (PF-04): a manual reprint that succeeded makes the queued
+ * retry a duplicate. Only `pending` jobs are removed — a `processing`
+ * job is mid-flight, and the worker's execution-time printed_at guard
+ * covers it. The row is deleted rather than marked done: the retry
+ * never executed, and the print_logs row is the record of the print.
+ * Callers run this in the same transaction as the printed_at stamp, so
+ * a confirmed print and its withdrawal cannot split across a crash.
+ */
+export function cancelPendingReceiptJobs(
+  db: ReturnType<typeof getDatabase>,
+  billId: number,
+): number {
+  const result = db
+    .prepare(
+      `DELETE FROM print_jobs
+       WHERE kind = 'receipt' AND bill_id = ? AND status = 'pending'`,
+    )
+    .run(billId);
+  return Number(result.changes);
+}
+
+/**
  * Record a confirmed print: a print_logs row, the bill's printed_at, and any
  * warnings the dispatch produced. Called only after the bytes were confirmed
  * dispatched — never on a print request.
@@ -113,6 +136,7 @@ export function recordPrintConfirmation(
       now(),
       billId,
     );
+    cancelPendingReceiptJobs(db, billId);
     recordBillPrintWarnings(db, billId, warnings, 'frontend', printLogId);
 
     return insertResult;
@@ -141,6 +165,9 @@ export function markBillPrintedOnDispatch(
       now(),
       billId,
     );
+    // A second pending receipt job for this bill (a different payload)
+    // is moot once this dispatch succeeded.
+    cancelPendingReceiptJobs(db, billId);
     recordBillPrintWarnings(db, billId, warnings, 'queue', null);
   });
 }
