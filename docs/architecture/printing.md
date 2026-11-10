@@ -308,6 +308,15 @@ KOT path applies it, so an item that has left the kitchen does not reappear on a
 - `frontend/src/lib/printer/kot-web-print.ts`, the browser KOT HTML path
 - `frontend/src/lib/printer/kot-encoder.ts`, the browser KOT encoder
 
+One window remains, and it is an accepted residual risk: if the process
+crashes between a successful KOT dispatch and the `kot_printed_at` stamp
+that follows it in the same function — or, on the WebUSB path, if the marker
+POST fails after the ticket printed — the next dispatch re-sends those
+items, because no surviving state distinguishes "printed but unmarked" from
+"never printed". The crash window is a single step, the normal path is
+protected by the marker and the queue's transactional claim, and no
+mitigation is planned.
+
 ## Menu catalog printing
 
 A product with active variants prints one sale row per active variant, in the catalog's variant
