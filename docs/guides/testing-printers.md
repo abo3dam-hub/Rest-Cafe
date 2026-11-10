@@ -35,8 +35,9 @@ To determine which profile a printer actually resolves to:
    list, so the stored name has to contain one of the profile's tokens. Recording the name string
    you entered is part of the report.
 
-Every profile declares raster capability. The 58 mm profile declares 384 dots of width; the other
-three declare 576.
+Only the branded profiles declare raster capability. The generic profiles declare raster off; a
+generic printer gains raster at 384 dots of width (58 mm) or 576 dots (80 mm) only after
+per-printer validation (raster test print + owner confirmation in Settings → Printers).
 
 ## Test 1: chunked network printing
 
@@ -145,10 +146,13 @@ on an 8-dot grid, and a solid 24-dot band. Each pattern is emitted as a sequence
 than the profile's `raster.maxBandHeight`, so a receipt taller than one band is still printable.
 Every emitted band is validated before it is returned.
 
-**The probe is not reachable from the UI.** The `rasterProbe` request-body flag on a printer route
-in `main/routes/printers.ts` is the only reference to it in the repository. No renderer sends it
-and no test covers it. Record a result for it only if you invoke the route directly; do not report
-it as a merchant-reachable feature.
+**The probe is reachable from the printer settings page.** The raster test print for a generic
+printer (Settings → Printers) sends it through the `rasterProbe` request-body flag on the
+test-print route in `main/routes/printers.ts`: the probe page prints the standard test page, then
+Arabic financial-style sample lines rendered as GS v 0 raster, then these diagnostic bands. The
+owner confirms in the UI that the Arabic lines printed correctly; only then is the printer's
+raster validation stored. A probe whose raster rendering fails is refused instead of printing
+without its Arabic lines.
 
 ## Report template
 
