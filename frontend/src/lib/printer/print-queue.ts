@@ -229,6 +229,24 @@ export function removePendingPrintJob(
   );
 }
 
+/**
+ * Removes pending receipt retries for a bill whose print just succeeded
+ * (PF-04): a manual reprint that went through makes the queued retry a
+ * duplicate. KOT jobs are untouched — the F-004 marker already keeps a
+ * retried ticket from duplicating, and a KOT retry is scoped by item.
+ */
+export function removePendingPrintJobsForBill(
+  billId: number,
+  storage: PendingPrintJobStorage = createPendingPrintJobStorage(),
+): void {
+  savePendingPrintJobs(
+    loadPendingPrintJobs(storage).filter(
+      (job) => !(job.kind === 'receipt' && job.billId === billId),
+    ),
+    storage,
+  );
+}
+
 /** Jobs due for a retry now: not exhausted and past their next-retry time, oldest first. */
 export function duePendingPrintJobs(
   nowMs: number = Date.now(),
