@@ -67,13 +67,19 @@ generic profile chosen by paper width.
 The generic profiles are the conservative ones. They are ASCII-only, with no text shaping, and
 they skip unsupported non-financial text with a warning but **refuse** a receipt whose financial
 rows contain unsupported text, reporting `Receipt not printed: a financial row contains unsupported
-printer text`. The Xprinter and Epson profiles add the Latin code pages and Latin script
-representability on top of that. All four shipped profiles enable the capability-gated raster
-path; what differs is encoding and script coverage.
+printer text`. That refusal is the rule for an unvalidated generic printer: its profile declares
+raster off, so an Arabic financial row is refused rather than rasterized. The Xprinter and Epson
+profiles add the Latin code pages and Latin script representability on top of that, and declare
+the capability-gated raster path on. A generic printer gains raster only after per-printer
+validation: run the raster test print from Settings → Printers, check that the Arabic total lines
+printed correctly on the paper, and confirm in the prompt that follows. The validation is stored
+on that printer and resets if its name, resolved profile, or paper width changes.
 
 If a receipt is refused because of unsupported text in a financial row, check the resolved profile
-before changing anything else. A printer set to the generic profile when it should be an Xprinter
-or Epson is the usual cause.
+before changing anything else. On a generic profile the usual cause is a printer that has not been
+validated yet — run the raster test print and confirm it. A printer set to the generic profile
+when it should be an Xprinter or Epson is the other cause: rename it so it matches the branded
+profile instead of validating a printer the system already knows.
 
 ## Arabic-script text
 
@@ -83,9 +89,9 @@ Arabic, Persian, or Urdu text. With this setting enabled, receipt, tax-bill, and
 lines containing those scripts are sent to the printer for it to shape. The setting is off by
 default, which is correct for generic ESC/POS hardware.
 
-A validated printer profile may also enable the capability-gated raster path, which uses an
-isolated Chromium renderer and bundled local fonts for content the printer cannot shape itself.
-Profile capability is what enables it; a locale never does.
+A validated generic printer, and any branded profile, may use the capability-gated raster path,
+which uses an isolated Chromium renderer and bundled local fonts for content the printer cannot
+shape itself. Validation is per printer, never per locale: a locale never enables raster.
 
 On the document-driven thermal and browser paths, unsupported non-financial text is skipped with a
 warning, while an unsupported item row or financial row refuses the receipt before transport with
