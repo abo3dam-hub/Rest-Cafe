@@ -9,7 +9,14 @@
  * ever re-runs a print that was already requested, and a retry re-reads
  * the order from the database, so it respects the F-004 printed marker —
  * items printed by an earlier attempt are never sent twice. A job that
- * finds nothing left to print completes as a no-op.
+ * finds nothing left to print completes as a no-op. Receipts get the
+ * same protection from the other side (PF-04): a confirmed manual
+ * reprint withdraws pending receipt jobs for the bill
+ * (`cancelPendingReceiptJobs`, called with the printed_at stamp), and
+ * the worker still re-checks printed_at at execution time before
+ * dispatching a receipt job, so a job that survived withdrawal — a
+ * mid-flight claim, or a second job under a different payload — never
+ * prints a bill that was already printed after the job was queued.
  *
  * Two executors share this table's contract: the backend worker below
  * (backend-attached printers) and the POS frontend queue (WebUSB, in
@@ -259,6 +266,7 @@ export function resolveReceiptLanguagesForTenant(db: ReturnType<typeof getDataba
 export interface ReceiptBusinessRow {
   id: number;
   customer_id?: unknown;
+  printed_at?: string | null;
   [key: string]: unknown;
 }
 
@@ -332,9 +340,9 @@ export function buildReceiptBusiness(
   const userName = (userId: unknown): string => {
     if (userId === null || userId === undefined || String(userId) === '') return '';
     try {
-      const row = db
-        .prepare('SELECT name FROM users WHERE id = ?')
-        .get(String(userId)) as { name?: string } | undefined;
+      const row = db.prepare('SELECT name FROM users WHERE id = ?').get(String(userId)) as
+        | { name?: string }
+        | undefined;
       return row?.name || '';
     } catch {
       return '';
@@ -468,7 +476,7 @@ export async function executePrintJob(
   db: ReturnType<typeof getDatabase>,
   job: PrintJob,
   dispatchers: PrintJobDispatchers = {},
-): Promise<{ ok: boolean; detail?: string; warnings?: PrintWarning[] }> {
+): Promise<{ ok: boolean; skipped?: boolean; detail?: string; warnings?: PrintWarning[] }> {
   if (job.kind === 'kot') {
     const dispatchKot = dispatchers.dispatchKot ?? dispatchKotForOrder;
     const result = await dispatchKot(db, {
@@ -489,6 +497,16 @@ export async function executePrintJob(
     | (ReceiptBusinessRow & { order_id: number })
     | undefined;
   if (!bill) return { ok: false, detail: 'Bill not found' };
+  // PF-04: a manual reprint that succeeded after this job was queued makes
+  // the retry a duplicate. Skip only when the bill was printed AFTER the
+  // job was created: a bill printed before the job was queued means the
+  // job is a failed reprint retry, and it must still print. Both stamps
+  // are UTC `YYYY-MM-DD HH:MM:SS`, so the string compare is chronological.
+  // The same-second remainder is covered by the cancellation on confirmed
+  // print, which runs in the same transaction as the printed_at stamp.
+  if (bill.printed_at && bill.printed_at > job.created_at) {
+    return { ok: true, skipped: true, detail: 'Bill printed after this job was queued' };
+  }
   const order = getOrderWithItems(db, Number(bill.order_id), Number(bill.id));
   if (!order) return { ok: false, detail: 'Order not found' };
   const dispatchBill = dispatchers.dispatchBill ?? dispatchBillPrint;
@@ -520,7 +538,9 @@ export async function processDuePrintJobs(
         completePrintJob(db, job.id);
         // The bytes moved: only now does the bill count as printed (F-026),
         // with any warnings the dispatch produced recorded with it (F-017).
-        if (job.kind === 'receipt' && job.bill_id) {
+        // A skipped job printed nothing, so it must not re-stamp
+        // printed_at: the manual print's stamp stays the record.
+        if (job.kind === 'receipt' && job.bill_id && !result.skipped) {
           markBillPrintedOnDispatch(db, job.bill_id, result.warnings);
         }
         succeeded += 1;
