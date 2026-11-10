@@ -16,6 +16,13 @@
  * The frontend queue (localStorage, same backoff) is covered by the same
  * helpers through the pure module functions below.
  *
+ * PF-04 (printing finalization B2): a queued receipt retry must not
+ * duplicate a manual reprint. Two mechanisms, pinning both: a confirmed
+ * print withdraws pending receipt jobs for the bill, and the worker
+ * re-checks printed_at at execution time, skipping a job whose bill was
+ * printed after the job was queued — while a failed reprint retry (bill
+ * printed before the job was queued) still prints.
+ *
  * Run: npm run test:kot-print-queue
  */
 
@@ -54,6 +61,7 @@ const {
   printJobRetryDelayMs,
   processDuePrintJobs,
 } = require('../main/services/print-queue');
+const { cancelPendingReceiptJobs, recordPrintConfirmation } = require('../main/services/receipt');
 const {
   PENDING_PRINT_JOB_MAX_ATTEMPTS,
   duePendingPrintJobs,
@@ -62,6 +70,7 @@ const {
   markPendingPrintJobFailed,
   pendingPrintJobRetryDelayMs,
   removePendingPrintJob,
+  removePendingPrintJobsForBill,
 } = require('../frontend/src/lib/printer/print-queue');
 
 function isNativeAbiMismatch(error: any): boolean {
@@ -86,6 +95,12 @@ const stamp = now();
 
 function jobRow(id: number): any {
   return db.prepare('SELECT * FROM print_jobs WHERE id = ?').get(id);
+}
+
+function billPrintedAt(id: number): string | null {
+  return (
+    (db.prepare('SELECT printed_at FROM bills WHERE id = ?').get(id) as any)?.printed_at ?? null
+  );
 }
 
 /** Makes a job due right now so the worker will claim it. */
@@ -376,6 +391,191 @@ async function main(): Promise<void> {
     assertEqualOrThrow(billCalls.length, 1, 'F-009: the dispatcher was not called for the orphan');
   }
 
+  // ── PF-04: exact sequence — fail → enqueue → manual reprint → worker pass → NO second print ──
+  {
+    // print_logs.user_id references users(id); the confirmation needs the
+    // confirming user to exist.
+    db.exec(
+      `INSERT OR IGNORE INTO users (id, name, password, role) VALUES ('user-1', 'Test User', 'hash', 'cashier')`,
+    );
+    const pfBillId = Number(
+      db
+        .prepare(
+          `INSERT INTO bills (bill_number, order_id, subtotal, total, payment_status, created_at, updated_at)
+           VALUES ('B-PF04-1', ?, 100, 100, 'unpaid', ?, ?)`,
+        )
+        .run(orderId, stamp, stamp).lastInsertRowid,
+    );
+    const billCalls: number[] = [];
+    const stubDispatchBill = async (_db: any, opts: any) => {
+      billCalls.push(Number(opts.bill.id));
+      return { ok: true };
+    };
+
+    // 1. The print fails → the receipt job is enqueued.
+    assertEqualOrThrow(billPrintedAt(pfBillId), null, 'PF-04: printed_at starts unset');
+    const { id: queuedJobId } = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: pfBillId,
+      payload: { isReprint: false },
+    });
+    makeDue(queuedJobId);
+
+    // 2. The operator reprints manually within the retry window and it
+    // succeeds: the confirmation stamps printed_at and withdraws the
+    // pending job in the same transaction.
+    recordPrintConfirmation(pfBillId, 'user-1', 'receipt');
+    assertOrThrow(!!billPrintedAt(pfBillId), 'PF-04: the manual reprint stamps printed_at');
+    assertEqualOrThrow(
+      jobRow(queuedJobId),
+      undefined,
+      'PF-04: the confirmed reprint withdraws the pending receipt job',
+    );
+
+    // 3. The worker pass finds nothing left to do and prints nothing.
+    const pass = await processDuePrintJobs({ dispatchBill: stubDispatchBill });
+    assertEqualOrThrow(pass.processed, 0, 'PF-04: the worker has no job left to process');
+    assertEqualOrThrow(billCalls.length, 0, 'PF-04: the dispatcher is never called');
+  }
+
+  // ── PF-04: the execution-time guard skips a job whose bill was printed
+  // after the job was queued, without calling the dispatcher ──
+  {
+    const guardBillId = Number(
+      db
+        .prepare(
+          `INSERT INTO bills (bill_number, order_id, subtotal, total, payment_status, created_at, updated_at)
+           VALUES ('B-PF04-2', ?, 100, 100, 'unpaid', ?, ?)`,
+        )
+        .run(orderId, stamp, stamp).lastInsertRowid,
+    );
+    const guardCalls: number[] = [];
+    const stubDispatchBill = async (_db: any, opts: any) => {
+      guardCalls.push(Number(opts.bill.id));
+      return { ok: true };
+    };
+    const { id: guardJobId } = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: guardBillId,
+      payload: { isReprint: false },
+    });
+    // Backdate the job so the manual stamp below is unambiguously after it.
+    db.prepare(`UPDATE print_jobs SET created_at = ? WHERE id = ?`).run(
+      '2020-01-01 00:00:00',
+      guardJobId,
+    );
+    // A manual print confirmed through a path that bypasses the
+    // withdrawal (direct stamp): the guard is the second line of defence.
+    db.prepare(`UPDATE bills SET printed_at = ? WHERE id = ?`).run(now(), guardBillId);
+    const stampedAt = billPrintedAt(guardBillId);
+    assertOrThrow(!!stampedAt, 'PF-04: the manual stamp is set');
+    makeDue(guardJobId);
+    const pass = await processDuePrintJobs({ dispatchBill: stubDispatchBill });
+    assertEqualOrThrow(pass.processed, 1, 'PF-04: the worker claims the guarded job');
+    assertEqualOrThrow(pass.succeeded, 1, 'PF-04: the skipped job counts as resolved');
+    assertEqualOrThrow(guardCalls.length, 0, 'PF-04: the guard never calls the dispatcher');
+    assertEqualOrThrow(jobRow(guardJobId).status, 'done', 'PF-04: the skipped job is done');
+    assertEqualOrThrow(
+      billPrintedAt(guardBillId),
+      stampedAt,
+      'PF-04: the skip does not re-stamp printed_at',
+    );
+  }
+
+  // ── PF-04: a failed REPRINT retry still prints — the bill was printed
+  // BEFORE the job was queued, so the guard must not fire ──
+  {
+    const reprintBillId = Number(
+      db
+        .prepare(
+          `INSERT INTO bills (bill_number, order_id, subtotal, total, payment_status, created_at, updated_at)
+           VALUES ('B-PF04-3', ?, 100, 100, 'unpaid', ?, ?)`,
+        )
+        .run(orderId, stamp, stamp).lastInsertRowid,
+    );
+    const reprintCalls: number[] = [];
+    const stubDispatchBill = async (_db: any, opts: any) => {
+      reprintCalls.push(Number(opts.bill.id));
+      return { ok: true };
+    };
+    // The bill printed successfully once (printed_at set) ...
+    recordPrintConfirmation(reprintBillId, 'user-1', 'receipt');
+    assertOrThrow(!!billPrintedAt(reprintBillId), 'PF-04: the first print stamps printed_at');
+    // ... then a reprint is requested and fails → the retry is enqueued.
+    const { id: reprintJobId } = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: reprintBillId,
+      payload: { isReprint: true },
+    });
+    makeDue(reprintJobId);
+    const pass = await processDuePrintJobs({ dispatchBill: stubDispatchBill });
+    assertEqualOrThrow(pass.processed, 1, 'PF-04: the worker claims the reprint job');
+    assertEqualOrThrow(reprintCalls.length, 1, 'PF-04: the failed reprint retry still dispatches');
+    assertEqualOrThrow(reprintCalls[0], reprintBillId, 'PF-04: the retry prints the right bill');
+    assertEqualOrThrow(jobRow(reprintJobId).status, 'done', 'PF-04: the reprint job is done');
+  }
+
+  // ── PF-04: cancelPendingReceiptJobs removes only pending receipt jobs for the bill ──
+  {
+    const cancelBillId = Number(
+      db
+        .prepare(
+          `INSERT INTO bills (bill_number, order_id, subtotal, total, payment_status, created_at, updated_at)
+           VALUES ('B-PF04-4', ?, 100, 100, 'unpaid', ?, ?)`,
+        )
+        .run(orderId, stamp, stamp).lastInsertRowid,
+    );
+    const otherBillId = Number(
+      db
+        .prepare(
+          `INSERT INTO bills (bill_number, order_id, subtotal, total, payment_status, created_at, updated_at)
+           VALUES ('B-PF04-5', ?, 100, 100, 'unpaid', ?, ?)`,
+        )
+        .run(orderId, stamp, stamp).lastInsertRowid,
+    );
+    const first = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: cancelBillId,
+      payload: { isReprint: false },
+    });
+    const second = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: cancelBillId,
+      payload: { isReprint: true },
+    });
+    const other = enqueuePrintJob(db, {
+      kind: 'receipt',
+      orderId,
+      billId: otherBillId,
+      payload: {},
+    });
+    const kot = enqueuePrintJob(db, {
+      kind: 'kot',
+      orderId,
+      payload: { itemIds: [pendingUnmarkedId] },
+    });
+    // One receipt job for the bill is already claimed (processing).
+    makeDue(second.id);
+    const claimed = claimDuePrintJobs(db).filter((job: any) => job.id === second.id);
+    assertEqualOrThrow(claimed.length, 1, 'PF-04: the second job is claimed (processing)');
+    const removed = cancelPendingReceiptJobs(db, cancelBillId);
+    assertEqualOrThrow(removed, 1, 'PF-04: cancel removes only the pending job');
+    assertEqualOrThrow(jobRow(first.id), undefined, 'PF-04: the pending job is gone');
+    assertEqualOrThrow(
+      jobRow(second.id).status,
+      'processing',
+      'PF-04: the processing job is untouched',
+    );
+    assertEqualOrThrow(jobRow(other.id).status, 'pending', 'PF-04: another bill keeps its job');
+    assertEqualOrThrow(jobRow(kot.id).status, 'pending', 'PF-04: KOT jobs are untouched');
+    completePrintJob(db, second.id);
+  }
+
   // ── F-009: frontend queue helpers (same backoff, localStorage-backed) ──
   {
     const storage = (() => {
@@ -447,6 +647,42 @@ async function main(): Promise<void> {
       loadPendingPrintJobs(storage).length,
       0,
       'F-009: removing the frontend job clears it',
+    );
+
+    // PF-04: a successful manual print withdraws the bill's queued
+    // receipt retries, and nothing else.
+    enqueuePendingPrintJob({ kind: 'receipt', orderId, billId: 501 }, 1_000_000, storage);
+    enqueuePendingPrintJob({ kind: 'receipt', orderId, billId: 502 }, 1_000_000, storage);
+    enqueuePendingPrintJob(
+      { kind: 'kot', orderId, itemIds: [pendingUnmarkedId] },
+      1_000_000,
+      storage,
+    );
+    removePendingPrintJobsForBill(501, storage);
+    const remaining = loadPendingPrintJobs(storage);
+    assertEqualOrThrow(
+      remaining.length,
+      2,
+      "PF-04: only the printed bill's receipt job is removed",
+    );
+    assertOrThrow(
+      remaining.every((job: any) => job.billId !== 501),
+      'PF-04: no job for the printed bill remains',
+    );
+    assertOrThrow(
+      remaining.some((job: any) => job.kind === 'receipt' && job.billId === 502),
+      'PF-04: another bill keeps its receipt job',
+    );
+    assertOrThrow(
+      remaining.some((job: any) => job.kind === 'kot'),
+      'PF-04: KOT jobs are untouched by the receipt withdrawal',
+    );
+    // Removing for a bill with no jobs is a no-op, not an error.
+    removePendingPrintJobsForBill(999_999, storage);
+    assertEqualOrThrow(
+      loadPendingPrintJobs(storage).length,
+      2,
+      'PF-04: removing an unknown bill changes nothing',
     );
   }
 
