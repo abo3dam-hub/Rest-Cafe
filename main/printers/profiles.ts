@@ -56,7 +56,7 @@ export const SUPPORTED_PRINTER_PROFILES: SupportedPrinterProfile[] = [
         enabled: true,
         widthDots: 576,
         maxBandHeight: 200,
-        modes: ['mixed', 'whole-receipt'],
+        modes: ['mixed'],
       },
     },
     notes:
@@ -79,7 +79,7 @@ export const SUPPORTED_PRINTER_PROFILES: SupportedPrinterProfile[] = [
         enabled: true,
         widthDots: 576,
         maxBandHeight: 200,
-        modes: ['mixed', 'whole-receipt'],
+        modes: ['mixed'],
       },
     },
   },
@@ -202,7 +202,7 @@ export function validatedGenericRaster(
     enabled: true,
     widthDots: profile.id === 'generic-escpos-58' ? 384 : 576,
     maxBandHeight: 200,
-    modes: ['mixed', 'whole-receipt'],
+    modes: ['mixed'],
   };
 }
 
