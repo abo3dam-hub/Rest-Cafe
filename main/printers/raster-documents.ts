@@ -12,7 +12,12 @@ import {
 import { renderKotDocumentToLines } from './document-kot';
 import { renderMerchantReceiptViaDocument } from './document-merchant';
 import { buildEscPos, normalizePrintLanguage, type PrintWarning } from './formatting-helpers';
-import { capabilitiesForPrinter, resolvePrinterProfile, type PrinterCutMode } from './profiles';
+import {
+  capabilitiesForPrinter,
+  isRasterValidatedForPrinter,
+  resolvePrinterProfile,
+  type PrinterCutMode,
+} from './profiles';
 import { rasterCapabilityEnabled, type RasterSemanticLineGroup } from '../../shared/print/raster';
 import type { PrintDocument } from '../../shared/print/document';
 import {
@@ -234,6 +239,7 @@ export async function rasterizePrintDocumentForWebUsb(
     arabicShaping: boolean;
     timezone?: string;
   },
+  printer?: unknown,
 ): Promise<
   | {
       ok: true;
@@ -249,6 +255,7 @@ export async function rasterizePrintDocumentForWebUsb(
     profile,
     `cols-${options.columns}`,
     options.arabicShaping,
+    isRasterValidatedForPrinter(printer, profile),
   );
   if (!rasterCapabilityEnabled(capabilities, 'mixed'))
     return { ok: false, error: 'Raster output is not enabled for this printer profile' };
@@ -305,6 +312,7 @@ export async function rasterizeKotDocumentForWebUsb(
     useUnicode: boolean;
     arabicShaping: boolean;
   },
+  printer?: unknown,
 ): Promise<
   | {
       ok: true;
@@ -320,6 +328,7 @@ export async function rasterizeKotDocumentForWebUsb(
     profile,
     `cols-${options.columns}`,
     options.arabicShaping,
+    isRasterValidatedForPrinter(printer, profile),
   );
   if (!rasterCapabilityEnabled(capabilities, 'mixed'))
     return { ok: false, error: 'Raster output is not enabled for this printer profile' };
