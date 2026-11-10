@@ -191,14 +191,14 @@ async function run(): Promise<void> {
     enabled: true,
     widthDots: 576,
     maxBandHeight: 200,
-    modes: ['mixed', 'whole-receipt'],
+    modes: ['mixed'],
   });
   assert.equal(rasterCapabilityEnabled(validated58), true);
   assert.deepEqual(validated58.raster, {
     enabled: true,
     widthDots: 384,
     maxBandHeight: 200,
-    modes: ['mixed', 'whole-receipt'],
+    modes: ['mixed'],
   });
   // A narrower configured paper width still caps the validated raster.
   assert.equal(capabilitiesForPrinter(generic80, 'cols-32', undefined, true).raster.widthDots, 384);
