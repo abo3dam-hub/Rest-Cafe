@@ -758,6 +758,7 @@ export function registerIpcHandlers(
       document?: unknown;
       template?: unknown;
       profileId?: unknown;
+      printerId?: unknown;
       options?: unknown;
     };
     if (
@@ -765,6 +766,7 @@ export function registerIpcHandlers(
       (request.template !== 'classic' && request.template !== 'compact') ||
       typeof request.profileId !== 'string' ||
       request.profileId.length === 0 ||
+      (request.printerId !== undefined && typeof request.printerId !== 'string') ||
       !request.options ||
       typeof request.options !== 'object'
     ) {
@@ -785,11 +787,16 @@ export function registerIpcHandlers(
       return { ok: false, error: 'Invalid raster document options' };
     }
     try {
+      const printer =
+        typeof request.printerId === 'string' && request.printerId.length > 0
+          ? getDatabase().prepare('SELECT * FROM printers WHERE id = ?').get(request.printerId)
+          : undefined;
       return await rasterizePrintDocumentForWebUsb(
         request.document as Parameters<typeof rasterizePrintDocumentForWebUsb>[0],
         request.template,
         request.profileId,
         options as Parameters<typeof rasterizePrintDocumentForWebUsb>[3],
+        printer,
       );
     } catch (error: unknown) {
       return { ok: false, error: getErrorMessage(error) };
@@ -802,12 +809,14 @@ export function registerIpcHandlers(
     const request = payload as {
       document?: unknown;
       profileId?: unknown;
+      printerId?: unknown;
       options?: unknown;
     };
     if (
       !isKotDocument(request.document) ||
       typeof request.profileId !== 'string' ||
       request.profileId.length === 0 ||
+      (request.printerId !== undefined && typeof request.printerId !== 'string') ||
       !request.options ||
       typeof request.options !== 'object'
     ) {
@@ -825,10 +834,15 @@ export function registerIpcHandlers(
       return { ok: false, error: 'Invalid raster KOT options' };
     }
     try {
+      const printer =
+        typeof request.printerId === 'string' && request.printerId.length > 0
+          ? getDatabase().prepare('SELECT * FROM printers WHERE id = ?').get(request.printerId)
+          : undefined;
       return await rasterizeKotDocumentForWebUsb(
         request.document,
         request.profileId,
         options as Parameters<typeof rasterizeKotDocumentForWebUsb>[2],
+        printer,
       );
     } catch (error: unknown) {
       return { ok: false, error: getErrorMessage(error) };
