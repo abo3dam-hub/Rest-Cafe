@@ -124,3 +124,7 @@ still be skipped or rasterized. Do not pursue label renaming.
   delivery (B4) lands.
 
 Start with B1. Announce the branch in `agent-comms/open/` as usual.
+
+## Status (2026-11-10): B1 landed, B2 NEXT
+
+B1 (PF-01) landed on upstream main at `7d204cd` (PR #31 closed unmerged; Ted battery 43 commands, 42 exit 0, test:raster Electron half NOT RUN — Xvfb supplementary exit 0; oracle 13/13 byte-identical; registry 389/389, 128 migrations). Decision `20261110-053` accepts B1 and closes thread 052. B2 (PF-04) is NEXT — start with B2. Announce the branch in `agent-comms/open/` as usual. No installer until B4 lands.
