@@ -5,6 +5,7 @@ import {
   SupportedPrinterProfile,
   dotsForPaperWidth,
   capabilitiesForPrinter,
+  isRasterValidatedForPrinter,
 } from './profiles';
 import {
   formatBusinessDateTime,
@@ -61,6 +62,8 @@ import {
   encodeRasterFeedAndCut,
   encodeRasterUnits,
   rasterCapabilityEnabled,
+  type RasterRenderRequest,
+  type RasterRenderResult,
 } from '../../shared/print/raster';
 import { columnsForPaperWidth as columnsForConfiguredPaperWidth } from '../../shared/print/width';
 import {
@@ -827,7 +830,7 @@ export interface PrinterContext {
   capabilities: ThermalPrinterCapabilities;
 }
 
-/** Resolves profile, column count, and capabilities aligned with printer paper_width. */
+/** Resolves profile, column count, and capabilities aligned with printer paper_width. A generic printer's capabilities gain raster only when its stored validation still applies to it. */
 export function resolvePrinterContext(
   printer: any,
   arabicShapingOverride?: boolean,
@@ -838,6 +841,7 @@ export function resolvePrinterContext(
     profile,
     printer?.paper_width || profile.defaultPaperWidth,
     arabicShapingOverride,
+    isRasterValidatedForPrinter(printer, profile),
   );
   return { profile, columns, capabilities };
 }
@@ -1026,13 +1030,11 @@ export function formatKOT(
   return result.data;
 }
 
-export function buildTestPage(
-  paperWidth: string = '80mm',
-  cutMode: PrinterCutMode = 'full',
-  language?: string,
-  timezone?: string,
-  capabilities?: ThermalPrinterCapabilities,
-): Buffer {
+function testPageLines(
+  paperWidth: string,
+  language: string | undefined,
+  timezone: string | undefined,
+): { lines: string[]; width: number; lang: string } {
   const width = columnsForPaperWidth(paperWidth) || 48;
   const lang = normalizePrintLanguage(language);
   const label = (concept: PrintConceptId): string =>
@@ -1040,26 +1042,40 @@ export function buildTestPage(
   const bar = '='.repeat(width);
   const ruler = Array.from({ length: width }, (_, i) => String((i + 1) % 10)).join('');
   const edgeProbe = 'X'.repeat(width);
-  const lines = [
-    '{INIT}',
-    '{CENTER}{BOLD}' + label('print.test.title') + '{/BOLD}{/CENTER}',
-    '',
-    bar,
-    '{CENTER}' + label('print.test.networkUsb') + '{/CENTER}',
-    bar,
-    '',
-    `${label('print.test.columns')}: ${width}`,
-    ...wrapText(label('print.test.wrapHint'), width),
-    ruler,
-    edgeProbe,
-    bar,
-    `${label('print.time')}: ${formatBusinessDateTime(new Date(), timezone ?? undefined)}`,
-    '',
-    bar,
-    '{CENTER}' + label('print.test.success') + '{/CENTER}',
-    bar,
-    '{CUT}',
-  ];
+  return {
+    lines: [
+      '{INIT}',
+      '{CENTER}{BOLD}' + label('print.test.title') + '{/BOLD}{/CENTER}',
+      '',
+      bar,
+      '{CENTER}' + label('print.test.networkUsb') + '{/CENTER}',
+      bar,
+      '',
+      `${label('print.test.columns')}: ${width}`,
+      ...wrapText(label('print.test.wrapHint'), width),
+      ruler,
+      edgeProbe,
+      bar,
+      `${label('print.time')}: ${formatBusinessDateTime(new Date(), timezone ?? undefined)}`,
+      '',
+      bar,
+      '{CENTER}' + label('print.test.success') + '{/CENTER}',
+      bar,
+      '{CUT}',
+    ],
+    width,
+    lang,
+  };
+}
+
+export function buildTestPage(
+  paperWidth: string = '80mm',
+  cutMode: PrinterCutMode = 'full',
+  language?: string,
+  timezone?: string,
+  capabilities?: ThermalPrinterCapabilities,
+): Buffer {
+  const { lines, width, lang } = testPageLines(paperWidth, language, timezone);
   if (!capabilities || !rasterCapabilityEnabled(capabilities))
     return buildEscPos(lines, false, { cutMode, language: lang, columns: width });
   // Explicit shaping capability prevents raster profile passing unshaped Arabic to text.
@@ -1087,6 +1103,93 @@ export function buildTestPage(
   return Buffer.concat([
     textData,
     Buffer.from(rasterData),
+    Buffer.from(encodeRasterFeedAndCut(cutMode)),
+  ]);
+}
+
+/** Arabic financial-style sample lines a raster probe renders through GS v 0. */
+const RASTER_PROBE_FINANCIAL_SAMPLES = [
+  'المجموع الفرعي 900',
+  'رسم الإنفاق الاستهلاكي 50',
+  'المجموع 1,000',
+] as const;
+
+/**
+ * Raster probe page: the standard test page, then the Arabic financial
+ * sample lines rendered as GS v 0 raster, then the diagnostic bands. The
+ * owner reads the paper and confirms the Arabic lines printed correctly;
+ * only then may the printer be validated. Throws when raster rendering
+ * fails, so a probe never silently prints without its Arabic lines.
+ */
+export async function buildRasterProbePage(
+  paperWidth: string = '80mm',
+  cutMode: PrinterCutMode = 'full',
+  language?: string,
+  timezone?: string,
+  capabilities?: ThermalPrinterCapabilities,
+  renderRaster?: (request: RasterRenderRequest) => Promise<RasterRenderResult>,
+): Promise<Buffer> {
+  if (!capabilities || !rasterCapabilityEnabled(capabilities)) {
+    throw new Error('Raster probe requires raster capabilities');
+  }
+  const { lines, width, lang } = testPageLines(paperWidth, language, timezone);
+  const textData = buildEscPos(lines.slice(0, -1), false, {
+    cutMode,
+    language: lang,
+    capabilities,
+    arabicShaping: capabilities.shaping.arabic,
+    columns: width,
+  });
+  const { getSharedRasterRenderer, renderUnsupportedRasterLines } =
+    await import('./raster-renderer');
+  const render =
+    renderRaster ?? ((request: RasterRenderRequest) => getSharedRasterRenderer().render(request));
+  const sampleLines = [
+    `{FINANCIAL}${RASTER_PROBE_FINANCIAL_SAMPLES[0]}`,
+    `{FINANCIAL}${RASTER_PROBE_FINANCIAL_SAMPLES[1]}`,
+    `{FINANCIAL}{BOLD}${RASTER_PROBE_FINANCIAL_SAMPLES[2]}{/BOLD}`,
+  ];
+  const rendered = await renderUnsupportedRasterLines(
+    { render },
+    sampleLines,
+    capabilities,
+    'raster-probe',
+    [
+      {
+        groupId: 'probe-financial',
+        lineIndex: 0,
+        lineCount: sampleLines.length,
+        sourceLines: [...RASTER_PROBE_FINANCIAL_SAMPLES],
+        financial: true,
+      },
+    ],
+  );
+  if (rendered.failures.length > 0) {
+    const failure = rendered.failures[0];
+    throw new Error(`Raster probe rendering failed (${failure.code}): ${failure.detail}`);
+  }
+  const sampleData = encodeRasterUnits(
+    rendered.units.map((entry) => entry.unit),
+    capabilities,
+  );
+  const diagnosticData = encodeRasterUnits(
+    [
+      {
+        unitId: 'diagnostic-test-page',
+        financial: false,
+        complete: true,
+        bands: buildRasterDiagnosticBands(
+          capabilities.raster.widthDots,
+          capabilities.raster.maxBandHeight,
+        ),
+      },
+    ],
+    capabilities,
+  );
+  return Buffer.concat([
+    textData,
+    Buffer.from(sampleData),
+    Buffer.from(diagnosticData),
     Buffer.from(encodeRasterFeedAndCut(cutMode)),
   ]);
 }
