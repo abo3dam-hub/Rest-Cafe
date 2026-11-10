@@ -52,7 +52,8 @@ import {
 import { layoutStyledUnit } from '@print/layout';
 import type { ResolvedPrintLanguages } from '@print/types';
 import { getLogoRasterBands } from '@print/image-raster';
-import { concatBytes, encodeGsV0Band } from '@print/raster';
+import { concatBytes, encodeGsV0Band, rasterCapabilityEnabled } from '@print/raster';
+import { makeLogoRasterSuppressedWarning } from '@print/warnings';
 import { formatItemHeading } from './item-heading';
 import { isExcludedFromBillReceipt } from '../../../../shared/order-item-status';
 
@@ -619,12 +620,19 @@ export function buildClassicReceiptBytes(
 
   // Business header (document block).
   if (header?.logoRaster) {
-    const widthDots = opts.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
-    const maxBandHeight = opts.capabilities?.raster?.maxBandHeight ?? 200;
-    const bands = getLogoRasterBands(header.logoRaster, widthDots, maxBandHeight);
-    if (bands.length > 0) {
-      const rawBytes = concatBytes(bands.map((band) => encodeGsV0Band(band, maxBandHeight)));
-      enc.align('center').raw(rawBytes).newline();
+    // PF-02: logo bands are raster output, so they follow the raster gate —
+    // a native-fallback render (raster off, width kept) must not emit
+    // GS v 0. A suppressed logo warns instead of vanishing silently.
+    if (rasterCapabilityEnabled(opts.capabilities)) {
+      const widthDots = opts.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
+      const maxBandHeight = opts.capabilities?.raster?.maxBandHeight ?? 200;
+      const bands = getLogoRasterBands(header.logoRaster, widthDots, maxBandHeight);
+      if (bands.length > 0) {
+        const rawBytes = concatBytes(bands.map((band) => encodeGsV0Band(band, maxBandHeight)));
+        enc.align('center').raw(rawBytes).newline();
+      }
+    } else {
+      warnings?.push(makeLogoRasterSuppressedWarning());
     }
   }
   if (header?.name) {
@@ -1149,12 +1157,19 @@ export function buildCompactReceiptBytes(
 
   // Header (document business-header block)
   if (header?.logoRaster) {
-    const widthDots = opts.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
-    const maxBandHeight = opts.capabilities?.raster?.maxBandHeight ?? 200;
-    const bands = getLogoRasterBands(header.logoRaster, widthDots, maxBandHeight);
-    if (bands.length > 0) {
-      const rawBytes = concatBytes(bands.map((band) => encodeGsV0Band(band, maxBandHeight)));
-      enc.align('center').raw(rawBytes).newline();
+    // PF-02: logo bands are raster output, so they follow the raster gate —
+    // a native-fallback render (raster off, width kept) must not emit
+    // GS v 0. A suppressed logo warns instead of vanishing silently.
+    if (rasterCapabilityEnabled(opts.capabilities)) {
+      const widthDots = opts.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
+      const maxBandHeight = opts.capabilities?.raster?.maxBandHeight ?? 200;
+      const bands = getLogoRasterBands(header.logoRaster, widthDots, maxBandHeight);
+      if (bands.length > 0) {
+        const rawBytes = concatBytes(bands.map((band) => encodeGsV0Band(band, maxBandHeight)));
+        enc.align('center').raw(rawBytes).newline();
+      }
+    } else {
+      warnings?.push(makeLogoRasterSuppressedWarning());
     }
   }
   if (header?.name) {
