@@ -105,9 +105,13 @@ output", "Warm Chromium raster singleton lifecycle passed").
 
 ## Disclosures
 
-- Formatter churn (pre-commit hook, oxc): none beyond the edited lines —
-  the committed diff is exactly the 5 B3 files (4 fix + 1 test), no
-  wholesale normalization of any never-formatted file.
+- Formatter churn (pre-commit hook, oxc): `main/printers/document-merchant.ts`
+  was wholesale-normalized by the hook on commit (a never-formatted file):
+  import collapsing plus line reflows in `finish`, the `renderDocument`
+  call and the `applyMerchantTemplate` call — whitespace only, no semantic
+  change; the only semantic change in that file is the `warnings`
+  pass-through in `renderDocument`. The other 4 files show no churn beyond
+  the edited lines.
 - No import cycle introduced: the shared warning helper lives in
   shared/print/warnings.ts, which both the backend renderer and the
   frontend encoder already import from (type-only before, now also the
