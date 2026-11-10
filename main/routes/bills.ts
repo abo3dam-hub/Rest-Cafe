@@ -18,6 +18,7 @@ import {
 import { asyncHandler } from '../middleware/async-handler';
 import { notifyKdsUpdate, notifyOrderUpdated } from '../services/kds';
 import {
+  cancelPendingReceiptJobs,
   recordPrintConfirmation,
   recordBillPrintWarnings,
   getBillPrintWarnings,
@@ -5372,11 +5373,16 @@ router.post('/:id/markPrinted', requirePermission('bills.print'), (req: Request,
       return res.status(400).json({ error: 'confirmed must be true to mark a bill printed' });
     }
 
-    db.prepare('UPDATE bills SET printed_at = ?, updated_at = ? WHERE id = ?').run(
-      now(),
-      now(),
-      req.params.id,
-    );
+    // A print the operator attests to also withdraws any pending receipt
+    // retry for the bill (PF-04), in the same transaction as the stamp.
+    withTxn(() => {
+      db.prepare('UPDATE bills SET printed_at = ?, updated_at = ? WHERE id = ?').run(
+        now(),
+        now(),
+        req.params.id,
+      );
+      cancelPendingReceiptJobs(db, Number(req.params.id));
+    });
     recordBillPrintWarnings(db, Number(req.params.id), req.body?.warnings, 'operator', null);
 
     const updatedBill = parseRowJson(
