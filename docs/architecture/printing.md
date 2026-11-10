@@ -233,11 +233,16 @@ so it must not embed device names or user data.
 | --- | --- | --- | --- |
 | `xprinter-xp-v320m-v330m` | Xprinter XP-V320M / XP-V330M | 72 mm, `cols-48` | 48 |
 | `epson-tm-series` | Epson TM Series ESC/POS | `cols-48` | 48 |
-| `generic-escpos-80` | Generic ESC/POS 80 mm | `cols-42` | 42 |
+| `generic-escpos-80` | Generic ESC/POS 80 mm | `cols-48` | 48 |
 | `generic-escpos-58` | Generic ESC/POS 58 mm | `cols-32` | 32 |
 
-All four declare `raster.enabled: true` with modes `mixed` and `whole-receipt`, at 576 dots of
-width except the 58 mm profile, which declares 384.
+The two branded profiles declare `raster.enabled: true` with modes `mixed` and `whole-receipt`,
+at 576 dots of width. The two generic profiles declare the conservative baseline instead —
+`raster.enabled: false` with zero width — and gain raster only for a single printer after the
+owner validates that printer with a raster test print (Settings → Printers) and confirms the
+Arabic lines printed correctly. A validated generic printer gains raster at 576 dots (80 mm) or
+384 dots (58 mm); the validation is stored on the printer and resets when the printer's name,
+resolved profile, or paper width changes.
 
 `resolvePrinterProfile()` resolves in three steps: an explicit `profile_id` if it names a known
 profile, then a substring match against each profile's make, model, and aliases, then the paper
@@ -247,7 +252,8 @@ of the two generic profiles, chosen by paper width.
 
 `capabilitiesForPrinter()` then caps the profile's raster width to the configured paper width when
 that width is narrower than the profile's hardware, so a 42-column configuration on 80 mm hardware
-does not raster at full width.
+does not raster at full width. For a validated generic printer it first applies the validated
+raster (576 dots for 80 mm, 384 for 58 mm), then caps the same way.
 
 ### Capabilities and refusal
 
@@ -324,20 +330,25 @@ steps are in the [printer setup guide](../printers.md#menu-printing).
 
 Raster is an additive, profile-owned capability, not a rendering mode a document selects. A
 profile that declares `raster.enabled` may render text it cannot represent as bitmaps; a profile
-that does not never takes that path. The two declared modes are `mixed`, which rasterizes only the
+that does not never takes that path. A generic profile gains raster only through per-printer
+validation (see Printer profiles above); until then its financial rows are refused rather than
+rasterized. The two declared modes are `mixed`, which rasterizes only the
 rows that need it, and `whole-receipt`, which rasterizes the entire receipt and must be opted into
 explicitly by the caller.
 
-### The diagnostic probe is not reachable from the UI
+### The raster probe validates a generic printer
 
 `buildRasterDiagnosticBands()` in `shared/print/raster.ts` builds a banded diagnostic pattern for
-capability-gated printer testing. It is referenced from exactly one place, the
-`rasterProbe` request-body flag on a printer route in `main/routes/printers.ts`.
-
-**It has no user-interface caller and no test.** The flag is accepted by the route, and nothing in
-the renderer sends it. Treat the band specification in the
-[printer testing guide](../guides/testing-printers.md) as the design record for a diagnostic path,
-not as a feature a merchant can reach today.
+capability-gated printer testing. The printer settings page sends it through the `rasterProbe`
+request-body flag on the test-print route in `main/routes/printers.ts`: the probe page
+(`buildRasterProbePage()` in `main/printers/thermal.ts`) prints the standard test page, then
+Arabic financial-style sample lines rendered as GS v 0 raster, then the diagnostic bands. The
+owner reads the paper and confirms in the UI that the Arabic lines printed correctly; only then
+is the printer's raster validation stored (`POST /api/printers/:id/raster-validate`). A probe
+whose raster rendering fails is refused instead of printing without its Arabic lines. Treat the
+band specification in the
+[printer testing guide](../guides/testing-printers.md) as the design record for the diagnostic
+pattern.
 
 ## Contributing: adding a print concept
 
