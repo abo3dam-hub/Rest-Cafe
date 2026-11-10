@@ -21,7 +21,7 @@ tree.
 | [architecture/overview.md](architecture/overview.md) | You need the map: one process, three ports, three windows, and how they connect. |
 | [reference/product-invariants.md](reference/product-invariants.md) | You are about to change authorization, access control, defaults, refunds, or stock. Read this first. |
 | [AGENTS.md](../AGENTS.md) | You are an agent working in this repository. |
-| [IMPLEMENTATION_REPORT_AR.md](IMPLEMENTATION_REPORT_AR.md) | Arabic implementation report: the running, numbered record of every Rest&Cafe delivery — UI simplification, the Syria fee model and receipt v3, the production-readiness fix round, and the device-trial rounds (point-in-time record, currently at follow-up 46). |
+| [IMPLEMENTATION_REPORT_AR.md](IMPLEMENTATION_REPORT_AR.md) | Arabic implementation report: the running, numbered record of every Rest&Cafe delivery — UI simplification, the Syria fee model and receipt v3, the production-readiness fix round, and the device-trial rounds (point-in-time record, currently at follow-up 50). |
 
 ## Architecture
 
@@ -78,6 +78,7 @@ Procedures for people with release credentials.
 | [upgrade-testing.md](maintainers/upgrade-testing.md) | How upgrade safety is proven for manual installer updates: backups and migration suites; and the restore-onto-a-replacement-host runbook. |
 | [RESTAURANT_PRODUCTION_AUDIT.md](production-readiness/RESTAURANT_PRODUCTION_AUDIT.md) | Independent production-readiness audit: verified capabilities, confirmed defects, risks, and the go/no-go for a real-restaurant pilot. |
 | [RESTAURANT_TEST_MATRIX.md](production-readiness/RESTAURANT_TEST_MATRIX.md) | The production test matrix: scenarios with expected results, executed status, evidence, and the manual pilot checklist. |
+| [PRINTING_FINALIZATION_AUDIT.md](production-readiness/PRINTING_FINALIZATION_AUDIT.md) | Printing finalization Phase A audit (thread 20261110-050): the verified current state of the printing subsystem, findings PF-01 to PF-08, and the PASS / CONDITIONAL / UNVERIFIED classification the finalization phases work from. |
 
 ## Architecture decisions
 
