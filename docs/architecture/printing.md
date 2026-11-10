@@ -236,12 +236,12 @@ so it must not embed device names or user data.
 | `generic-escpos-80` | Generic ESC/POS 80 mm | `cols-48` | 48 |
 | `generic-escpos-58` | Generic ESC/POS 58 mm | `cols-32` | 32 |
 
-The two branded profiles declare `raster.enabled: true` with modes `mixed` and `whole-receipt`,
+The two branded profiles declare `raster.enabled: true` with mode `mixed` only,
 at 576 dots of width. The two generic profiles declare the conservative baseline instead —
 `raster.enabled: false` with zero width — and gain raster only for a single printer after the
 owner validates that printer with a raster test print (Settings → Printers) and confirms the
 Arabic lines printed correctly. A validated generic printer gains raster at 576 dots (80 mm) or
-384 dots (58 mm); the validation is stored on the printer and resets when the printer's name,
+384 dots (58 mm), with mode `mixed` only; the validation is stored on the printer and resets when the printer's name,
 resolved profile, or paper width changes.
 
 `resolvePrinterProfile()` resolves in three steps: an explicit `profile_id` if it names a known
@@ -332,9 +332,10 @@ Raster is an additive, profile-owned capability, not a rendering mode a document
 profile that declares `raster.enabled` may render text it cannot represent as bitmaps; a profile
 that does not never takes that path. A generic profile gains raster only through per-printer
 validation (see Printer profiles above); until then its financial rows are refused rather than
-rasterized. The two declared modes are `mixed`, which rasterizes only the
-rows that need it, and `whole-receipt`, which rasterizes the entire receipt and must be opted into
-explicitly by the caller.
+rasterized. The declared mode is `mixed`, which rasterizes only the
+rows that need it. No shipped profile declares `whole-receipt`, which rasterizes the entire
+receipt; `encodeWholeReceiptRaster` in `shared/print/raster.ts` keeps that path for its unit
+test with synthetic capabilities only.
 
 ### The raster probe validates a generic printer
 
