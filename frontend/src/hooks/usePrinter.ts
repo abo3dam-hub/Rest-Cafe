@@ -24,7 +24,7 @@ import {
 } from '@/lib/printer/print-document';
 import { buildTaxBillBytes, type TaxBillOptions } from '@/lib/printer/tax-bill-encoder';
 import { buildKotBytes, type KotOptions } from '@/lib/printer/kot-encoder';
-import { enqueuePendingPrintJob } from '@/lib/printer/print-queue';
+import { enqueuePendingPrintJob, removePendingPrintJobsForBill } from '@/lib/printer/print-queue';
 import { selectWebUsbPrinter } from '@/lib/printer/webusb-selection';
 import { isKotItemPending } from '@print/document';
 import {
@@ -315,6 +315,15 @@ export const usePrinterStore = create<PrinterState>()(
           );
 
           const isReprint = opts?.isReprint ?? false;
+          // A print that succeeded makes any queued retry for this bill a
+          // duplicate (PF-04); withdraw it before returning success.
+          const withdrawQueuedReceiptRetries = (): void => {
+            try {
+              removePendingPrintJobsForBill(bill.id);
+            } catch {
+              // Queue bookkeeping must never mask a successful print.
+            }
+          };
           const isUnknownCoreTemplate =
             billTemplateSource === null &&
             (billTemplate === 'compact' || billTemplate === 'classic');
@@ -371,6 +380,7 @@ export const usePrinterStore = create<PrinterState>()(
               },
               reservedWindow,
             );
+            withdrawQueuedReceiptRetries();
             return billTemplateWarning
               ? [...browserWarnings, billTemplateWarning]
               : browserWarnings;
@@ -391,6 +401,7 @@ export const usePrinterStore = create<PrinterState>()(
               );
               if (reservedWindow && !reservedWindow.closed) reservedWindow.close();
               windowTransferred = true;
+              withdrawQueuedReceiptRetries();
               return response.data.warnings || [];
             } catch (err: unknown) {
               const e = err as {
@@ -595,6 +606,7 @@ export const usePrinterStore = create<PrinterState>()(
             }
             throw err;
           }
+          withdrawQueuedReceiptRetries();
           return warnings;
         } catch (err) {
           if (!windowTransferred && reservedWindow && !reservedWindow.closed)
