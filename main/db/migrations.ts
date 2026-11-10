@@ -3707,6 +3707,35 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    version: 128,
+    name: 'printer_raster_validation',
+    up: () => {
+      // Per-printer raster validation (PF-01): a generic printer gains
+      // raster only after the owner validates it with a raster test print.
+      // The scope columns pin the validation to the exact printer it was
+      // validated on; a name, profile, or paper-width change resets it at
+      // read time (see isRasterValidatedForPrinter in profiles.ts).
+      const printerColumns = getRawDatabase()
+        .prepare('PRAGMA table_info(printers)')
+        .all()
+        .map((c: any) => c.name);
+      if (!printerColumns.includes('raster_validated')) {
+        getRawDatabase().exec(
+          'ALTER TABLE printers ADD COLUMN raster_validated INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+      if (!printerColumns.includes('raster_validated_profile_id')) {
+        getRawDatabase().exec('ALTER TABLE printers ADD COLUMN raster_validated_profile_id TEXT');
+      }
+      if (!printerColumns.includes('raster_validated_paper_width')) {
+        getRawDatabase().exec('ALTER TABLE printers ADD COLUMN raster_validated_paper_width TEXT');
+      }
+      if (!printerColumns.includes('raster_validated_printer_name')) {
+        getRawDatabase().exec('ALTER TABLE printers ADD COLUMN raster_validated_printer_name TEXT');
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
