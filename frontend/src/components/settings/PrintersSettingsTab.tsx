@@ -11,6 +11,7 @@ import {
   Usb,
   CheckCircle2,
   TestTube2,
+  ScanLine,
   Star,
   Settings,
   Trash2,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/bill-template-picker';
 import { type PaperSize, type BillTemplate } from '@/store/pos-settings';
 import { usePrinterStore } from '@/hooks/usePrinter';
+import { printerService } from '@/lib/printer/PrinterService';
 import api, { LONG_API_REQUEST_TIMEOUT_MS } from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -46,6 +48,7 @@ export type HwPrinter = {
   is_default: number;
   profile_id?: string;
   profile_name?: string;
+  raster_validated?: number;
 };
 
 export type DetectedPrinter = {
@@ -181,6 +184,9 @@ export function PrintersSettingsTab({
   const [editingPrinterId, setEditingPrinterId] = useState<string | null>(null);
   const [savingPrinter, setSavingPrinter] = useState(false);
   const [testingPrinterId, setTestingPrinterId] = useState<string | null>(null);
+  const [rasterProbingPrinterId, setRasterProbingPrinterId] = useState<string | null>(null);
+  const [rasterProbePrinterId, setRasterProbePrinterId] = useState<string | null>(null);
+  const [confirmingRasterPrinterId, setConfirmingRasterPrinterId] = useState<string | null>(null);
   const [detectedPrinters, setDetectedPrinters] = useState<DetectedPrinter[]>([]);
   const [detectingPrinters, setDetectingPrinters] = useState(false);
   const [addingDetectedName, setAddingDetectedName] = useState<string | null>(null);
@@ -362,6 +368,41 @@ export function PrintersSettingsTab({
     }
   };
 
+  // Raster validation for a generic printer: send the probe page (Arabic
+  // financial sample lines through GS v 0), then let the owner confirm on
+  // paper that the lines printed correctly before the flag is set.
+  const probeRasterPrinter = async (printer: HwPrinter) => {
+    setRasterProbingPrinterId(printer.id);
+    try {
+      const res = await api.post(`/printers/${printer.id}/test`, { rasterProbe: true });
+      if (printer.connection_type === 'webusb') {
+        if (!Array.isArray(res.data?.bytes)) throw new Error('WebUSB probe returned no bytes');
+        await printerService.printToConfiguredDevice(Uint8Array.from(res.data.bytes), printer.name);
+      }
+      setRasterProbePrinterId(printer.id);
+      toast.success(t('rasterProbeSent'));
+    } catch (err) {
+      toast.error(printerErrorMessage(err, t('rasterProbeFailed')));
+    } finally {
+      setRasterProbingPrinterId(null);
+    }
+  };
+
+  const confirmRasterValidation = async (printer: HwPrinter) => {
+    setConfirmingRasterPrinterId(printer.id);
+    try {
+      await api.post(`/printers/${printer.id}/raster-validate`, { confirmed: true });
+      toast.success(t('rasterValidationSaved'));
+      setRasterProbePrinterId(null);
+      fetchPrinters();
+      refreshHardwarePrinter();
+    } catch (err) {
+      toast.error(printerErrorMessage(err, t('rasterValidationFailed')));
+    } finally {
+      setConfirmingRasterPrinterId(null);
+    }
+  };
+
   return (
     <SettingsTabShell maxWidth="wide">
       <div className="space-y-6">
@@ -516,81 +557,123 @@ export function PrintersSettingsTab({
             </h3>
           )}
           <div className="space-y-3">
-            {hwPrinters.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center gap-3 rounded-xl border p-4 ${
-                  p.is_default ? 'border-brand bg-brand/5' : 'border-border'
-                }`}
-              >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-muted shrink-0">
-                  {p.connection_type === 'network' ? (
-                    <Wifi size={18} className="text-muted-foreground" />
-                  ) : p.connection_type === 'webusb' ? (
-                    <Usb size={18} className="text-blue-500" />
-                  ) : (
-                    <Usb size={18} className="text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground text-sm">{p.name}</span>
-                    {p.is_default === 1 && (
-                      <span className="text-[10px] bg-brand/10 text-brand px-2 py-0.5 rounded-full font-medium">
-                        {t('defaultPrinter')}
-                      </span>
-                    )}
+            {hwPrinters.map((p) => {
+              const isGeneric =
+                typeof p.profile_id === 'string' && p.profile_id.startsWith('generic-');
+              const isRasterValidated = p.raster_validated === 1;
+              const probePending = rasterProbePrinterId === p.id;
+              return (
+                <div key={p.id} className="space-y-2">
+                  <div
+                    className={`flex items-center gap-3 rounded-xl border p-4 ${
+                      p.is_default ? 'border-brand bg-brand/5' : 'border-border'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-muted shrink-0">
+                      {p.connection_type === 'network' ? (
+                        <Wifi size={18} className="text-muted-foreground" />
+                      ) : p.connection_type === 'webusb' ? (
+                        <Usb size={18} className="text-blue-500" />
+                      ) : (
+                        <Usb size={18} className="text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground text-sm">{p.name}</span>
+                        {p.is_default === 1 && (
+                          <span className="text-[10px] bg-brand/10 text-brand px-2 py-0.5 rounded-full font-medium">
+                            {t('defaultPrinter')}
+                          </span>
+                        )}
+                        {isGeneric && isRasterValidated && (
+                          <span className="text-[10px] bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full font-medium">
+                            {t('rasterValidated')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {p.connection_type === 'network' ? (
+                          <Ltr>
+                            {p.ip_address}:{p.port}
+                          </Ltr>
+                        ) : p.connection_type === 'usb' ? (
+                          t('connectionUsb')
+                        ) : (
+                          t('browserWebusb')
+                        )}
+                        {' · '}
+                        {printWidthLabel(p.paper_width)}
+                        {p.profile_name ? ` · ${p.profile_name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isGeneric && !isRasterValidated && (
+                        <button
+                          onClick={() => probeRasterPrinter(p)}
+                          disabled={rasterProbingPrinterId === p.id}
+                          title={t('rasterProbeTest')}
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40"
+                        >
+                          <ScanLine size={15} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => testPrinterHw(p)}
+                        disabled={testingPrinterId === p.id}
+                        title={t('testPrint')}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <TestTube2 size={15} />
+                      </button>
+                      {p.is_default !== 1 && (
+                        <button
+                          onClick={() => setDefaultPrinter(p.id)}
+                          title={t('setAsDefault')}
+                          className="p-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-950/40 text-muted-foreground hover:text-yellow-600 dark:hover:text-yellow-400"
+                        >
+                          <Star size={15} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openEditPrinter(p)}
+                        title={t('edit')}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                      >
+                        <Settings size={15} />
+                      </button>
+                      <button
+                        onClick={() => deletePrinterHw(p.id)}
+                        title={t('delete')}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {p.connection_type === 'network' ? (
-                      <Ltr>
-                        {p.ip_address}:{p.port}
-                      </Ltr>
-                    ) : p.connection_type === 'usb' ? (
-                      t('connectionUsb')
-                    ) : (
-                      t('browserWebusb')
-                    )}
-                    {' · '}
-                    {printWidthLabel(p.paper_width)}
-                    {p.profile_name ? ` · ${p.profile_name}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => testPrinterHw(p)}
-                    disabled={testingPrinterId === p.id}
-                    title={t('testPrint')}
-                    className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40"
-                  >
-                    <TestTube2 size={15} />
-                  </button>
-                  {p.is_default !== 1 && (
-                    <button
-                      onClick={() => setDefaultPrinter(p.id)}
-                      title={t('setAsDefault')}
-                      className="p-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-950/40 text-muted-foreground hover:text-yellow-600 dark:hover:text-yellow-400"
-                    >
-                      <Star size={15} />
-                    </button>
+                  {isGeneric && !isRasterValidated && probePending && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30 p-4">
+                      <p className="text-xs text-foreground">{t('rasterProbeConfirmPrompt')}</p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => confirmRasterValidation(p)}
+                          disabled={confirmingRasterPrinterId === p.id}
+                          className="px-3 py-1.5 text-xs bg-brand text-white rounded-lg hover:opacity-90 disabled:opacity-50 font-medium"
+                        >
+                          {t('rasterProbeConfirm')}
+                        </button>
+                        <button
+                          onClick={() => setRasterProbePrinterId(null)}
+                          className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted font-medium"
+                        >
+                          {t('rasterProbeNotPrinted')}
+                        </button>
+                      </div>
+                    </div>
                   )}
-                  <button
-                    onClick={() => openEditPrinter(p)}
-                    title={t('edit')}
-                    className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                  >
-                    <Settings size={15} />
-                  </button>
-                  <button
-                    onClick={() => deletePrinterHw(p.id)}
-                    title={t('delete')}
-                    className="p-2 rounded-lg hover:bg-red-50 text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 size={15} />
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Add / Edit form */}
