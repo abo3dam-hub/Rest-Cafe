@@ -8,6 +8,10 @@
  * 4. KOT tickets never printing business logo.
  * 5. Multi-width raster variant selection (384 dots for 58mm, 576 dots for 80mm).
  * 6. Settings API logo validation (payload size limits, data URL validation).
+ * 7. PF-02 logo raster gate: logo bands emit only when the effective
+ *    capabilities have raster on; a configured logo suppressed by the gate
+ *    warns (backend classic path and frontend classic/compact encoders),
+ *    including the native-fallback capability shape (raster off, width kept).
  */
 
 import * as fs from 'node:fs';
@@ -38,9 +42,16 @@ import {
   getLogoRasterBands,
   type ReceiptLogoData,
 } from '../shared/print/image-raster';
+import {
+  GENERIC_THERMAL_CAPABILITIES,
+  type ThermalPrinterCapabilities,
+} from '../shared/print/thermal-capabilities';
+import type { PrintWarning } from '../shared/print/warnings';
 import { buildBillDocument, getBlock, type BusinessHeaderBlock } from '../shared/print/document';
 import { buildBillPrintData } from '../main/printers/document-classic';
 import { formatReceipt, formatKOT } from '../main/printers/thermal';
+import { loadFrontendPrintModules } from './helpers/receipt-column-measure';
+import { buildParityFixtures } from './print-parity.test';
 import { settingsRoutes } from '../main/routes/settings';
 import {
   initTestDb,
@@ -61,6 +72,37 @@ function uint8ToBase64(bytes: Uint8Array): string {
   }
   return Buffer.from(binary, 'binary').toString('base64');
 }
+
+/** GS v 0 signature: 0x1D 0x76 0x30 0x00. */
+function hasGsV0(bytes: Uint8Array): boolean {
+  for (let i = 0; i < bytes.length - 4; i += 1) {
+    if (
+      bytes[i] === 0x1d &&
+      bytes[i + 1] === 0x76 &&
+      bytes[i + 2] === 0x30 &&
+      bytes[i + 3] === 0x00
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function logoSuppressedWarnings(warnings: readonly PrintWarning[]): PrintWarning[] {
+  return warnings.filter((warning) => warning.field === 'receipt logo');
+}
+
+/** Raster on: a validated generic / branded profile (576 dots, 80mm). */
+const RASTER_ON_CAPABILITIES: ThermalPrinterCapabilities = {
+  ...GENERIC_THERMAL_CAPABILITIES,
+  raster: { enabled: true, widthDots: 576, maxBandHeight: 200, modes: ['mixed'] },
+};
+
+/** Native-fallback shape (Phase A probe): raster off, width kept at 576. */
+const NATIVE_FALLBACK_CAPABILITIES: ThermalPrinterCapabilities = {
+  ...GENERIC_THERMAL_CAPABILITIES,
+  raster: { enabled: false, widthDots: 576, maxBandHeight: 200, modes: [] },
+};
 
 function createSampleLogoData(): { logoUrl: string; rasterJson: string } {
   const logoUrl =
@@ -258,6 +300,7 @@ async function run() {
 
   console.log('--- 3. ESC/POS byte generation ---');
 
+  const rasterOnWarnings: PrintWarning[] = [];
   const receiptBytesWithLogo = formatReceipt(
     dummyOrder,
     dummyBill,
@@ -272,24 +315,24 @@ async function run() {
     },
     'classic',
     32,
+    false,
+    false,
+    'full',
+    rasterOnWarnings,
+    false,
+    undefined,
+    undefined,
+    RASTER_ON_CAPABILITIES,
   );
 
-  // GS v 0 signature: 0x1D 0x76 0x30 0x00
-  let foundGsV0 = false;
-  for (let i = 0; i < receiptBytesWithLogo.length - 4; i += 1) {
-    if (
-      receiptBytesWithLogo[i] === 0x1d &&
-      receiptBytesWithLogo[i + 1] === 0x76 &&
-      receiptBytesWithLogo[i + 2] === 0x30 &&
-      receiptBytesWithLogo[i + 3] === 0x00
-    ) {
-      foundGsV0 = true;
-      break;
-    }
-  }
   assertOrThrow(
-    foundGsV0,
+    hasGsV0(receiptBytesWithLogo),
     'Receipt ESC/POS bytes should contain GS v 0 raster command when show_logo is true',
+  );
+  assertEqualOrThrow(
+    logoSuppressedWarnings(rasterOnWarnings).length,
+    0,
+    'No logo-suppressed warning when raster is on',
   );
 
   const receiptBytesWithoutLogo = formatReceipt(
@@ -308,39 +351,15 @@ async function run() {
     32,
   );
 
-  let foundGsV0WithoutLogo = false;
-  for (let i = 0; i < receiptBytesWithoutLogo.length - 4; i += 1) {
-    if (
-      receiptBytesWithoutLogo[i] === 0x1d &&
-      receiptBytesWithoutLogo[i + 1] === 0x76 &&
-      receiptBytesWithoutLogo[i + 2] === 0x30 &&
-      receiptBytesWithoutLogo[i + 3] === 0x00
-    ) {
-      foundGsV0WithoutLogo = true;
-      break;
-    }
-  }
   assertOrThrow(
-    !foundGsV0WithoutLogo,
+    !hasGsV0(receiptBytesWithoutLogo),
     'Receipt ESC/POS bytes should not contain GS v 0 command when show_logo is false',
   );
 
   console.log('--- 4. KOT kitchen tickets invariant: never print logo ---');
   const kotBytes = formatKOT(dummyOrder, dummyOrder.items, 'Kitchen', 32);
 
-  let kotHasGsV0 = false;
-  for (let i = 0; i < kotBytes.length - 4; i += 1) {
-    if (
-      kotBytes[i] === 0x1d &&
-      kotBytes[i + 1] === 0x76 &&
-      kotBytes[i + 2] === 0x30 &&
-      kotBytes[i + 3] === 0x00
-    ) {
-      kotHasGsV0 = true;
-      break;
-    }
-  }
-  assertOrThrow(!kotHasGsV0, 'KOT ticket must never contain GS v 0 logo command');
+  assertOrThrow(!hasGsV0(kotBytes), 'KOT ticket must never contain GS v 0 logo command');
 
   console.log('--- 5. Settings API validation and persistence ---');
   const db = initTestDb();
@@ -485,6 +504,130 @@ async function run() {
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     closeDatabase();
+  }
+
+  console.log('--- 6. PF-02 logo raster gate (backend classic path) ---');
+  const logoBusiness = {
+    name: 'Flo Cafe',
+    country: 'US',
+    currency: 'USD',
+    show_logo: true,
+    receipt_logo: logoUrl,
+    receipt_logo_raster: rasterJson,
+    show_name: true,
+  };
+  const renderWithCaps = (capabilities?: ThermalPrinterCapabilities) => {
+    const warnings: PrintWarning[] = [];
+    const bytes = formatReceipt(
+      dummyOrder,
+      dummyBill,
+      logoBusiness,
+      'classic',
+      32,
+      false,
+      false,
+      'full',
+      warnings,
+      false,
+      undefined,
+      undefined,
+      capabilities,
+    );
+    return { bytes, warnings };
+  };
+
+  // Raster on: logo emitted, no suppression warning.
+  const rasterOn = renderWithCaps(RASTER_ON_CAPABILITIES);
+  assertOrThrow(hasGsV0(rasterOn.bytes), 'Raster-on render should emit GS v 0 logo bands');
+  assertEqualOrThrow(
+    logoSuppressedWarnings(rasterOn.warnings).length,
+    0,
+    'Raster-on render should not warn about the logo',
+  );
+
+  // Native-fallback shape (raster off, width kept): logo suppressed + warning.
+  const nativeFallback = renderWithCaps(NATIVE_FALLBACK_CAPABILITIES);
+  assertOrThrow(
+    !hasGsV0(nativeFallback.bytes),
+    'Native-fallback render (raster off) should not emit GS v 0 logo bands',
+  );
+  assertEqualOrThrow(
+    logoSuppressedWarnings(nativeFallback.warnings).length,
+    1,
+    'Native-fallback render should warn once that the logo was suppressed',
+  );
+  assertEqualOrThrow(
+    logoSuppressedWarnings(nativeFallback.warnings)[0].kind,
+    'configuration',
+    'Logo-suppressed warning should be a configuration warning',
+  );
+
+  // Strict generic baseline (raster off, width 0): logo suppressed + warning.
+  const strictBaseline = renderWithCaps(GENERIC_THERMAL_CAPABILITIES);
+  assertOrThrow(
+    !hasGsV0(strictBaseline.bytes),
+    'Strict-baseline render (raster off) should not emit GS v 0 logo bands',
+  );
+  assertEqualOrThrow(
+    logoSuppressedWarnings(strictBaseline.warnings).length,
+    1,
+    'Strict-baseline render should warn once that the logo was suppressed',
+  );
+
+  // No effective capabilities at all: no raster on, so suppressed + warning.
+  const noCaps = renderWithCaps(undefined);
+  assertOrThrow(!hasGsV0(noCaps.bytes), 'Render without capabilities should not emit GS v 0');
+  assertEqualOrThrow(
+    logoSuppressedWarnings(noCaps.warnings).length,
+    1,
+    'Render without capabilities should warn once that the logo was suppressed',
+  );
+
+  console.log('--- 7. PF-02 logo raster gate (frontend classic/compact encoders) ---');
+  const fe = loadFrontendPrintModules();
+  const { bill: parityBill, tenant: parityTenant } = buildParityFixtures();
+  const feRender = (
+    build: (bill: any, tenant: any, opts: any, warnings: any) => Uint8Array,
+    capabilities?: ThermalPrinterCapabilities,
+  ) => {
+    const warnings: PrintWarning[] = [];
+    const bytes = build(
+      parityBill as any,
+      parityTenant as any,
+      {
+        paperWidth: 80,
+        showLogo: true,
+        receiptLogoRaster: rasterJson,
+        capabilities,
+      } as any,
+      warnings as any,
+    );
+    return { bytes, warnings };
+  };
+  for (const [name, build] of [
+    ['classic', fe.receiptEncoder.buildClassicReceiptBytes],
+    ['compact', fe.receiptEncoder.buildCompactReceiptBytes],
+  ] as const) {
+    const on = feRender(build, RASTER_ON_CAPABILITIES);
+    assertOrThrow(
+      hasGsV0(on.bytes),
+      `Frontend ${name} encoder with raster on should emit GS v 0 logo bands`,
+    );
+    assertEqualOrThrow(
+      logoSuppressedWarnings(on.warnings).length,
+      0,
+      `Frontend ${name} encoder with raster on should not warn about the logo`,
+    );
+    const fallback = feRender(build, NATIVE_FALLBACK_CAPABILITIES);
+    assertOrThrow(
+      !hasGsV0(fallback.bytes),
+      `Frontend ${name} encoder with native-fallback caps should not emit GS v 0 logo bands`,
+    );
+    assertEqualOrThrow(
+      logoSuppressedWarnings(fallback.warnings).length,
+      1,
+      `Frontend ${name} encoder with native-fallback caps should warn once that the logo was suppressed`,
+    );
   }
 
   console.log('✅ All receipt logo printing tests passed successfully!');
