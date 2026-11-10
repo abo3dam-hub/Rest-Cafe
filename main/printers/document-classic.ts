@@ -19,9 +19,11 @@ import {
 import {
   concatBytes,
   encodeGsV0Band,
+  rasterCapabilityEnabled,
   type RasterSemanticLineGroup,
   type RasterTextLayout,
 } from '../../shared/print/raster';
+import { makeLogoRasterSuppressedWarning } from '../../shared/print/warnings';
 import { getLogoRasterBands } from '../../shared/print/image-raster';
 import {
   displayCellWidth,
@@ -282,6 +284,8 @@ export interface ClassicDocumentRenderOptions {
   readonly maskCustomerPhone?: boolean;
   readonly rasterGroups?: RasterSemanticLineGroup[];
   readonly financialLineRanges?: Array<{ lineIndex: number; lineCount: number }>;
+  /** Sink for non-financial warnings (e.g. a logo suppressed by the raster gate). */
+  readonly warnings?: PrintWarning[];
 }
 
 function labelOf(label: SemanticLabel): string {
@@ -630,14 +634,23 @@ export function renderBillDocumentToClassicLines(
       case 'business-header': {
         const segment = segmentOf('business-header');
         if (block.logoRaster) {
-          const widthDots = options.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
-          const maxBandHeight = options.capabilities?.raster?.maxBandHeight ?? 200;
-          const bands = getLogoRasterBands(block.logoRaster, widthDots, maxBandHeight);
-          if (bands.length > 0) {
-            const rawBytes = concatBytes(bands.map((band) => encodeGsV0Band(band, maxBandHeight)));
-            segment.main.push(`{RAW_BYTES:${Buffer.from(rawBytes).toString('base64')}}`);
-            segment.sourceLines.main.push('[Logo]');
-            segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
+          // PF-02: logo bands are raster output, so they follow the raster
+          // gate — a native-fallback render (raster off, width kept) must
+          // not emit GS v 0. A suppressed logo warns instead of vanishing.
+          if (rasterCapabilityEnabled(options.capabilities)) {
+            const widthDots = options.capabilities?.raster?.widthDots ?? (cols <= 32 ? 384 : 576);
+            const maxBandHeight = options.capabilities?.raster?.maxBandHeight ?? 200;
+            const bands = getLogoRasterBands(block.logoRaster, widthDots, maxBandHeight);
+            if (bands.length > 0) {
+              const rawBytes = concatBytes(
+                bands.map((band) => encodeGsV0Band(band, maxBandHeight)),
+              );
+              segment.main.push(`{RAW_BYTES:${Buffer.from(rawBytes).toString('base64')}}`);
+              segment.sourceLines.main.push('[Logo]');
+              segment.sourceControlLines.main.push(segment.main.at(-1) ?? '');
+            }
+          } else {
+            options.warnings?.push(makeLogoRasterSuppressedWarning());
           }
         }
         if (block.name) {
@@ -1433,6 +1446,7 @@ export function renderClassicReceiptViaDocument(
     preserveCurrencySymbol: opts.preserveCurrencySymbol,
     rasterGroups,
     financialLineRanges,
+    warnings,
   });
   const data = buildEscPos(
     lines,
